@@ -66,6 +66,17 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         return dto.Items.Select(MapPlayHistoryItem).ToArray();
     }
 
+    public Task PromoteQueueItemAsync(int queueId, CancellationToken cancellationToken = default)
+    {
+        ValidateQueueId(queueId);
+        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/{queueId}/play", cancellationToken);
+    }
+
+    public Task MarkPlayingSongAsPlayedAsync(CancellationToken cancellationToken = default)
+    {
+        return SendWithoutResponseAsync(HttpMethod.Post, "queue/played?position=playing", cancellationToken);
+    }
+
     private async Task<T> GetAsync<T>(string relativeUrl, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(relativeUrl));
@@ -91,6 +102,22 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
                 response.StatusCode,
                 ex);
         }
+    }
+
+    private async Task SendWithoutResponseAsync(
+        HttpMethod method,
+        string relativeUrl,
+        CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(method, BuildUri(relativeUrl));
+        await AddCredentialAsync(request, cancellationToken);
+
+        using var response = await _http.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        if (!response.IsSuccessStatusCode)
+            throw await CreateApiExceptionAsync(response, cancellationToken);
     }
 
     private async ValueTask AddCredentialAsync(
@@ -138,6 +165,12 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         return $"streamer_name={Uri.EscapeDataString(name)}&platform={Uri.EscapeDataString(platform)}";
     }
 
+    private static void ValidateQueueId(int queueId)
+    {
+        if (queueId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(queueId), "A positive queue entry ID is required.");
+    }
+
     private DateTimeOffset? GetPlayedAfter(string period)
     {
         var now = _timeProvider.GetUtcNow();
@@ -156,6 +189,7 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         var title = item.Song?.Title;
         return new SpinnerQueueItem
         {
+            QueueId = item.Id,
             Position = item.Position,
             Song = new SpinnerSong
             {

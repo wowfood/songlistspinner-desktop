@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace SonglistSpinner.Core.Data;
 
 public class SettingsDto
@@ -15,7 +17,8 @@ public class SettingsDto
     public bool ExcludePlayedSongs { get; set; }
     public string PlayedListPosition { get; set; } = "right";
     public string PlayHistoryPeriod { get; set; } = "week";
-    public bool AutoPlay { get; set; }
+    [JsonPropertyName("AutoPlay")]
+    public bool UpdateQueueAfterSpin { get; set; }
     public bool DebugMode { get; set; }
     public string ColorText { get; set; } = "#ffffff";
     public string ColorStatusBackground { get; set; } = "rgba(0, 0, 0, 0.7)";

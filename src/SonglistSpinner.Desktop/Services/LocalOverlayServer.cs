@@ -616,15 +616,13 @@ public class LocalOverlayServer : IAsyncDisposable
                                        </html>
                                        """;
 
-    private readonly TwitchAuthService _auth;
     private readonly CancellationTokenSource _cts = new();
     private readonly OverlayStateService _overlay;
     private HttpListener? _listener;
 
-    public LocalOverlayServer(OverlayStateService overlay, TwitchAuthService auth)
+    public LocalOverlayServer(OverlayStateService overlay)
     {
         _overlay = overlay;
-        _auth = auth;
     }
 
     public async ValueTask DisposeAsync()
@@ -648,7 +646,6 @@ public class LocalOverlayServer : IAsyncDisposable
     {
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://localhost:{_overlay.Port}/");
-        _listener.Prefixes.Add("http://localhost:3000/auth/");
         try
         {
             _listener.Start();
@@ -717,9 +714,6 @@ public class LocalOverlayServer : IAsyncDisposable
                 case "/overlay/events":
                     await ServeSSEAsync(context, ct);
                     break;
-                case "/auth/callback":
-                    await ServeAuthCallbackAsync(context);
-                    break;
                 default:
                     context.Response.StatusCode = 404;
                     context.Response.Close();
@@ -773,31 +767,4 @@ public class LocalOverlayServer : IAsyncDisposable
         }
     }
 
-    private async Task ServeAuthCallbackAsync(HttpListenerContext context)
-    {
-        var query = context.Request.QueryString;
-        var code = query["code"];
-        var state = query["state"];
-        var error = query["error"];
-
-        string message;
-        if (!string.IsNullOrEmpty(error) || string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
-        {
-            message = "Login failed or was cancelled. You can close this tab.";
-        }
-        else
-        {
-            var ok = await _auth.CompleteOAuthAsync(code, state);
-            message = ok ? "Login successful! You can close this tab." : "Login failed. You can close this tab.";
-        }
-
-        var html = "<!DOCTYPE html><html><head><meta charset=\"utf-8\">" +
-                   "<style>body{font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;background:#0e0e10;color:#efeff1}h2{color:#9147ff}</style>" +
-                   $"</head><body><h2>{message}</h2></body></html>";
-        var bytes = Encoding.UTF8.GetBytes(html);
-        context.Response.ContentType = "text/html; charset=utf-8";
-        context.Response.ContentLength64 = bytes.Length;
-        await context.Response.OutputStream.WriteAsync(bytes);
-        context.Response.Close();
-    }
 }

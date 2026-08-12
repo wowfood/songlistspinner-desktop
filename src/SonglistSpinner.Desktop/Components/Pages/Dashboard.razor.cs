@@ -40,6 +40,7 @@ public partial class Dashboard
     private bool _wheelVisible = true;
     private string _winnerDetails = "";
     private string _winnerMainLine = "";
+    private bool _winnerPromoted;
     private bool _winnerVisible;
 
     public async ValueTask DisposeAsync()
@@ -161,6 +162,7 @@ public partial class Dashboard
         _lastSpinTime = DateTime.UtcNow;
         _spinDisabled = true;
         _isSpinning = true;
+        _winnerPromoted = false;
         _wheelCts.Cancel();
         _wheelCts.Dispose();
         _wheelCts = new CancellationTokenSource();
@@ -200,8 +202,18 @@ public partial class Dashboard
             await Task.Delay(5100);
             ShowWinnerModal(winner);
             SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(winner)}");
-            if (LocalSettings.LoadSettings().AutoPlay)
-                _ = TwitchChat.SendCommandAsync($"!setSong {winner.Position} to 1");
+            if (LocalSettings.LoadSettings().UpdateQueueAfterSpin)
+            {
+                try
+                {
+                    await ApiService.PromoteQueueItemAsync(winner.QueueId);
+                    _winnerPromoted = true;
+                }
+                catch (Exception ex)
+                {
+                    SetStatus($"Winner selected, but the queue update failed: {ex.Message}");
+                }
+            }
             StateHasChanged();
 
             for (var i = 1; i >= 0; i--)
@@ -268,8 +280,19 @@ public partial class Dashboard
         _winnerVisible = false;
         _isSpinning = false;
         _ = OverlayService.BroadcastCloseWinnerAsync();
-        if (LocalSettings.LoadSettings().AutoPlay)
-            _ = TwitchChat.SendCommandAsync("!setPlayed");
+        if (LocalSettings.LoadSettings().UpdateQueueAfterSpin && _winnerPromoted)
+        {
+            try
+            {
+                await ApiService.MarkPlayingSongAsPlayedAsync();
+            }
+            catch (Exception ex)
+            {
+                SetStatus($"The winner closed, but marking it played failed: {ex.Message}");
+            }
+        }
+
+        _winnerPromoted = false;
         _playedRefreshCts?.Cancel();
         _playedRefreshCts = new CancellationTokenSource();
         _ = RefreshAfterWinnerAsync(_playedRefreshCts.Token);

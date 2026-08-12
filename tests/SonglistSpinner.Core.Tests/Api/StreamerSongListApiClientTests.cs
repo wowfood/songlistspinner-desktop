@@ -39,6 +39,7 @@ public class StreamerSongListApiClientTests
             TestContext.Current.CancellationToken);
 
         var item = Assert.Single(result);
+        Assert.Equal(91, item.QueueId);
         Assert.Equal(4, item.Position);
         Assert.Equal(42, item.Song.Id);
         Assert.Equal("Artist", item.Song.Artist);
@@ -76,6 +77,42 @@ public class StreamerSongListApiClientTests
 
         Assert.Equal("User", handler.Authorization?.Scheme);
         Assert.Null(handler.ClientId);
+    }
+
+    [Fact]
+    public async Task Given_QueueId_When_PromoteQueueItemAsync_Then_PostsToPlayEndpoint()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(handler);
+
+        await client.PromoteQueueItemAsync(91, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("https://example.test/queue/91/play", handler.RequestUri?.AbsoluteUri);
+        Assert.Equal("Streamer", handler.Authorization?.Scheme);
+    }
+
+    [Fact]
+    public async Task Given_PromotedWinner_When_MarkPlayingSongAsPlayedAsync_Then_PostsPlayingPosition()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("{}"));
+        var client = CreateClient(handler);
+
+        await client.MarkPlayingSongAsPlayedAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("https://example.test/queue/played?position=playing", handler.RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task Given_InvalidQueueId_When_PromoteQueueItemAsync_Then_RejectsRequest()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("{}"));
+        var client = CreateClient(handler);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            client.PromoteQueueItemAsync(0, TestContext.Current.CancellationToken));
+        Assert.Equal(0, handler.RequestCount);
     }
 
     [Fact]
@@ -206,6 +243,7 @@ public class StreamerSongListApiClientTests
     {
         public AuthenticationHeaderValue? Authorization { get; private set; }
         public string? ClientId { get; private set; }
+        public HttpMethod? Method { get; private set; }
         public int RequestCount { get; private set; }
         public Uri? RequestUri { get; private set; }
 
@@ -214,6 +252,7 @@ public class StreamerSongListApiClientTests
             CancellationToken cancellationToken)
         {
             RequestCount++;
+            Method = request.Method;
             RequestUri = request.RequestUri;
             Authorization = request.Headers.Authorization;
             ClientId = request.Headers.TryGetValues("Client-Id", out var values)

@@ -30,8 +30,6 @@ public static class MauiProgram
         builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
         builder.Services.AddScoped<ISpinnerSyncService, NoOpSyncService>();
         builder.Services.AddSingleton<OverlayStateService>();
-        builder.Services.AddSingleton<TwitchAuthService>();
-        builder.Services.AddSingleton<TwitchChatService>();
         builder.Services.AddSingleton<LocalOverlayServer>();
 
 #if DEBUG

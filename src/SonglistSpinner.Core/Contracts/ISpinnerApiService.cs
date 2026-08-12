@@ -12,4 +12,10 @@ public interface ISpinnerApiService
         StreamerSongListChannel channel,
         string period = "week",
         CancellationToken cancellationToken = default);
+
+    Task PromoteQueueItemAsync(
+        int queueId,
+        CancellationToken cancellationToken = default);
+
+    Task MarkPlayingSongAsPlayedAsync(CancellationToken cancellationToken = default);
 }
