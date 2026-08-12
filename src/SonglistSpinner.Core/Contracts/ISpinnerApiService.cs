@@ -13,9 +13,7 @@ public interface ISpinnerApiService
         string period = "week",
         CancellationToken cancellationToken = default);
 
-    Task PromoteQueueItemAsync(
+    Task MarkQueueItemAsPlayedAsync(
         int queueId,
         CancellationToken cancellationToken = default);
-
-    Task MarkPlayingSongAsPlayedAsync(CancellationToken cancellationToken = default);
 }

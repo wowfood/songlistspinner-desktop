@@ -67,15 +67,10 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         return (dto.Items ?? []).Select(MapPlayHistoryItem).ToArray();
     }
 
-    public Task PromoteQueueItemAsync(int queueId, CancellationToken cancellationToken = default)
+    public Task MarkQueueItemAsPlayedAsync(int queueId, CancellationToken cancellationToken = default)
     {
         ValidateQueueId(queueId);
-        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/{queueId}/play", cancellationToken);
-    }
-
-    public Task MarkPlayingSongAsPlayedAsync(CancellationToken cancellationToken = default)
-    {
-        return SendWithoutResponseAsync(HttpMethod.Post, "queue/played?position=playing", cancellationToken);
+        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/played?queue_id={queueId}", cancellationToken);
     }
 
     private async Task<T> GetAsync<T>(string relativeUrl, CancellationToken cancellationToken)

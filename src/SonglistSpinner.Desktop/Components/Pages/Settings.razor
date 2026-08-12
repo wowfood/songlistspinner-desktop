@@ -97,9 +97,9 @@ else
                     <div class="ss-field">
                         <label>
                             <InputCheckbox @bind-Value="_dto.UpdateQueueAfterSpin"/>
-                            Update now-playing and play history after each spin
+                            Mark the winner as played when its popup closes
                         </label>
-                        <div class="ss-field-hint">Uses the StreamerSongList API directly. A streamer token has full queue access for its own channel.</div>
+                        <div class="ss-field-hint">Moves the selected queue entry directly into play history without using the now-playing state.</div>
                     </div>
                 </section>
 

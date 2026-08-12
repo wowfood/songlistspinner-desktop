@@ -8,8 +8,7 @@ The typed client currently uses:
 
 - `GET /queue?streamer_name={name}&platform={platform}`
 - `GET /play_history?streamer_name={name}&platform={platform}&limit=100&order_by=played_at&order_dir=desc`
-- `POST /queue/{queueId}/play` to promote the selected winner to now-playing
-- `POST /queue/played?position=playing` to record the promoted winner in play history
+- `POST /queue/played?queue_id={queueId}` to move the selected winner directly into play history when its popup closes
 
 Supported platform values are `twitch`, `youtube`, `kick`, and `none`. Queue and play-history transport DTOs are internal to the v2 client and are mapped to the existing `SpinnerQueueItem` and `PlayHistoryItem` models.
 

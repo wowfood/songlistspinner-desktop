@@ -120,38 +120,26 @@ public class StreamerSongListApiClientTests
     }
 
     [Fact]
-    public async Task Given_QueueId_When_PromoteQueueItemAsync_Then_PostsToPlayEndpoint()
+    public async Task Given_QueueId_When_MarkQueueItemAsPlayedAsync_Then_PostsQueueId()
     {
         var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
         var client = CreateClient(handler);
 
-        await client.PromoteQueueItemAsync(91, TestContext.Current.CancellationToken);
+        await client.MarkQueueItemAsPlayedAsync(91, TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpMethod.Post, handler.Method);
-        Assert.Equal("https://example.test/queue/91/play", handler.RequestUri?.AbsoluteUri);
+        Assert.Equal("https://example.test/queue/played?queue_id=91", handler.RequestUri?.AbsoluteUri);
         Assert.Equal("Streamer", handler.Authorization?.Scheme);
     }
 
     [Fact]
-    public async Task Given_PromotedWinner_When_MarkPlayingSongAsPlayedAsync_Then_PostsPlayingPosition()
-    {
-        var handler = new RecordingHandler(_ => JsonResponse("{}"));
-        var client = CreateClient(handler);
-
-        await client.MarkPlayingSongAsPlayedAsync(TestContext.Current.CancellationToken);
-
-        Assert.Equal(HttpMethod.Post, handler.Method);
-        Assert.Equal("https://example.test/queue/played?position=playing", handler.RequestUri?.AbsoluteUri);
-    }
-
-    [Fact]
-    public async Task Given_InvalidQueueId_When_PromoteQueueItemAsync_Then_RejectsRequest()
+    public async Task Given_InvalidQueueId_When_MarkQueueItemAsPlayedAsync_Then_RejectsRequest()
     {
         var handler = new RecordingHandler(_ => JsonResponse("{}"));
         var client = CreateClient(handler);
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
-            client.PromoteQueueItemAsync(0, TestContext.Current.CancellationToken));
+            client.MarkQueueItemAsPlayedAsync(0, TestContext.Current.CancellationToken));
         Assert.Equal(0, handler.RequestCount);
     }
 
