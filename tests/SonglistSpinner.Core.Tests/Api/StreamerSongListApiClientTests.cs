@@ -66,6 +66,46 @@ public class StreamerSongListApiClientTests
     }
 
     [Fact]
+    public async Task Given_NullRequestCollection_When_FetchQueueAsync_Then_MapsEmptyRequests()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(
+            """
+            {
+              "items": [{
+                "id": 92,
+                "position": 1,
+                "nonlistSong": "",
+                "requests": null,
+                "song": { "artist": "Artist", "title": "Unrequested Song" },
+                "songId": 43
+              }],
+              "playing": null,
+              "total": 1
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var result = await client.FetchQueueAsync(
+            new StreamerSongListChannel("wowfood"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(Assert.Single(result).Requests);
+    }
+
+    [Fact]
+    public async Task Given_NullItems_When_FetchQueueAsync_Then_ReturnsEmptyQueue()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("""{"items":null,"playing":null,"total":0}"""));
+        var client = CreateClient(handler);
+
+        var result = await client.FetchQueueAsync(
+            new StreamerSongListChannel("wowfood"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
     public async Task Given_UserCredential_When_FetchQueueAsync_Then_UsesUserAuthorizationScheme()
     {
         var handler = new RecordingHandler(_ => JsonResponse("""{"items":[],"playing":null,"total":0}"""));

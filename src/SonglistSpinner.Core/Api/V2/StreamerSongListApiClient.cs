@@ -47,7 +47,7 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
     {
         var query = BuildChannelQuery(channel);
         var dto = await GetAsync<QueueResponseDto>($"queue?{query}", cancellationToken);
-        return dto.Items.Select(MapQueueItem).ToArray();
+        return (dto.Items ?? []).Select(MapQueueItem).ToArray();
     }
 
     public async Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
@@ -64,7 +64,7 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         }
 
         var dto = await GetAsync<PlayHistoryResponseDto>($"play_history?{query}", cancellationToken);
-        return dto.Items.Select(MapPlayHistoryItem).ToArray();
+        return (dto.Items ?? []).Select(MapPlayHistoryItem).ToArray();
     }
 
     public Task PromoteQueueItemAsync(int queueId, CancellationToken cancellationToken = default)
@@ -233,8 +233,10 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         };
     }
 
-    private static List<SpinnerRequest> MapRequests(IEnumerable<RequestDto> requests)
+    private static List<SpinnerRequest> MapRequests(IEnumerable<RequestDto>? requests)
     {
+        if (requests is null) return [];
+
         return requests.Select(request => new SpinnerRequest
         {
             Name = string.IsNullOrWhiteSpace(request.Name)
