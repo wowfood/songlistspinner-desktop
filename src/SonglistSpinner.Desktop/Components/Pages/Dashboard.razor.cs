@@ -285,7 +285,7 @@ public partial class Dashboard
         _winnerQueueId = null;
         _playedRefreshCts?.Cancel();
         _playedRefreshCts = new CancellationTokenSource();
-        _ = RefreshAfterWinnerAsync(_playedRefreshCts.Token);
+        await RefreshAfterWinnerAsync(_playedRefreshCts.Token);
         StateHasChanged();
     }
 
@@ -354,16 +354,19 @@ public partial class Dashboard
 
                 var listChanged = JsonSerializer.Serialize(newAvailable) !=
                                   JsonSerializer.Serialize(_availableSongs);
+                var historyChanged = JsonSerializer.Serialize(played) !=
+                                     JsonSerializer.Serialize(_playedSongs);
 
                 _allSongs = all;
                 _playedSongs = played;
                 _availableSongs = newAvailable;
 
                 if (listChanged)
-                {
                     await RebuildWheel(_wheelCts.Token);
-                    _ = OverlayService.UpdateStateAsync(_config, _availableSongs, _playedSongs, _currentStreamer);
-                }
+
+                if (listChanged || historyChanged)
+                    await OverlayService.UpdateStateAsync(
+                        _config, _availableSongs, _playedSongs, _currentStreamer);
 
                 StateHasChanged();
             }
@@ -420,7 +423,6 @@ public partial class Dashboard
     {
         try
         {
-            await Task.Delay(TimeSpan.FromSeconds(5), ct);
             if (_isSpinning || string.IsNullOrEmpty(_currentStreamer)) return;
             await InvokeAsync(async () =>
             {
@@ -429,6 +431,8 @@ public partial class Dashboard
                 _playedSongs = played;
                 _availableSongs = SpinnerDataService.FilterAvailableSongs(all, played, _config);
                 await RebuildWheel(_wheelCts.Token);
+                await OverlayService.UpdateStateAsync(
+                    _config, _availableSongs, _playedSongs, _currentStreamer);
                 StateHasChanged();
             });
         }
