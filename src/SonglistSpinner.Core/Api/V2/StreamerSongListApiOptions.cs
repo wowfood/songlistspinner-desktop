@@ -6,5 +6,5 @@ public sealed class StreamerSongListApiOptions
         new("https://api.staging.streamersonglist.com/", UriKind.Absolute);
 
     public Uri BaseAddress { get; init; } = StagingBaseAddress;
-    public int PageSize { get; init; } = 200;
+    public int PageSize { get; init; } = 100;
 }

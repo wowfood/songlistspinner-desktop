@@ -185,7 +185,7 @@ public class StreamerSongListApiClientTests
         var query = Uri.UnescapeDataString(handler.RequestUri?.Query ?? "");
         Assert.Contains("streamer_name=wowfood", query);
         Assert.Contains("platform=youtube", query);
-        Assert.Contains("limit=200", query);
+        Assert.Contains("limit=100", query);
         Assert.Contains("order_by=played_at", query);
         Assert.Contains("order_dir=desc", query);
         Assert.Contains("played_after=2026-08-05T12:00:00.0000000+00:00", query);
@@ -226,6 +226,58 @@ public class StreamerSongListApiClientTests
         Assert.Equal(HttpStatusCode.Unauthorized, exception.StatusCode);
         Assert.Contains("rejected", exception.Message);
         Assert.Contains("token expired", exception.Message);
+    }
+
+    [Fact]
+    public async Task Given_ValidationErrors_When_FetchPlayHistoryAsync_Then_ReportsFieldDetails()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+        {
+            Content = new StringContent(
+                """
+                {
+                  "title": "Unprocessable Entity",
+                  "status": 422,
+                  "detail": "validation failed",
+                  "errors": [{
+                    "location": "query.limit",
+                    "message": "must be less than or equal to 100",
+                    "value": 200
+                  }]
+                }
+                """,
+                Encoding.UTF8,
+                "application/problem+json")
+        });
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.FetchPlayHistoryAsync(
+                new StreamerSongListChannel("wowfood"),
+                cancellationToken: TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, exception.StatusCode);
+        Assert.Contains("validation failed", exception.Message);
+        Assert.Contains("query.limit: must be less than or equal to 100", exception.Message);
+    }
+
+    [Fact]
+    public void Given_PageSizeAboveApiMaximum_When_ConstructingClient_Then_RejectsOptions()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("{}"));
+        var credential = new StreamerSongListCredential(StreamerSongListCredentialKind.Streamer, "test-token");
+        var options = new StreamerSongListApiOptions
+        {
+            BaseAddress = new Uri("https://example.test/"),
+            PageSize = 101
+        };
+
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(() => new StreamerSongListApiClient(
+            new HttpClient(handler),
+            new StubCredentialProvider(credential),
+            options));
+
+        Assert.Contains("between 1 and 100", exception.Message);
     }
 
     [Fact]

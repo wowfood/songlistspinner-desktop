@@ -39,6 +39,6 @@ Completed in the next baseline:
 Remaining before a production release:
 
 1. Confirm the production v2 base URL and change the default from staging when StreamerSongList promotes the contract.
-2. Add cursor traversal if more than 200 play-history entries must be loaded.
+2. Add cursor traversal if more than 100 play-history entries must be loaded.
 3. Decide whether to retain Windows-only MAUI or migrate the host to WPF.
 4. Consider OAuth with PKCE only if the application later needs a multi-user sign-in experience instead of manually entered streamer tokens.

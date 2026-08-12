@@ -169,9 +169,11 @@ public partial class Settings
 
             var channel = new StreamerSongListChannel(streamerName, _dto.StreamerPlatform);
             var queue = await ApiService.FetchQueueAsync(channel);
+            var history = await ApiService.FetchPlayHistoryAsync(channel, _dto.PlayHistoryPeriod);
             _credentialTestSucceeded = true;
             _credentialTestResult =
-                $"Connected to {ApiOptions.BaseAddress} and loaded {queue.Length} queued song(s) for {streamerName}.";
+                $"Connected to {ApiOptions.BaseAddress} and loaded {queue.Length} queued song(s) " +
+                $"and {history.Length} history item(s) for {streamerName}.";
         }
         catch (Exception ex)
         {

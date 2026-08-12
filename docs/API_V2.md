@@ -7,7 +7,7 @@ This migration is based on the StreamerSongList API reference version 2.0.0 at <
 The typed client currently uses:
 
 - `GET /queue?streamer_name={name}&platform={platform}`
-- `GET /play_history?streamer_name={name}&platform={platform}&limit=200&order_by=played_at&order_dir=desc`
+- `GET /play_history?streamer_name={name}&platform={platform}&limit=100&order_by=played_at&order_dir=desc`
 - `POST /queue/{queueId}/play` to promote the selected winner to now-playing
 - `POST /queue/played?position=playing` to record the promoted winner in play history
 
@@ -42,6 +42,6 @@ SONGLISTSPINNER_SSL_CLIENT_ID=<oauth-client-id>
 
 - Confirm the production v2 server URL before changing the checked-in default.
 - Exercise the client against a real staging account and token; automated tests currently verify the published request and response contract with HTTP fixtures.
-- Implement cursor traversal when the first 200 play-history entries are insufficient.
+- Implement cursor traversal when the first 100 play-history entries are insufficient.
 - Revisit the `stream` history option if the API publishes a session boundary or equivalent filter.
 - Add OAuth with PKCE only if a future distribution model needs third-party user sign-in instead of a streamer-supplied token.

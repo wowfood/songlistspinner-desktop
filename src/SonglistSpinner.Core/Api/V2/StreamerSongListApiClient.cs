@@ -37,8 +37,8 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
 
         if (!_options.BaseAddress.IsAbsoluteUri)
             throw new ArgumentException("The StreamerSongList API base address must be absolute.", nameof(options));
-        if (_options.PageSize is < 1 or > 500)
-            throw new ArgumentOutOfRangeException(nameof(options), "Page size must be between 1 and 500.");
+        if (_options.PageSize is < 1 or > 100)
+            throw new ArgumentOutOfRangeException(nameof(options), "Page size must be between 1 and 100.");
     }
 
     public async Task<SpinnerQueueItem[]> FetchQueueAsync(
@@ -272,15 +272,35 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             var body = await content.ReadAsStringAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(body)) return null;
             using var document = JsonDocument.Parse(body);
+            var details = new List<string>();
             foreach (var propertyName in new[] { "message", "detail", "error" })
             {
                 if (document.RootElement.TryGetProperty(propertyName, out var property) &&
                     property.ValueKind == JsonValueKind.String)
                 {
                     var value = property.GetString();
-                    return value is { Length: > 200 } ? value[..200] : value;
+                    if (!string.IsNullOrWhiteSpace(value)) details.Add(value);
                 }
             }
+
+            if (document.RootElement.TryGetProperty("errors", out var errors) &&
+                errors.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var error in errors.EnumerateArray())
+                {
+                    var location = error.TryGetProperty("location", out var locationProperty)
+                        ? locationProperty.GetString()
+                        : null;
+                    var message = error.TryGetProperty("message", out var messageProperty)
+                        ? messageProperty.GetString()
+                        : null;
+                    if (string.IsNullOrWhiteSpace(message)) continue;
+                    details.Add(string.IsNullOrWhiteSpace(location) ? message : $"{location}: {message}");
+                }
+            }
+
+            var combined = string.Join(" ", details.Distinct(StringComparer.OrdinalIgnoreCase));
+            return combined.Length > 400 ? combined[..400] : combined;
         }
         catch (JsonException)
         {
