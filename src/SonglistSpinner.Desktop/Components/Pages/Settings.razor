@@ -1,6 +1,8 @@
 @page "/settings"
 @inject ILocalSettingsService LocalSettings
 @inject IStreamerSongListCredentialStore CredentialStore
+@inject ISpinnerApiService ApiService
+@inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
 
 <h1 style="color:#6441a5; margin-bottom:1rem;">Settings</h1>
 
@@ -50,6 +52,7 @@ else
                             <option value="@StreamerSongListCredentialKind.OAuthBearer">OAuth bearer token</option>
                         </InputSelect>
                         <div class="ss-field-hint">For a single channel, create a streamer token under StreamerSongList Settings &gt; Access.</div>
+                        <div class="ss-field-hint">API endpoint: <code>@ApiOptions.BaseAddress</code></div>
                     </div>
                     <div class="ss-field">
                         <label>API Token</label>
@@ -73,6 +76,18 @@ else
                         else
                         {
                             <span class="ss-auth-status ss-auth-none">No API credential configured</span>
+                        }
+                    </div>
+                    <div class="ss-field">
+                        <button type="button" class="small-button" @onclick="TestApiConnection"
+                                disabled="@_testingCredential">
+                            @(_testingCredential ? "Testing..." : "Save and test connection")
+                        </button>
+                        @if (!string.IsNullOrWhiteSpace(_credentialTestResult))
+                        {
+                            <div class="@(_credentialTestSucceeded ? "ss-save-success" : "ss-save-error")">
+                                @_credentialTestResult
+                            </div>
                         }
                     </div>
                 </section>

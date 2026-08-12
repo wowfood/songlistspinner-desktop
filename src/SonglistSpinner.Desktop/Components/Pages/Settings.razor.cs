@@ -1,6 +1,8 @@
+using System.Diagnostics;
 using MudBlazor.Utilities;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
+using SonglistSpinner.Core.Models;
 using SonglistSpinner.Extensions;
 
 namespace SonglistSpinner.Components.Pages;
@@ -11,10 +13,13 @@ public partial class Settings
     private readonly SettingsViewModel _vm = new();
     private string _credentialClientId = "";
     private StreamerSongListCredentialKind _credentialKind = StreamerSongListCredentialKind.Streamer;
+    private string? _credentialTestResult;
+    private bool _credentialTestSucceeded;
     private string _credentialToken = "";
     private SettingsDto? _dto;
     private StreamerSongListCredential? _existingCredential;
     private bool _hasCredential;
+    private bool _testingCredential;
 
     private MudColor ColorBackground
     {
@@ -134,5 +139,48 @@ public partial class Settings
         _credentialClientId = "";
         _credentialKind = StreamerSongListCredentialKind.Streamer;
         _hasCredential = false;
+        _credentialTestResult = null;
+        _credentialTestSucceeded = false;
+    }
+
+    private async Task TestApiConnection()
+    {
+        if (_dto == null || _testingCredential) return;
+
+        _testingCredential = true;
+        _credentialTestResult = null;
+        _credentialTestSucceeded = false;
+
+        try
+        {
+            await Save();
+            if (!string.IsNullOrWhiteSpace(_vm.SaveError))
+            {
+                _credentialTestResult = $"Unable to save the credential: {_vm.SaveError}";
+                return;
+            }
+
+            var streamerName = _dto.DefaultStreamerName.Trim();
+            if (string.IsNullOrWhiteSpace(streamerName))
+            {
+                _credentialTestResult = "Enter a Default StreamerSongList Name before testing.";
+                return;
+            }
+
+            var channel = new StreamerSongListChannel(streamerName, _dto.StreamerPlatform);
+            var queue = await ApiService.FetchQueueAsync(channel);
+            _credentialTestSucceeded = true;
+            _credentialTestResult =
+                $"Connected to {ApiOptions.BaseAddress} and loaded {queue.Length} queued song(s) for {streamerName}.";
+        }
+        catch (Exception ex)
+        {
+            _credentialTestResult = $"Connection failed: {ex.Message}";
+            Debug.WriteLine($"[SonglistSpinner] API connection test failed: {ex}");
+        }
+        finally
+        {
+            _testingCredential = false;
+        }
     }
 }

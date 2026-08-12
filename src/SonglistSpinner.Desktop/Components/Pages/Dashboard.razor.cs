@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
@@ -362,8 +363,8 @@ public partial class Dashboard
                 var (all, played) = await FetchQueueAndHistory(_currentStreamer);
                 var newAvailable = SpinnerDataService.FilterAvailableSongs(all, played, _config);
 
-                var listChanged = newAvailable.Count != _availableSongs.Count ||
-                                  newAvailable.Zip(_availableSongs).Any(p => p.First.Song.Id != p.Second.Song.Id);
+                var listChanged = JsonSerializer.Serialize(newAvailable) !=
+                                  JsonSerializer.Serialize(_availableSongs);
 
                 _allSongs = all;
                 _playedSongs = played;
@@ -377,9 +378,10 @@ public partial class Dashboard
 
                 StateHasChanged();
             }
-            catch
+            catch (Exception ex)
             {
-                /* swallow auto-refresh errors */
+                SetStatus($"Auto-refresh failed: {ex.Message}");
+                Debug.WriteLine($"[SonglistSpinner] Auto-refresh failed: {ex}");
             }
         });
     }
@@ -405,7 +407,8 @@ public partial class Dashboard
     private void SetStatus(string message, bool visible = true)
     {
         _status = message;
-        _statusVisible = visible && _config.Debug;
+        _statusVisible = visible && !string.IsNullOrWhiteSpace(message);
+        Debug.WriteLine($"[SonglistSpinner] {message}");
     }
 
     private async Task OnStreamerKeyDown(KeyboardEventArgs e)
@@ -441,5 +444,11 @@ public partial class Dashboard
             });
         }
         catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            SetStatus($"Post-spin refresh failed: {ex.Message}");
+            Debug.WriteLine($"[SonglistSpinner] Post-spin refresh failed: {ex}");
+            await InvokeAsync(StateHasChanged);
+        }
     }
 }
