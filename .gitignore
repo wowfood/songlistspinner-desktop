@@ -5,6 +5,7 @@
 # Publish output
 **/publish/
 **/Properties/PublishProfiles/
+/artifacts/
 
 # NuGet
 *.nupkg

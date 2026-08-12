@@ -31,8 +31,13 @@
         <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
         <RuntimeIdentifier>win-x64</RuntimeIdentifier>
         <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
+        <EnableMsixTooling>true</EnableMsixTooling>
         <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
         <SelfContained>true</SelfContained>
+        <PublishSingleFile>true</PublishSingleFile>
+        <DebugType>none</DebugType>
+        <DebugSymbols>false</DebugSymbols>
+        <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     </PropertyGroup>
 
     <ItemGroup>

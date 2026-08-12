@@ -25,6 +25,13 @@ This repository was established as a clean, desktop-only continuation of ServerS
 - Release builds are unpackaged, `win-x64`, and self-contained.
 - The legacy Twitch OAuth and chatbot-command integration has been removed.
 
+## Phase 1 distribution status
+
+- The MAUI Windows host is retained for the desktop release.
+- Release publishing produces one unpackaged, self-contained `win-x64` executable.
+- Blazor static assets and the Windows App SDK runtime are embedded in the executable.
+- The repeatable publish command verifies that no sidecar files remain.
+
 ## API v2 migration status
 
 Completed in the next baseline:
@@ -40,5 +47,4 @@ Remaining before a production release:
 
 1. Confirm the production v2 base URL and change the default from staging when StreamerSongList promotes the contract.
 2. Add cursor traversal if more than 100 play-history entries must be loaded.
-3. Decide whether to retain Windows-only MAUI or migrate the host to WPF.
-4. Consider OAuth with PKCE only if the application later needs a multi-user sign-in experience instead of manually entered streamer tokens.
+3. Consider OAuth with PKCE only if the application later needs a multi-user sign-in experience instead of manually entered streamer tokens.

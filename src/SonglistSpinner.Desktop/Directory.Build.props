@@ -1,6 +1,0 @@
-<Project>
-    <PropertyGroup>
-        <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
-        <WindowsAppSDKSingleFileVerifyConfiguration>false</WindowsAppSDKSingleFileVerifyConfiguration>
-    </PropertyGroup>
-</Project>

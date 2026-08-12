@@ -5,7 +5,7 @@ SonglistSpinner Desktop is the Windows-only desktop edition of the StreamerSongL
 ## Baseline
 
 - Windows desktop only (`net8.0-windows10.0.19041.0`)
-- Unpackaged and self-contained release configuration
+- One unpackaged, self-contained `win-x64` release executable
 - No Microsoft Store or MSIX signing requirement
 - No fixed WebView2 runtime binaries checked into source control
 - No backend, Azure Functions, database, or browser-client projects
@@ -27,11 +27,18 @@ dotnet test SonglistSpinner.Desktop.sln
 dotnet build SonglistSpinner.Desktop.sln -c Release
 ```
 
-The Release configuration uses an unpackaged, self-contained `win-x64` target. A distributable publish layout can be produced with:
+The Release configuration produces one unpackaged, self-contained `win-x64`
+executable. Build the verified distribution artifact with:
 
 ```powershell
-dotnet publish src/SonglistSpinner.Desktop/SonglistSpinner.Desktop.csproj -c Release
+.\scripts\publish-single-file.ps1
 ```
+
+The executable is written to
+`artifacts\win-x64\SonglistSpinner.Desktop.exe`. End users do not need .NET,
+MAUI, the Windows App SDK, MSIX, or an installer. WebView2 Evergreen remains the
+only external runtime requirement. See
+[docs/SINGLE_FILE_DISTRIBUTION.md](docs/SINGLE_FILE_DISTRIBUTION.md) for details.
 
 ## Development credentials
 

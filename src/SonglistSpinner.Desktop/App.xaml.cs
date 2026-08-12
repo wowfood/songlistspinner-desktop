@@ -6,6 +6,10 @@ public partial class App
 {
     public App(LocalOverlayServer overlayServer)
     {
+        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        var webViewData = Path.Combine(localAppData, "SonglistSpinner", "WebView2");
+        Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", webViewData);
+
         InitializeComponent();
         _ = overlayServer.StartAsync(CancellationToken.None);
     }

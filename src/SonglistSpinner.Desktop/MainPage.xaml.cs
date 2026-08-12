@@ -1,4 +1,4 @@
-﻿namespace SonglistSpinner;
+namespace SonglistSpinner;
 
 public partial class MainPage
 {

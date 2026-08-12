@@ -1,0 +1,84 @@
+<Project>
+  <!--
+    Windows App SDK 1.5 does not include PublishSingleFile in the incremental
+    inputs for CreateWinRTRegistration. Force that small manifest target to run
+    so switching from a normal build cannot reuse a non-redirecting manifest.
+  -->
+  <Target Name="InvalidateNonSingleFileWinRtManifest"
+          BeforeTargets="CreateWinRTRegistration"
+          Condition="'$(PublishSingleFile)' == 'true' And Exists('$(ApplicationManifest)')">
+    <Delete Files="$(ApplicationManifest)" />
+  </Target>
+
+  <!--
+    Blazor Hybrid static web assets are normally copied after .NET creates its
+    single-file bundle. Add those assets to ResolvedFileToPublish early enough
+    for the bundler, then suppress only the redundant post-bundle copies.
+
+    IncludeAllContentForSelfExtract causes these files to be extracted beside
+    the app's managed/native payload at startup, preserving the wwwroot layout
+    expected by BlazorWebView.
+  -->
+  <Target Name="AddMauiStaticWebAssetsToSingleFileBundle"
+          BeforeTargets="_ComputeFilesToBundle"
+          DependsOnTargets="StaticWebAssetsPrepareForPublish;LoadStaticWebAssetsPublishManifest;GenerateStaticWebAssetsPublishManifest"
+          Condition="'$(PublishSingleFile)' == 'true' And '$(IncludeAllContentForSelfExtract)' == 'true'">
+    <PropertyGroup>
+      <_MauiStaticWebAssetsPublishPathPrefix>wwwroot</_MauiStaticWebAssetsPublishPathPrefix>
+      <_MauiStaticWebAssetsPublishPathPrefix Condition="'$(StaticWebAssetProjectMode)' == 'Root'">wwwroot/$(StaticWebAssetBasePath)</_MauiStaticWebAssetsPublishPathPrefix>
+      <_BundledStaticWebAssetEndpointsManifest>$(StaticWebAssetEndpointsPublishManifestPath)</_BundledStaticWebAssetEndpointsManifest>
+    </PropertyGroup>
+
+    <ComputeStaticWebAssetsForCurrentProject
+        Assets="@(StaticWebAsset)"
+        ProjectMode="$(StaticWebAssetProjectMode)"
+        AssetKind="Publish"
+        Source="$(PackageId)">
+      <Output TaskParameter="StaticWebAssets" ItemName="_MauiStaticWebAssetsToBundle" />
+    </ComputeStaticWebAssetsForCurrentProject>
+
+    <ComputeStaticWebAssetsTargetPaths
+        Assets="@(_MauiStaticWebAssetsToBundle)"
+        PathPrefix="$(_MauiStaticWebAssetsPublishPathPrefix)">
+      <Output TaskParameter="AssetsWithTargetPath" ItemName="_MauiStaticWebAssetsToBundleWithTargetPath" />
+    </ComputeStaticWebAssetsTargetPaths>
+
+    <ItemGroup>
+      <!-- Symbols are developer artifacts and cannot be embedded on .NET 5+. -->
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+                             Condition="'%(ResolvedFileToPublish.Extension)' == '.pdb'" />
+
+      <!-- Replace any duplicate entries already supplied through MauiAsset. -->
+      <ResolvedFileToPublish Remove="@(_MauiStaticWebAssetsToBundleWithTargetPath)" />
+      <ResolvedFileToPublish Include="@(_MauiStaticWebAssetsToBundleWithTargetPath)"
+                             RelativePath="%(_MauiStaticWebAssetsToBundleWithTargetPath.TargetPath)"
+                             CopyToPublishDirectory="PreserveNewest"
+                             ExcludeFromSingleFile="false" />
+
+      <ResolvedFileToPublish Include="$(_BundledStaticWebAssetEndpointsManifest)"
+                             RelativePath="$(TargetName).staticwebassets.endpoints.json"
+                             CopyToPublishDirectory="PreserveNewest"
+                             ExcludeFromSingleFile="false"
+                             Condition="Exists('$(_BundledStaticWebAssetEndpointsManifest)')" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="SuppressBundledStaticWebAssetFileCopies"
+          BeforeTargets="_PublishCopyStaticWebAssetsPreserveNewest;_PublishCopyStaticWebAssetsAlways;_PublishCopyStaticWebAssetsIfDifferent"
+          Condition="'$(PublishSingleFile)' == 'true' And '$(IncludeAllContentForSelfExtract)' == 'true'">
+    <ItemGroup>
+      <_PublishStaticWebAssetsPreserveNewest Remove="@(_PublishStaticWebAssetsPreserveNewest)" />
+      <_PublishStaticWebAssetsCopyAlways Remove="@(_PublishStaticWebAssetsCopyAlways)" />
+      <_PublishStaticWebAssetsIfDifferent Remove="@(_PublishStaticWebAssetsIfDifferent)" />
+    </ItemGroup>
+  </Target>
+
+  <Target Name="SuppressBundledStaticWebAssetEndpointsCopy"
+          BeforeTargets="CopyStaticWebAssetsEndpointsManifest"
+          Condition="'$(PublishSingleFile)' == 'true' And '$(IncludeAllContentForSelfExtract)' == 'true'">
+    <!-- Make the SDK copy target a no-op after the real manifest is bundled. -->
+    <PropertyGroup>
+      <StaticWebAssetEndpointsPublishManifestPath>$(IntermediateOutputPath)__staticwebassets-endpoints-already-bundled__</StaticWebAssetEndpointsPublishManifestPath>
+    </PropertyGroup>
+  </Target>
+</Project>
