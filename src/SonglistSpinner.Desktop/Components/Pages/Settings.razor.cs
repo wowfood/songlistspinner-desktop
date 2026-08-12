@@ -1,4 +1,5 @@
 using MudBlazor.Utilities;
+using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Extensions;
 
@@ -8,8 +9,12 @@ namespace SonglistSpinner.Components.Pages;
 public partial class Settings
 {
     private readonly SettingsViewModel _vm = new();
-    private string _apiBaseUrl = "";
+    private string _credentialClientId = "";
+    private StreamerSongListCredentialKind _credentialKind = StreamerSongListCredentialKind.Streamer;
+    private string _credentialToken = "";
     private SettingsDto? _dto;
+    private StreamerSongListCredential? _existingCredential;
+    private bool _hasCredential;
 
     private MudColor ColorBackground
     {
@@ -75,15 +80,20 @@ public partial class Settings
         }
     }
 
-    protected override Task OnInitializedAsync()
+    protected override async Task OnInitializedAsync()
     {
         _dto = LocalSettings.LoadSettings();
-        _apiBaseUrl = LocalSettings.GetApiBaseUrl();
         _vm.Initialize(_dto);
-        return Task.CompletedTask;
+        _existingCredential = await CredentialStore.GetCredentialAsync();
+        if (_existingCredential is not null)
+        {
+            _credentialKind = _existingCredential.Kind;
+            _credentialClientId = _existingCredential.ClientId ?? "";
+            _hasCredential = true;
+        }
     }
 
-    private void Save()
+    private async Task Save()
     {
         _vm.SaveSuccess = false;
         _vm.SaveError = null;
@@ -93,13 +103,36 @@ public partial class Settings
         {
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
-            LocalSettings.SetApiBaseUrl(_apiBaseUrl);
-            Config["ApiBaseUrl"] = _apiBaseUrl;
+
+            var token = string.IsNullOrWhiteSpace(_credentialToken)
+                ? _existingCredential?.Token
+                : _credentialToken.Trim();
+            if (!string.IsNullOrWhiteSpace(token))
+            {
+                _existingCredential = new StreamerSongListCredential(
+                    _credentialKind,
+                    token,
+                    string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
+                await CredentialStore.SaveCredentialAsync(_existingCredential);
+                _credentialToken = "";
+                _hasCredential = true;
+            }
+
             _vm.SaveSuccess = true;
         }
         catch (Exception ex)
         {
             _vm.SaveError = ex.Message;
         }
+    }
+
+    private async Task ClearApiCredential()
+    {
+        await CredentialStore.ClearCredentialAsync();
+        _existingCredential = null;
+        _credentialToken = "";
+        _credentialClientId = "";
+        _credentialKind = StreamerSongListCredentialKind.Streamer;
+        _hasCredential = false;
     }
 }

@@ -11,7 +11,6 @@ namespace SonglistSpinner.Components.Pages;
 public partial class Dashboard
 {
     private SpinnerQueueItem[] _allSongs = [];
-    private string _apiBaseUrl = "";
     private CancellationTokenSource? _autoRefreshCts;
     private List<SpinnerQueueItem> _availableSongs = [];
 
@@ -69,13 +68,6 @@ public partial class Dashboard
         GC.SuppressFinalize(this);
     }
 
-    protected override Task OnInitializedAsync()
-    {
-        _apiBaseUrl = LocalSettings.GetApiBaseUrl();
-        Config["ApiBaseUrl"] = _apiBaseUrl;
-        return Task.CompletedTask;
-    }
-
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         if (firstRender)
@@ -83,9 +75,7 @@ public partial class Dashboard
             await JS.InvokeVoidAsync("document.body.classList.add", "spinner-page");
             SyncService.MessageReceived += OnMessageReceived;
 
-            var configUrl = $"{_apiBaseUrl}/api/spinner-config";
-            var localConfig = LocalSettings.ToSpinnerConfig(LocalSettings.LoadSettings());
-            _config = await ApiService.FetchConfigAsync(configUrl) ?? localConfig;
+            _config = LocalSettings.ToSpinnerConfig(LocalSettings.LoadSettings());
             _isLockedDefault = _config.Streamer.HideChangeOptionWhenDefault
                                && !string.IsNullOrWhiteSpace(_config.Streamer.DefaultName);
 
@@ -374,8 +364,9 @@ public partial class Dashboard
     private async Task<(SpinnerQueueItem[] all, PlayHistoryItem[] played)> FetchQueueAndHistory(string streamer)
     {
         var period = _config.SongList.PlayHistoryPeriod;
-        var all = await ApiService.FetchQueueAsync(streamer);
-        var played = await ApiService.FetchPlayHistoryAsync(streamer, period);
+        var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
+        var all = await ApiService.FetchQueueAsync(channel);
+        var played = await ApiService.FetchPlayHistoryAsync(channel, period);
         return (all, played);
     }
 

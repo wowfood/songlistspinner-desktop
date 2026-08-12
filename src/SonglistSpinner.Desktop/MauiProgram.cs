@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
+using SonglistSpinner.Core.Api.V2;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Services;
 
@@ -16,15 +17,17 @@ public static class MauiProgram
 
         builder.Services.AddSingleton<ILocalSettingsService, PreferencesSettingsService>();
 
-        // Seed ApiBaseUrl from persisted preferences so all components see the correct value.
-        var settingsSvc = new PreferencesSettingsService();
-        builder.Configuration["ApiBaseUrl"] = settingsSvc.GetApiBaseUrl();
-
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddMudServices();
-        builder.Services.AddSingleton(new HttpClient());
-        builder.Services.AddSingleton<ITokenStore, SecureStorageTokenStore>();
-        builder.Services.AddScoped<ISpinnerApiService, HttpApiService>();
+        builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton(CreateStreamerSongListApiOptions());
+        builder.Services.AddSingleton<SecureStorageStreamerSongListCredentialStore>();
+        builder.Services.AddSingleton<IStreamerSongListCredentialProvider>(serviceProvider =>
+            serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
+        builder.Services.AddSingleton<IStreamerSongListCredentialStore>(serviceProvider =>
+            serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
+        builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
         builder.Services.AddScoped<ISpinnerSyncService, NoOpSyncService>();
         builder.Services.AddSingleton<OverlayStateService>();
         builder.Services.AddSingleton<TwitchAuthService>();
@@ -37,5 +40,15 @@ public static class MauiProgram
 #endif
 
         return builder.Build();
+    }
+
+    private static StreamerSongListApiOptions CreateStreamerSongListApiOptions()
+    {
+        var configuredAddress = Environment.GetEnvironmentVariable("SONGLISTSPINNER_SSL_API_BASE_URL");
+        var baseAddress = Uri.TryCreate(configuredAddress, UriKind.Absolute, out var parsedAddress)
+            ? parsedAddress
+            : StreamerSongListApiOptions.StagingBaseAddress;
+
+        return new StreamerSongListApiOptions { BaseAddress = baseAddress };
     }
 }

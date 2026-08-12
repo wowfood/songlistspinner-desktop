@@ -11,7 +11,7 @@ SonglistSpinner Desktop is the Windows-only desktop edition of the StreamerSongL
 - No backend, Azure Functions, database, or browser-client projects
 - Clean Git history based on source commit `56d51a4`
 
-The current StreamerSongList client still targets the legacy v1 endpoint. Updating it for the new API is the next migration phase; see [docs/BASELINE.md](docs/BASELINE.md).
+The queue and play-history client now targets the documented StreamerSongList API v2 contract. Transport DTOs are isolated from the wheel models, and API credentials are stored separately from Twitch credentials. See [docs/API_V2.md](docs/API_V2.md) for configuration and current limitations.
 
 ## Prerequisites
 
@@ -35,5 +35,13 @@ dotnet publish src/SonglistSpinner.Desktop/SonglistSpinner.Desktop.csproj -c Rel
 
 ## Development credentials
 
-No secrets belong in this repository. The existing Twitch authorization implementation is transitional and reads its client secret from `SONGLISTSPINNER_TWITCH_CLIENT_SECRET`. A public-client OAuth flow that does not embed or require a distributed secret should replace it before release.
+No secrets belong in this repository. Add a StreamerSongList streamer, user, or OAuth token on the Settings page; the token is kept in Windows secure storage.
 
+For development and automation, these environment variables are also supported:
+
+- `SONGLISTSPINNER_SSL_API_BASE_URL` — defaults to the staging v2 server documented by StreamerSongList
+- `SONGLISTSPINNER_SSL_ACCESS_TOKEN` — used only when no securely stored token exists
+- `SONGLISTSPINNER_SSL_TOKEN_TYPE` — `streamer` (default), `user`, or `bearer`
+- `SONGLISTSPINNER_SSL_CLIENT_ID` — optional OAuth client ID sent with bearer tokens
+
+The existing Twitch authorization implementation is transitional and reads its client secret from `SONGLISTSPINNER_TWITCH_CLIENT_SECRET`. A public-client OAuth flow that does not embed or require a distributed secret should replace it before release.

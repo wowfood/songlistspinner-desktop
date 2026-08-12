@@ -7,8 +7,6 @@ namespace SonglistSpinner.Services;
 public class PreferencesSettingsService : ILocalSettingsService
 {
     private const string SettingsKey = "local_settings";
-    private const string ApiUrlKey = "api_base_url";
-    private const string DefaultApiUrl = "http://localhost:7071";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
     private SpinnerConfig? _cachedConfig;
 
@@ -31,16 +29,6 @@ public class PreferencesSettingsService : ILocalSettingsService
     public void SaveSettings(SettingsDto dto)
     {
         Preferences.Set(SettingsKey, JsonSerializer.Serialize(dto, JsonOpts));
-    }
-
-    public string GetApiBaseUrl()
-    {
-        return Preferences.Get(ApiUrlKey, DefaultApiUrl);
-    }
-
-    public void SetApiBaseUrl(string url)
-    {
-        Preferences.Set(ApiUrlKey, url.Trim());
     }
 
     public SpinnerConfig ToSpinnerConfig(SettingsDto dto)
@@ -79,6 +67,7 @@ public class PreferencesSettingsService : ILocalSettingsService
             Streamer = new SpinnerStreamerConfig
             {
                 DefaultName = dto.DefaultStreamerName,
+                Platform = dto.StreamerPlatform,
                 HideChangeOptionWhenDefault = dto.HideChangeOptionWhenDefault
             },
             SongList = new SpinnerSongListConfig

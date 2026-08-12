@@ -9,6 +9,7 @@ public class SettingsDto
     public string BackgroundColor { get; set; } = "#111111";
     public string BackgroundImage { get; set; } = "";
     public string DefaultStreamerName { get; set; } = "";
+    public string StreamerPlatform { get; set; } = "twitch";
     public bool HideChangeOptionWhenDefault { get; set; } = true;
     public string SongListFields { get; set; } = """["artist","title"]""";
     public bool ExcludePlayedSongs { get; set; }

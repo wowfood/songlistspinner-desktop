@@ -1,0 +1,249 @@
+using System.Globalization;
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.Models;
+
+namespace SonglistSpinner.Core.Api.V2;
+
+public sealed class StreamerSongListApiClient : ISpinnerApiService
+{
+    private static readonly HashSet<string> SupportedPlatforms =
+        new(StringComparer.OrdinalIgnoreCase) { "kick", "none", "twitch", "youtube" };
+
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
+    private readonly HttpClient _http;
+    private readonly IStreamerSongListCredentialProvider _credentialProvider;
+    private readonly StreamerSongListApiOptions _options;
+    private readonly TimeProvider _timeProvider;
+
+    public StreamerSongListApiClient(
+        HttpClient http,
+        IStreamerSongListCredentialProvider credentialProvider,
+        StreamerSongListApiOptions options,
+        TimeProvider? timeProvider = null)
+    {
+        _http = http;
+        _credentialProvider = credentialProvider;
+        _options = options;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+
+        if (!_options.BaseAddress.IsAbsoluteUri)
+            throw new ArgumentException("The StreamerSongList API base address must be absolute.", nameof(options));
+        if (_options.PageSize is < 1 or > 500)
+            throw new ArgumentOutOfRangeException(nameof(options), "Page size must be between 1 and 500.");
+    }
+
+    public async Task<SpinnerQueueItem[]> FetchQueueAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default)
+    {
+        var query = BuildChannelQuery(channel);
+        var dto = await GetAsync<QueueResponseDto>($"queue?{query}", cancellationToken);
+        return dto.Items.Select(MapQueueItem).ToArray();
+    }
+
+    public async Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
+        StreamerSongListChannel channel,
+        string period = "week",
+        CancellationToken cancellationToken = default)
+    {
+        var query = $"{BuildChannelQuery(channel)}&limit={_options.PageSize}" +
+                    "&order_by=played_at&order_dir=desc";
+        var playedAfter = GetPlayedAfter(period);
+        if (playedAfter.HasValue)
+        {
+            query += $"&played_after={Uri.EscapeDataString(playedAfter.Value.ToString("O", CultureInfo.InvariantCulture))}";
+        }
+
+        var dto = await GetAsync<PlayHistoryResponseDto>($"play_history?{query}", cancellationToken);
+        return dto.Items.Select(MapPlayHistoryItem).ToArray();
+    }
+
+    private async Task<T> GetAsync<T>(string relativeUrl, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(relativeUrl));
+        await AddCredentialAsync(request, cancellationToken);
+
+        using var response = await _http.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+
+        if (!response.IsSuccessStatusCode)
+            throw await CreateApiExceptionAsync(response, cancellationToken);
+
+        try
+        {
+            return await response.Content.ReadFromJsonAsync<T>(JsonOptions, cancellationToken)
+                   ?? throw new StreamerSongListApiException("StreamerSongList returned an empty response.");
+        }
+        catch (JsonException ex)
+        {
+            throw new StreamerSongListApiException(
+                "StreamerSongList returned a response that does not match API v2.",
+                response.StatusCode,
+                ex);
+        }
+    }
+
+    private async ValueTask AddCredentialAsync(
+        HttpRequestMessage request,
+        CancellationToken cancellationToken)
+    {
+        var credential = await _credentialProvider.GetCredentialAsync(cancellationToken);
+        if (credential is null || string.IsNullOrWhiteSpace(credential.Token))
+        {
+            throw new StreamerSongListApiException(
+                "StreamerSongList API access is not configured. Add an API token in Settings.");
+        }
+
+        var scheme = credential.Kind switch
+        {
+            StreamerSongListCredentialKind.OAuthBearer => "Bearer",
+            StreamerSongListCredentialKind.Streamer => "Streamer",
+            StreamerSongListCredentialKind.User => "User",
+            _ => throw new ArgumentOutOfRangeException(nameof(credential.Kind))
+        };
+
+        request.Headers.Authorization = new AuthenticationHeaderValue(scheme, credential.Token.Trim());
+        if (credential.Kind == StreamerSongListCredentialKind.OAuthBearer &&
+            !string.IsNullOrWhiteSpace(credential.ClientId))
+        {
+            request.Headers.TryAddWithoutValidation("Client-Id", credential.ClientId.Trim());
+        }
+    }
+
+    private Uri BuildUri(string relativeUrl)
+    {
+        var baseAddress = _options.BaseAddress.AbsoluteUri.TrimEnd('/') + "/";
+        return new Uri(new Uri(baseAddress, UriKind.Absolute), relativeUrl);
+    }
+
+    private static string BuildChannelQuery(StreamerSongListChannel channel)
+    {
+        var name = channel.Name.Trim();
+        var platform = channel.Platform.Trim().ToLowerInvariant();
+        if (string.IsNullOrWhiteSpace(name))
+            throw new ArgumentException("A streamer name is required.", nameof(channel));
+        if (!SupportedPlatforms.Contains(platform))
+            throw new ArgumentException($"Unsupported StreamerSongList platform '{channel.Platform}'.", nameof(channel));
+
+        return $"streamer_name={Uri.EscapeDataString(name)}&platform={Uri.EscapeDataString(platform)}";
+    }
+
+    private DateTimeOffset? GetPlayedAfter(string period)
+    {
+        var now = _timeProvider.GetUtcNow();
+        return period.Trim().ToLowerInvariant() switch
+        {
+            "day" => now.AddDays(-1),
+            "week" => now.AddDays(-7),
+            "month" => now.AddMonths(-1),
+            "all" or "stream" => null,
+            _ => throw new ArgumentOutOfRangeException(nameof(period), period, "Unknown play-history period.")
+        };
+    }
+
+    private static SpinnerQueueItem MapQueueItem(QueueDetailsDto item)
+    {
+        var title = item.Song?.Title;
+        return new SpinnerQueueItem
+        {
+            Position = item.Position,
+            Song = new SpinnerSong
+            {
+                Id = item.SongId,
+                Artist = item.Song?.Artist ?? "",
+                Title = string.IsNullOrWhiteSpace(title) ? item.NonlistSong ?? "" : title
+            },
+            Requests = MapRequests(item.Requests)
+        };
+    }
+
+    private static PlayHistoryItem MapPlayHistoryItem(PlayHistoryDetailsDto item)
+    {
+        var requests = MapRequests(item.Requests);
+        if (item.DonationAmount.HasValue)
+        {
+            if (requests.Count == 0)
+                requests.Add(new SpinnerRequest { DonationAmount = item.DonationAmount });
+            else if (!requests[0].Amount.HasValue)
+                requests[0].DonationAmount = item.DonationAmount;
+        }
+
+        return new PlayHistoryItem
+        {
+            Song = item.Song is null
+                ? null
+                : new SpinnerSong
+                {
+                    Id = item.SongId,
+                    Artist = item.Song.Artist ?? "",
+                    Title = item.Song.Title ?? ""
+                },
+            Requests = requests
+        };
+    }
+
+    private static List<SpinnerRequest> MapRequests(IEnumerable<RequestDto> requests)
+    {
+        return requests.Select(request => new SpinnerRequest
+        {
+            Name = string.IsNullOrWhiteSpace(request.Name)
+                ? request.User?.Username ?? ""
+                : request.Name,
+            Amount = request.Amount
+        }).ToList();
+    }
+
+    private static async Task<StreamerSongListApiException> CreateApiExceptionAsync(
+        HttpResponseMessage response,
+        CancellationToken cancellationToken)
+    {
+        var message = response.StatusCode switch
+        {
+            HttpStatusCode.Unauthorized => "StreamerSongList rejected the configured API token.",
+            HttpStatusCode.Forbidden => "The configured StreamerSongList token cannot access this channel.",
+            HttpStatusCode.TooManyRequests => "StreamerSongList rate-limited the request. Try again shortly.",
+            _ => $"StreamerSongList returned HTTP {(int)response.StatusCode} ({response.ReasonPhrase})."
+        };
+
+        var detail = await TryReadErrorDetailAsync(response.Content, cancellationToken);
+        if (!string.IsNullOrWhiteSpace(detail)) message += $" {detail}";
+        return new StreamerSongListApiException(message, response.StatusCode);
+    }
+
+    private static async Task<string?> TryReadErrorDetailAsync(
+        HttpContent content,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var body = await content.ReadAsStringAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(body)) return null;
+            using var document = JsonDocument.Parse(body);
+            foreach (var propertyName in new[] { "message", "detail", "error" })
+            {
+                if (document.RootElement.TryGetProperty(propertyName, out var property) &&
+                    property.ValueKind == JsonValueKind.String)
+                {
+                    var value = property.GetString();
+                    return value is { Length: > 200 } ? value[..200] : value;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // Error bodies are not guaranteed to be JSON.
+        }
+
+        return null;
+    }
+}

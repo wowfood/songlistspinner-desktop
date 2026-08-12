@@ -1,6 +1,6 @@
 @page "/settings"
 @inject ILocalSettingsService LocalSettings
-@inject IConfiguration Config
+@inject IStreamerSongListCredentialStore CredentialStore
 @inject TwitchAuthService TwitchAuth
 
 <h1 style="color:#6441a5; margin-bottom:1rem;">Settings</h1>
@@ -25,10 +25,56 @@ else
                         <div class="ss-field-hint">Auto-loads this streamer when you open the Dashboard.</div>
                     </div>
                     <div class="ss-field">
+                        <label>Platform</label>
+                        <InputSelect @bind-Value="_dto.StreamerPlatform">
+                            <option value="twitch">Twitch</option>
+                            <option value="youtube">YouTube</option>
+                            <option value="kick">Kick</option>
+                            <option value="none">None</option>
+                        </InputSelect>
+                    </div>
+                    <div class="ss-field">
                         <label>
                             <InputCheckbox @bind-Value="_dto.HideChangeOptionWhenDefault"/>
                             Hide &ldquo;Change Streamer&rdquo; button when default name is set
                         </label>
+                    </div>
+                </section>
+
+                <section class="ss-settings-section">
+                    <h3>StreamerSongList API v2 Access</h3>
+                    <div class="ss-field">
+                        <label>Credential Type</label>
+                        <InputSelect @bind-Value="_credentialKind">
+                            <option value="@StreamerSongListCredentialKind.Streamer">Streamer token</option>
+                            <option value="@StreamerSongListCredentialKind.User">User token</option>
+                            <option value="@StreamerSongListCredentialKind.OAuthBearer">OAuth bearer token</option>
+                        </InputSelect>
+                        <div class="ss-field-hint">For a single channel, create a streamer token under StreamerSongList Settings &gt; Access.</div>
+                    </div>
+                    <div class="ss-field">
+                        <label>API Token</label>
+                        <InputText @bind-Value="_credentialToken" type="password" autocomplete="off"
+                                   placeholder="Leave blank to keep the saved token"/>
+                        <div class="ss-field-hint">Stored with Windows secure storage and never written to the repository.</div>
+                    </div>
+                    @if (_credentialKind == StreamerSongListCredentialKind.OAuthBearer)
+                    {
+                        <div class="ss-field">
+                            <label>OAuth Client ID</label>
+                            <InputText @bind-Value="_credentialClientId" autocomplete="off"/>
+                        </div>
+                    }
+                    <div class="ss-field">
+                        @if (_hasCredential)
+                        {
+                            <span class="ss-auth-status ss-auth-ok">&#10003; API credential configured</span>
+                            <button type="button" class="small-button" @onclick="ClearApiCredential">Clear</button>
+                        }
+                        else
+                        {
+                            <span class="ss-auth-status ss-auth-none">No API credential configured</span>
+                        }
                     </div>
                 </section>
 
@@ -145,10 +191,10 @@ else
                     <div class="ss-field">
                         <label>Play History Period</label>
                         <InputSelect @bind-Value="_dto.PlayHistoryPeriod">
-                            <option value="stream">This stream</option>
-                            <option value="day">Today</option>
-                            <option value="week">This week</option>
-                            <option value="month">This month</option>
+                            <option value="stream">Recent (API v2)</option>
+                            <option value="day">Last 24 hours</option>
+                            <option value="week">Last 7 days</option>
+                            <option value="month">Last month</option>
                             <option value="all">All time</option>
                         </InputSelect>
                     </div>
