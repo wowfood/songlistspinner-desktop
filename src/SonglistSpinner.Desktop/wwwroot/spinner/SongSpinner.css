@@ -170,7 +170,7 @@ input {
     width: 18.75rem;
 }
 
-#soungCounterSection {
+#songCounterSection {
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -477,11 +477,11 @@ body.overlay-mode #changeStreamerBtn {
         border-top: 2px solid var(--app-resize-handle-bg);
     }
 
-    #soungCounterSection {
+    #songCounterSection {
         flex-wrap: wrap;
     }
 
-    #soungCounterSection h3 {
+    #songCounterSection h3 {
         font-size: 1rem;
         margin: 0.5rem 0;
     }

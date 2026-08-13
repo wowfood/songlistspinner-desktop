@@ -4,14 +4,10 @@ using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Services;
 
-public class PreferencesSettingsService : ILocalSettingsService
+public sealed class PreferencesSettingsService : ILocalSettingsService
 {
     private const string SettingsKey = "local_settings";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
-    private SpinnerConfig? _cachedConfig;
-
-    public SpinnerConfig CurrentConfig => _cachedConfig ??= ToSpinnerConfig(LoadSettings());
-
     public SettingsDto LoadSettings()
     {
         var json = Preferences.Get(SettingsKey, null);

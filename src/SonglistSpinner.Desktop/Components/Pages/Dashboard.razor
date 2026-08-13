@@ -2,7 +2,6 @@
 @page "/dashboard"
 @layout MainLayout
 @inject ISpinnerApiService ApiService
-@inject ISpinnerSyncService SyncService
 @inject ILocalSettingsService LocalSettings
 @inject IJSRuntime JS
 @inject OverlayStateService OverlayService
@@ -57,7 +56,7 @@
                 </div>
             </div>
             <div id="playedListContent">
-                <div id="soungCounterSection">
+                <div id="songCounterSection">
                     <h3>Played Songs: <span id="playedCount">@_playedSongs.Length</span></h3>
                     <h3>Queued Songs: <span id="availableCount">@_availableSongs.Count</span></h3>
                 </div>
@@ -69,10 +68,6 @@
                 </ul>
             </div>
             <div class="toggle-container">
-                @if (!string.IsNullOrEmpty(_currentStreamer))
-                {
-                    <button id="resetBtn" class="small-button" @onclick="ResetPlayed">Reset</button>
-                }
                 <div class="toggle-right">
                     <span class="toggle-label">Toggle Wheel</span>
                     <label class="switch">

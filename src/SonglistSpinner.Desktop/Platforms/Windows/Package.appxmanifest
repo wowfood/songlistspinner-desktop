@@ -6,7 +6,7 @@
         xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
         IgnorableNamespaces="uap rescap">
 
-    <Identity Name="com.companyname.songlistspinner" Publisher="CN=wowfood" Version="1.1.0.0"/>
+    <Identity Name="com.wowfood.songlistspinner.desktop" Publisher="CN=wowfood" Version="1.1.0.0"/>
 
     <mp:PhoneIdentity PhoneProductId="7C77DB99-D08E-47E5-A6D9-19CA66DF53D4"
                       PhonePublisherId="00000000-0000-0000-0000-000000000000"/>

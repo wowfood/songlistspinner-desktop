@@ -8,7 +8,7 @@ using SonglistSpinner.Core.Services;
 
 namespace SonglistSpinner.Components.Pages;
 
-// Injected properties (Config, ApiService, SyncService, JS) are generated from @inject in Dashboard.razor.
+// Injected properties are generated from @inject directives in Dashboard.razor.
 public partial class Dashboard
 {
     private SpinnerQueueItem[] _allSongs = [];
@@ -46,7 +46,6 @@ public partial class Dashboard
 
     public async ValueTask DisposeAsync()
     {
-        SyncService.MessageReceived -= OnMessageReceived;
         _autoRefreshCts?.Cancel();
         _autoRefreshCts?.Dispose();
         _playedRefreshCts?.Cancel();
@@ -54,7 +53,6 @@ public partial class Dashboard
         _wheelCts.Cancel();
         _wheelCts.Dispose();
         _dotNetRef?.Dispose();
-        await SyncService.DisposeAsync();
         try
         {
             await JS.InvokeVoidAsync("document.body.classList.remove", "spinner-page");
@@ -75,8 +73,6 @@ public partial class Dashboard
         if (firstRender)
         {
             await JS.InvokeVoidAsync("document.body.classList.add", "spinner-page");
-            SyncService.MessageReceived += OnMessageReceived;
-
             _config = LocalSettings.ToSpinnerConfig(LocalSettings.LoadSettings());
             _isLockedDefault = _config.Streamer.HideChangeOptionWhenDefault
                                && !string.IsNullOrWhiteSpace(_config.Streamer.DefaultName);
@@ -223,16 +219,6 @@ public partial class Dashboard
         }
     }
 
-    private async Task ResetPlayed()
-    {
-        _playedSongs = [];
-        _availableSongs = SpinnerDataService.FilterAvailableSongs(_allSongs, _playedSongs, _config);
-        SetStatus($"Played songs reset for {_currentStreamer}");
-        await RebuildWheel(_wheelCts.Token);
-        _ = OverlayService.UpdateStateAsync(_config, _availableSongs, _playedSongs, _currentStreamer);
-        StateHasChanged();
-    }
-
     private void ChangeStreamer()
     {
         _showStreamerInput = true;
@@ -294,52 +280,6 @@ public partial class Dashboard
     {
         _ = OverlayService.BroadcastAsync("set_played_list_width", new { width, minWidth });
         await Task.CompletedTask;
-    }
-
-    private async Task OnMessageReceived(string messageType, string payloadJson)
-    {
-        await InvokeAsync(async () =>
-        {
-            try
-            {
-                var payload = JsonSerializer.Deserialize<JsonElement>(payloadJson);
-                switch (messageType)
-                {
-                    case "close_winner_modal":
-                        _winnerVisible = false;
-                        break;
-                    case "set_wheel_visible":
-                        if (payload.TryGetProperty("visible", out var vis))
-                        {
-                            _wheelVisible = vis.GetBoolean();
-                            await JS.InvokeVoidAsync("SpinnerInterop.setWheelVisible", _wheelVisible);
-                        }
-
-                        break;
-                    case "set_collapse":
-                        if (payload.TryGetProperty("collapsed", out var col))
-                        {
-                            _playedListCollapsed = col.GetBoolean();
-                            await JS.InvokeVoidAsync("SpinnerInterop.setPlayedListCollapsed",
-                                _playedListCollapsed, _config.SongList.PlayedListPosition);
-                        }
-
-                        break;
-                    case "set_played_list_width":
-                        if (payload.TryGetProperty("width", out var w) &&
-                            payload.TryGetProperty("minWidth", out var mw))
-                            await JS.InvokeVoidAsync("SpinnerInterop.setPlayedListWidth",
-                                w.GetString(), mw.GetString());
-                        break;
-                }
-            }
-            catch
-            {
-                /* ignore parse errors */
-            }
-
-            StateHasChanged();
-        });
     }
 
     private async Task AutoRefresh()

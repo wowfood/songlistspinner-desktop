@@ -142,7 +142,7 @@ public class LocalOverlayServer : IAsyncDisposable
                                            background:var(--app-button-bg);
                                            color:var(--app-button-text);
                                        }
-                                       #soungCounterSection{
+                                       #songCounterSection{
                                            display:flex;
                                            align-items:center;
                                            justify-content:space-between;
@@ -311,11 +311,11 @@ public class LocalOverlayServer : IAsyncDisposable
                                                max-height:40vh;
                                                border-top:2px solid var(--app-resize-handle-bg);
                                            }
-                                           #soungCounterSection{
+                                           #songCounterSection{
                                                flex-wrap: wrap;
                                                flex-shrink: 0;
                                            }
-                                           #soungCounterSection h3{
+                                           #songCounterSection h3{
                                                font-size:1rem;
                                                margin:0.5rem 0;
                                                flex-shrink: 0;
@@ -362,7 +362,7 @@ public class LocalOverlayServer : IAsyncDisposable
                                                    </div>
                                                </div>
                                                <div id="playedListContent">
-                                                   <div id="soungCounterSection">
+                                                   <div id="songCounterSection">
                                                        <h3>Played Songs: <span id="playedCount">0</span></h3>
                                                        <h3>Queued Songs: <span id="availableCount">0</span></h3>
                                                    </div>

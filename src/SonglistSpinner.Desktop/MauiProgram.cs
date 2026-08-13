@@ -28,7 +28,6 @@ public static class MauiProgram
         builder.Services.AddSingleton<IStreamerSongListCredentialStore>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
-        builder.Services.AddScoped<ISpinnerSyncService, NoOpSyncService>();
         builder.Services.AddSingleton<OverlayStateService>();
         builder.Services.AddSingleton<LocalOverlayServer>();
 
