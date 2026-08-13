@@ -37,7 +37,7 @@ jobs:
           workloads: maui-windows
 
       - name: Restore
-        run: dotnet restore SonglistSpinner.Desktop.sln
+        run: dotnet restore SonglistSpinner.Desktop.sln --property:Configuration=Release
 
       - name: Test
         run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
