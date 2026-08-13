@@ -1,0 +1,57 @@
+name: Windows CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Test, build, and publish
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET and MAUI Windows
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          workloads: maui-windows
+
+      - name: Restore
+        run: dotnet restore SonglistSpinner.Desktop.sln
+
+      - name: Test
+        run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
+
+      - name: Build
+        run: dotnet build SonglistSpinner.Desktop.sln --configuration Release --no-restore
+
+      - name: Create verified single executable
+        shell: pwsh
+        run: .\scripts\publish-single-file.ps1 -BuildNumber ${{ github.run_number }}
+
+      - name: Upload executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: songlistspinner-desktop-win-x64-${{ github.sha }}
+          path: artifacts/win-x64/SonglistSpinner.Desktop.exe
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0

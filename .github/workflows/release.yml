@@ -1,0 +1,79 @@
+name: Draft Windows release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Validate and draft release
+    runs-on: windows-2022
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Validate release tag
+        id: version
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+)$') {
+              throw "Release tags must use vMAJOR.MINOR.PATCH, for example v1.2.0."
+          }
+
+          "number=$($Matches[1])" >> $env:GITHUB_OUTPUT
+
+      - name: Set up .NET and MAUI Windows
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+          workloads: maui-windows
+
+      - name: Restore
+        run: dotnet restore SonglistSpinner.Desktop.sln
+
+      - name: Test
+        run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
+
+      - name: Create versioned single executable
+        shell: pwsh
+        run: >-
+          .\scripts\publish-single-file.ps1
+          -ReleaseVersion '${{ steps.version.outputs.number }}'
+          -BuildNumber ${{ github.run_number }}
+
+      - name: Create draft GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ github.ref_name }}'
+          $executable = 'artifacts/win-x64/SonglistSpinner.Desktop.exe'
+          $existingRelease = gh release view $tag --json isDraft 2>$null
+
+          if ($LASTEXITCODE -eq 0) {
+              $release = $existingRelease | ConvertFrom-Json
+              if (-not $release.isDraft) {
+                  throw "Release $tag is already published; refusing to replace its executable."
+              }
+
+              gh release upload $tag $executable --clobber
+          }
+          else {
+              gh release create $tag $executable `
+                  --verify-tag `
+                  --draft `
+                  --generate-notes `
+                  --title 'SonglistSpinner Desktop ${{ steps.version.outputs.number }}'
+          }
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "GitHub release creation or upload failed with exit code $LASTEXITCODE."
+          }

@@ -32,6 +32,14 @@ This repository was established as a clean, desktop-only continuation of ServerS
 - Blazor static assets and the Windows App SDK runtime are embedded in the executable.
 - The repeatable publish command verifies that no sidecar files remain.
 
+## Stage 3 release hardening status
+
+- Application, assembly, and publish version metadata share one semantic version.
+- A repository SDK policy keeps local and hosted builds on the .NET 10 toolchain family.
+- Windows CI runs tests, a Release build, and verified single-file publishing.
+- Semantic version tags create draft releases for manual review and publication.
+- Release automation does not change the staging API default.
+
 ## API v2 migration status
 
 Completed in the next baseline:

@@ -1,5 +1,7 @@
 # SonglistSpinner Desktop
 
+[![Windows CI](https://github.com/wowfood/songlistspinner-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/wowfood/songlistspinner-desktop/actions/workflows/ci.yml)
+
 SonglistSpinner Desktop is the Windows-only desktop edition of the StreamerSongList queue spinner. It is a .NET MAUI Blazor Hybrid application with shared queue and spinner models in a separate core library.
 
 ## Baseline
@@ -15,7 +17,7 @@ The queue and play-history client targets the documented StreamerSongList API v2
 
 ## Prerequisites
 
-- .NET 8 SDK
+- .NET 10 SDK (selected by `global.json`; the application still targets .NET 8)
 - .NET MAUI Windows workload
 - Windows App SDK prerequisites supplied by the .NET workload
 
@@ -39,6 +41,8 @@ The executable is written to
 MAUI, the Windows App SDK, MSIX, or an installer. WebView2 Evergreen remains the
 only external runtime requirement. See
 [docs/SINGLE_FILE_DISTRIBUTION.md](docs/SINGLE_FILE_DISTRIBUTION.md) for details.
+Versioned tag builds create reviewable draft GitHub releases; see
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Development credentials
 

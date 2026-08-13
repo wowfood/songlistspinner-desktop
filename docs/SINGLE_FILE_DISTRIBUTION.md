@@ -12,6 +12,12 @@ From the repository root in PowerShell:
 .\scripts\publish-single-file.ps1
 ```
 
+Optional release metadata can be supplied explicitly:
+
+```powershell
+.\scripts\publish-single-file.ps1 -ReleaseVersion 1.2.0 -BuildNumber 3
+```
+
 The script creates:
 
 ```text
@@ -20,6 +26,8 @@ artifacts\win-x64\SonglistSpinner.Desktop.exe
 
 It clears only that output directory before publishing and fails if anything
 other than the expected executable remains in the publish layout.
+It also verifies that the executable's product version matches the requested
+release version.
 
 ## End-user requirements
 

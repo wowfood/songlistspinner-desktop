@@ -1,5 +1,11 @@
 [CmdletBinding()]
-param()
+param(
+    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [string] $ReleaseVersion = '1.1.0',
+
+    [ValidateRange(1, 65535)]
+    [int] $BuildNumber = 2
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -25,7 +31,10 @@ $project = Join-Path $repositoryRoot 'src\SonglistSpinner.Desktop\SonglistSpinne
     --configuration Release `
     --runtime win-x64 `
     --self-contained true `
-    --output $outputDirectory
+    --output $outputDirectory `
+    -p:Version=$ReleaseVersion `
+    -p:ApplicationDisplayVersion=$ReleaseVersion `
+    -p:ApplicationVersion=$BuildNumber
 
 if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed with exit code $LASTEXITCODE."
@@ -39,5 +48,12 @@ if ($publishedFiles.Count -ne 1 -or $null -eq $executable) {
     throw "Single-file verification failed. Expected only SonglistSpinner.Desktop.exe, found: $publishedNames"
 }
 
+$versionInfo = [Diagnostics.FileVersionInfo]::GetVersionInfo($executable.FullName)
+$productVersion = $versionInfo.ProductVersion.Split('+')[0]
+
+if ($productVersion -ne $ReleaseVersion) {
+    throw "Version verification failed. Expected $ReleaseVersion, found $productVersion."
+}
+
 $sizeMiB = [Math]::Round($executable.Length / 1MB, 1)
-Write-Host "Single executable created: $($executable.FullName) ($sizeMiB MiB)"
+Write-Host "Single executable created: $($executable.FullName) (version $productVersion, build $BuildNumber, $sizeMiB MiB)"
