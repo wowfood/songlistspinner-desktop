@@ -30,6 +30,10 @@ jobs:
 
           "number=$($Matches[1])" >> $env:GITHUB_OUTPUT
 
+      - name: Confirm project version
+        shell: pwsh
+        run: .\scripts\assert-release-version.ps1 -ReleaseVersion '${{ steps.version.outputs.number }}'
+
       - name: Set up .NET and MAUI Windows
         uses: actions/setup-dotnet@v6
         with:
@@ -39,8 +43,14 @@ jobs:
       - name: Restore
         run: dotnet restore SonglistSpinner.Desktop.sln --property:Configuration=Release
 
+      - name: Verify formatting
+        run: dotnet format SonglistSpinner.Desktop.sln --verify-no-changes --severity warn --no-restore
+
       - name: Test
         run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
+
+      - name: Build
+        run: dotnet build SonglistSpinner.Desktop.sln --configuration Release --no-restore
 
       - name: Create versioned single executable
         shell: pwsh
@@ -49,6 +59,14 @@ jobs:
           -ReleaseVersion '${{ steps.version.outputs.number }}'
           -BuildNumber ${{ github.run_number }}
 
+      - name: Smoke-test executable
+        shell: pwsh
+        run: .\scripts\smoke-test-single-file.ps1
+
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: .\scripts\write-release-checksum.ps1
+
       - name: Create draft GitHub release
         shell: pwsh
         env:
@@ -56,6 +74,7 @@ jobs:
         run: |
           $tag = '${{ github.ref_name }}'
           $executable = 'artifacts/win-x64/SonglistSpinner.Desktop.exe'
+          $checksum = 'artifacts/release/SonglistSpinner.Desktop.exe.sha256'
           $existingRelease = gh release view $tag --json isDraft 2>$null
 
           if ($LASTEXITCODE -eq 0) {
@@ -64,10 +83,10 @@ jobs:
                   throw "Release $tag is already published; refusing to replace its executable."
               }
 
-              gh release upload $tag $executable --clobber
+              gh release upload $tag $executable $checksum --clobber
           }
           else {
-              gh release create $tag $executable `
+              gh release create $tag $executable $checksum `
                   --verify-tag `
                   --draft `
                   --generate-notes `

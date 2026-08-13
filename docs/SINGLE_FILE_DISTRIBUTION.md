@@ -27,7 +27,29 @@ artifacts\win-x64\SonglistSpinner.Desktop.exe
 It clears only that output directory before publishing and fails if anything
 other than the expected executable remains in the publish layout.
 It also verifies that the executable's product version matches the requested
-release version.
+release version. When version arguments are omitted, it reads `VersionPrefix`
+and `ApplicationVersion` directly from the desktop project so those values
+cannot drift between project and script defaults.
+
+To launch-test the bundled application and verify that its local OBS overlay is
+available:
+
+```powershell
+.\scripts\smoke-test-single-file.ps1
+```
+
+The smoke test starts only the executable it is given, checks
+`http://localhost:5150/overlay`, and stops that process when finished. Port 5150
+must not already be in use.
+
+To produce the optional checksum distributed with automated builds:
+
+```powershell
+.\scripts\write-release-checksum.ps1
+```
+
+This writes `artifacts\release\SonglistSpinner.Desktop.exe.sha256`; it does not
+add a sidecar file to the verified `artifacts\win-x64` directory.
 
 ## End-user requirements
 

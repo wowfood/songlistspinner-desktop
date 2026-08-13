@@ -1,10 +1,7 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')]
-    [string] $ReleaseVersion = '1.1.0',
-
-    [ValidateRange(1, 65535)]
-    [int] $BuildNumber = 2
+    [string] $ReleaseVersion,
+    [int] $BuildNumber
 )
 
 Set-StrictMode -Version Latest
@@ -14,6 +11,32 @@ $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $artifactRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 $outputDirectory = [IO.Path]::GetFullPath((Join-Path $artifactRoot 'win-x64'))
 $expectedPrefix = $artifactRoot + [IO.Path]::DirectorySeparatorChar
+$project = Join-Path $repositoryRoot 'src\SonglistSpinner.Desktop\SonglistSpinner.Desktop.csproj'
+[xml] $projectXml = Get-Content -LiteralPath $project -Raw
+
+if (-not $PSBoundParameters.ContainsKey('ReleaseVersion')) {
+    $versionNode = $projectXml.SelectSingleNode('/Project/PropertyGroup/VersionPrefix')
+    if ($null -eq $versionNode -or [string]::IsNullOrWhiteSpace($versionNode.InnerText)) {
+        throw "VersionPrefix is missing from $project."
+    }
+
+    $ReleaseVersion = $versionNode.InnerText.Trim()
+}
+
+if ($ReleaseVersion -notmatch '^\d+\.\d+\.\d+$') {
+    throw "ReleaseVersion must use MAJOR.MINOR.PATCH format."
+}
+
+if (-not $PSBoundParameters.ContainsKey('BuildNumber')) {
+    $buildNode = $projectXml.SelectSingleNode('/Project/PropertyGroup/ApplicationVersion')
+    if ($null -eq $buildNode -or -not [int]::TryParse($buildNode.InnerText, [ref] $BuildNumber)) {
+        throw "ApplicationVersion is missing or invalid in $project."
+    }
+}
+
+if ($BuildNumber -lt 1 -or $BuildNumber -gt 65535) {
+    throw "BuildNumber must be between 1 and 65535."
+}
 
 if (-not $outputDirectory.StartsWith($expectedPrefix, [StringComparison]::OrdinalIgnoreCase)) {
     throw "Unsafe output directory: $outputDirectory"
@@ -24,8 +47,6 @@ if (Test-Path -LiteralPath $outputDirectory) {
 }
 
 New-Item -ItemType Directory -Path $outputDirectory | Out-Null
-
-$project = Join-Path $repositoryRoot 'src\SonglistSpinner.Desktop\SonglistSpinner.Desktop.csproj'
 
 & dotnet publish $project `
     --configuration Release `

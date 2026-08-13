@@ -40,6 +40,22 @@ This repository was established as a clean, desktop-only continuation of ServerS
 - Semantic version tags create draft releases for manual review and publication.
 - Release automation does not change the staging API default.
 
+## Code and product cleanup status
+
+- Removed the unused server-era synchronization abstraction, request DTOs, and no-op desktop service.
+- Removed unreachable template pages, layouts, sample assets, and stock .NET artwork.
+- Replaced the template icon and splash mark with SonglistSpinner artwork.
+- Corrected the Windows application identity and the played-song counter identifier.
+- Removed the misleading local history reset action; API play history remains the source of truth.
+
+## Release automation and QA status
+
+- CI enforces formatting in addition to tests and the Release build.
+- The published executable is launched and its local OBS overlay is smoke-tested.
+- Every candidate receives a SHA-256 checksum alongside the single executable.
+- Release tags must match the version declared in the desktop project.
+- Dependabot checks NuGet packages and GitHub Actions weekly.
+
 ## API v2 migration status
 
 Completed in the next baseline:

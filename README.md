@@ -41,7 +41,9 @@ The executable is written to
 MAUI, the Windows App SDK, MSIX, or an installer. WebView2 Evergreen remains the
 only external runtime requirement. See
 [docs/SINGLE_FILE_DISTRIBUTION.md](docs/SINGLE_FILE_DISTRIBUTION.md) for details.
-Versioned tag builds create reviewable draft GitHub releases; see
+Windows QA also launches the built executable, verifies its local OBS overlay,
+and produces a SHA-256 checksum. Versioned tag builds create reviewable draft
+GitHub releases; see
 [docs/RELEASING.md](docs/RELEASING.md).
 
 ## Development credentials

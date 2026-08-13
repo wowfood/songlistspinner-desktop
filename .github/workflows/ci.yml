@@ -18,7 +18,7 @@ concurrency:
 
 jobs:
   validate:
-    name: Test, build, and publish
+    name: Test, build, smoke-test, and publish
     runs-on: windows-2022
     timeout-minutes: 45
 
@@ -37,6 +37,9 @@ jobs:
       - name: Restore
         run: dotnet restore SonglistSpinner.Desktop.sln --property:Configuration=Release
 
+      - name: Verify formatting
+        run: dotnet format SonglistSpinner.Desktop.sln --verify-no-changes --severity warn --no-restore
+
       - name: Test
         run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
 
@@ -47,11 +50,21 @@ jobs:
         shell: pwsh
         run: .\scripts\publish-single-file.ps1 -BuildNumber ${{ github.run_number }}
 
-      - name: Upload executable
+      - name: Smoke-test executable
+        shell: pwsh
+        run: .\scripts\smoke-test-single-file.ps1
+
+      - name: Create SHA-256 checksum
+        shell: pwsh
+        run: .\scripts\write-release-checksum.ps1
+
+      - name: Upload release candidate
         uses: actions/upload-artifact@v7
         with:
           name: songlistspinner-desktop-win-x64-${{ github.sha }}
-          path: artifacts/win-x64/SonglistSpinner.Desktop.exe
+          path: |
+            artifacts/win-x64/SonglistSpinner.Desktop.exe
+            artifacts/release/SonglistSpinner.Desktop.exe.sha256
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
