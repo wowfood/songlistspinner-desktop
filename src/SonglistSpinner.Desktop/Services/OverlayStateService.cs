@@ -19,26 +19,38 @@ public class OverlayStateService
 
     private SpinnerConfig _config = new();
     private string _currentStreamer = "";
+    private bool _playedListCollapsed;
+    private string _playedListMinWidth = "";
+    private string _playedListWidth = "";
+    private SpinnerQueueItem? _nowPlaying;
     private PlayHistoryItem[] _playedSongs = [];
     public int Port { get; } = 5150;
     public string OverlayUrl => $"http://localhost:{Port}/overlay";
 
-    public Task UpdateStateAsync(SpinnerConfig config, List<SpinnerQueueItem> available,
-        PlayHistoryItem[] played, string streamer)
+    public Task UpdateStateAsync(
+        SpinnerConfig config,
+        List<SpinnerQueueItem> available,
+        PlayHistoryItem[] played,
+        SpinnerQueueItem? nowPlaying,
+        string streamer)
     {
         _config = config;
         _availableSongs = available;
         _playedSongs = played;
+        _nowPlaying = nowPlaying;
         _currentStreamer = streamer;
 
         var wheelItems = BuildWheelItems(available);
         var playedTexts = played.Select(s => SpinnerDataService.CreatePlayedSongText(s, config)).ToList();
+        var nowPlayingText = BuildNowPlayingText(nowPlaying, config);
 
         return BroadcastAsync("update_songs", new
         {
+            config,
             streamer,
             wheelItems,
             playedTexts,
+            nowPlayingText,
             playedCount = played.Length,
             availableCount = available.Count
         });
@@ -52,6 +64,19 @@ public class OverlayStateService
     public Task BroadcastCloseWinnerAsync()
     {
         return BroadcastAsync("close_winner", new { });
+    }
+
+    public Task UpdatePlayedListCollapsedAsync(bool collapsed)
+    {
+        _playedListCollapsed = collapsed;
+        return BroadcastAsync("set_collapse", new { collapsed });
+    }
+
+    public Task UpdatePlayedListWidthAsync(string width, string minWidth)
+    {
+        _playedListWidth = width;
+        _playedListMinWidth = minWidth;
+        return BroadcastAsync("set_played_list_width", new { width, minWidth });
     }
 
     public Task BroadcastAsync(string eventName, object payload)
@@ -87,6 +112,7 @@ public class OverlayStateService
     {
         var wheelItems = BuildWheelItems(_availableSongs);
         var playedTexts = _playedSongs.Select(s => SpinnerDataService.CreatePlayedSongText(s, _config)).ToList();
+        var nowPlayingText = BuildNowPlayingText(_nowPlaying, _config);
 
         var payload = new
         {
@@ -94,8 +120,12 @@ public class OverlayStateService
             streamer = _currentStreamer,
             wheelItems,
             playedTexts,
+            nowPlayingText,
             playedCount = _playedSongs.Length,
-            availableCount = _availableSongs.Count
+            availableCount = _availableSongs.Count,
+            playedListCollapsed = _playedListCollapsed,
+            playedListWidth = _playedListWidth,
+            playedListMinWidth = _playedListMinWidth
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOpts);
@@ -107,5 +137,14 @@ public class OverlayStateService
         return songs.Count > 0
             ? songs.Select(s => (object)new { label = SpinnerDataService.BuildWheelLabel(s) }).ToArray()
             : [new { label = "Waiting for Dashboard..." }];
+    }
+
+    private static string? BuildNowPlayingText(SpinnerQueueItem? item, SpinnerConfig config)
+    {
+        if (item is null) return null;
+        var fields = config.NowPlaying.Fields is { Length: > 0 }
+            ? config.NowPlaying.Fields
+            : ["artist", "title"];
+        return SpinnerDataService.CreateSongTextForFields(item, fields);
     }
 }

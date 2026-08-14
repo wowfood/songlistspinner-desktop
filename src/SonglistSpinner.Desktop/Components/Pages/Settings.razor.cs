@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Text.Json;
+using Microsoft.AspNetCore.Components.Routing;
 using MudBlazor.Utilities;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
@@ -16,10 +18,18 @@ public partial class Settings
     private string? _credentialTestResult;
     private bool _credentialTestSucceeded;
     private string _credentialToken = "";
+    private bool _clearCredentialOnSave;
     private SettingsDto? _dto;
     private StreamerSongListCredential? _existingCredential;
     private bool _hasCredential;
+    private bool _navigationPromptOpen;
+    private bool _allowNavigation;
+    private string? _savedFormState;
     private bool _testingCredential;
+
+    private bool HasUnsavedChanges =>
+        _savedFormState is not null &&
+        !StringComparer.Ordinal.Equals(_savedFormState, CaptureFormState());
 
     private MudColor ColorBackground
     {
@@ -96,48 +106,69 @@ public partial class Settings
             _credentialClientId = _existingCredential.ClientId ?? "";
             _hasCredential = true;
         }
+
+        _savedFormState = CaptureFormState();
     }
 
-    private async Task Save()
+    private Task Save()
+    {
+        return SaveCoreAsync();
+    }
+
+    private async Task<bool> SaveCoreAsync()
     {
         _vm.SaveSuccess = false;
         _vm.SaveError = null;
-        if (_dto == null) return;
+        if (_dto == null) return false;
 
         try
         {
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
 
-            var token = string.IsNullOrWhiteSpace(_credentialToken)
-                ? _existingCredential?.Token
-                : _credentialToken.Trim();
-            if (!string.IsNullOrWhiteSpace(token))
+            var submittedToken = _credentialToken.Trim();
+            if (_clearCredentialOnSave && string.IsNullOrWhiteSpace(submittedToken))
             {
-                _existingCredential = new StreamerSongListCredential(
-                    _credentialKind,
-                    token,
-                    string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
-                await CredentialStore.SaveCredentialAsync(_existingCredential);
-                _credentialToken = "";
-                _hasCredential = true;
+                await CredentialStore.ClearCredentialAsync();
+                _existingCredential = null;
+                _clearCredentialOnSave = false;
+                _hasCredential = false;
+            }
+            else
+            {
+                var token = string.IsNullOrWhiteSpace(submittedToken)
+                    ? _existingCredential?.Token
+                    : submittedToken;
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    _existingCredential = new StreamerSongListCredential(
+                        _credentialKind,
+                        token,
+                        string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
+                    await CredentialStore.SaveCredentialAsync(_existingCredential);
+                    _credentialToken = "";
+                    _hasCredential = true;
+                    _clearCredentialOnSave = false;
+                }
             }
 
             _vm.SaveSuccess = true;
+            _savedFormState = CaptureFormState();
+            return true;
         }
         catch (Exception ex)
         {
             _vm.SaveError = ex.Message;
+            return false;
         }
     }
 
-    private async Task ClearApiCredential()
+    private void ClearApiCredential()
     {
-        await CredentialStore.ClearCredentialAsync();
-        _existingCredential = null;
         _credentialToken = "";
         _credentialClientId = "";
         _credentialKind = StreamerSongListCredentialKind.Streamer;
+        _clearCredentialOnSave = true;
         _hasCredential = false;
         _credentialTestResult = null;
         _credentialTestSucceeded = false;
@@ -153,8 +184,7 @@ public partial class Settings
 
         try
         {
-            await Save();
-            if (!string.IsNullOrWhiteSpace(_vm.SaveError))
+            if (!await SaveCoreAsync())
             {
                 _credentialTestResult = $"Unable to save the credential: {_vm.SaveError}";
                 return;
@@ -185,4 +215,77 @@ public partial class Settings
             _testingCredential = false;
         }
     }
+
+    private async Task ConfirmNavigationAsync(LocationChangingContext context)
+    {
+        if (_allowNavigation || !HasUnsavedChanges) return;
+
+        context.PreventNavigation();
+        if (_navigationPromptOpen) return;
+
+        _navigationPromptOpen = true;
+        try
+        {
+            var choice = await DialogService.ShowMessageBoxAsync(
+                "Unsaved settings",
+                "Settings have been changed. Please save them before leaving, or abandon your changes.",
+                yesText: "Save and leave",
+                noText: "Abandon changes",
+                cancelText: "Keep editing");
+
+            if (choice == true)
+            {
+                if (!await SaveCoreAsync()) return;
+            }
+            else if (choice is not false)
+            {
+                return;
+            }
+
+            _allowNavigation = true;
+            Navigation.NavigateTo(context.TargetLocation);
+        }
+        finally
+        {
+            _navigationPromptOpen = false;
+        }
+    }
+
+    private string CaptureFormState()
+    {
+        if (_dto is null) return "";
+
+        return JsonSerializer.Serialize(new SettingsFormSnapshot(
+            JsonSerializer.Serialize(_dto),
+            _vm.WheelColorsRaw,
+            CaptureDisplayFields(_vm.DisplayFields),
+            CaptureDisplayFields(_vm.NowPlayingDisplayFields),
+            _vm.PlayedListBgHex,
+            _vm.PlayedListBgAlpha,
+            _credentialKind,
+            _credentialClientId,
+            _credentialToken,
+            _hasCredential,
+            _clearCredentialOnSave));
+    }
+
+    private static string CaptureDisplayFields(IEnumerable<DisplayField> fields)
+    {
+        return JsonSerializer.Serialize(fields.Select(field => new DisplayFieldSnapshot(field.Name, field.Selected)));
+    }
+
+    private sealed record DisplayFieldSnapshot(string Name, bool Selected);
+
+    private sealed record SettingsFormSnapshot(
+        string Settings,
+        string WheelColors,
+        string DisplayFields,
+        string NowPlayingDisplayFields,
+        string PlayedListBackground,
+        double PlayedListBackgroundAlpha,
+        StreamerSongListCredentialKind CredentialKind,
+        string CredentialClientId,
+        string CredentialToken,
+        bool HasCredential,
+        bool ClearCredentialOnSave);
 }

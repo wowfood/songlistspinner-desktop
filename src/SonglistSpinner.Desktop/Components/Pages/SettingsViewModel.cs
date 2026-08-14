@@ -12,8 +12,11 @@ public sealed class SettingsViewModel
     public bool SaveSuccess { get; set; }
     public string? SaveError { get; set; }
     public List<DisplayField> DisplayFields { get; private set; } = new();
+    public List<DisplayField> NowPlayingDisplayFields { get; private set; } = new();
     public int DragIdx { get; set; } = -1;
     public int DragOverIdx { get; set; } = -1;
+    public int NowPlayingDragIdx { get; set; } = -1;
+    public int NowPlayingDragOverIdx { get; set; } = -1;
     public string PlayedListBgHex { get; set; } = "#000000";
     public double PlayedListBgAlpha { get; set; } = 0.7;
 
@@ -29,11 +32,22 @@ public sealed class SettingsViewModel
         }
 
         InitDisplayFields(dto.SongListFields);
+        InitNowPlayingDisplayFields(dto.NowPlayingFields);
         InitPlayedListBg(dto.ColorPlayedListBackground);
         dto.ColorPointer = NormalizeHexColor(dto.ColorPointer);
     }
 
     public void InitDisplayFields(string json)
+    {
+        DisplayFields = BuildDisplayFields(json);
+    }
+
+    public void InitNowPlayingDisplayFields(string json)
+    {
+        NowPlayingDisplayFields = BuildDisplayFields(json);
+    }
+
+    private static List<DisplayField> BuildDisplayFields(string json)
     {
         string[] selected;
         try
@@ -45,7 +59,7 @@ public sealed class SettingsViewModel
             selected = ["artist", "title"];
         }
 
-        DisplayFields = selected
+        return selected
             .Where(f => ValidFields.Contains(f))
             .Select(f => new DisplayField { Name = f, Selected = true })
             .Concat(ValidFields.Except(selected).Select(f => new DisplayField { Name = f, Selected = false }))
@@ -57,6 +71,11 @@ public sealed class SettingsViewModel
         DisplayFields[idx].Selected = !DisplayFields[idx].Selected;
     }
 
+    public void ToggleNowPlayingField(int idx)
+    {
+        NowPlayingDisplayFields[idx].Selected = !NowPlayingDisplayFields[idx].Selected;
+    }
+
     public void DropField(int targetIdx)
     {
         if (DragIdx < 0 || DragIdx == targetIdx) return;
@@ -66,6 +85,17 @@ public sealed class SettingsViewModel
         DisplayFields.Insert(insertIdx, item);
         DragIdx = -1;
         DragOverIdx = -1;
+    }
+
+    public void DropNowPlayingField(int targetIdx)
+    {
+        if (NowPlayingDragIdx < 0 || NowPlayingDragIdx == targetIdx) return;
+        var item = NowPlayingDisplayFields[NowPlayingDragIdx];
+        NowPlayingDisplayFields.RemoveAt(NowPlayingDragIdx);
+        var insertIdx = NowPlayingDragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+        NowPlayingDisplayFields.Insert(insertIdx, item);
+        NowPlayingDragIdx = -1;
+        NowPlayingDragOverIdx = -1;
     }
 
     public void InitPlayedListBg(string value)
@@ -129,6 +159,10 @@ public sealed class SettingsViewModel
 
         var fields = DisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
         dto.SongListFields = JsonSerializer.Serialize(fields.Length > 0 ? fields : new[] { "artist", "title" });
+
+        var nowPlayingFields = NowPlayingDisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
+        dto.NowPlayingFields = JsonSerializer.Serialize(
+            nowPlayingFields.Length > 0 ? nowPlayingFields : new[] { "artist", "title" });
 
         dto.ColorPlayedListBackground = ComputedPlayedListBg();
     }

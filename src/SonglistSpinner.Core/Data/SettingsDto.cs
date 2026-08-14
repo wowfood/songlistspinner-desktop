@@ -19,6 +19,12 @@ public class SettingsDto
     public string PlayHistoryPeriod { get; set; } = "week";
     [JsonPropertyName("AutoPlay")]
     public bool UpdateQueueAfterSpin { get; set; }
+    public bool DisplayNowPlaying { get; set; }
+    public string NowPlayingFields { get; set; } = """["artist","title"]""";
+    public string NowPlayingFontFamily { get; set; } = "sans-serif";
+    public string NowPlayingFontSize { get; set; } = "1.125rem";
+    public string NowPlayingWidth { get; set; } = "28rem";
+    public string NowPlayingPosition { get; set; } = "bottom-left";
     public bool DebugMode { get; set; }
     public string ColorText { get; set; } = "#ffffff";
     public string ColorStatusBackground { get; set; } = "rgba(0, 0, 0, 0.7)";

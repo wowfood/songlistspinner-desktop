@@ -4,7 +4,15 @@ namespace SonglistSpinner.Core.Contracts;
 
 public interface ISpinnerApiService
 {
+    Task<int> ResolveStreamerIdAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default);
+
     Task<SpinnerQueueItem[]> FetchQueueAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default);
+
+    Task<SpinnerQueueSnapshot> FetchQueueSnapshotAsync(
         StreamerSongListChannel channel,
         CancellationToken cancellationToken = default);
 
@@ -14,6 +22,14 @@ public interface ISpinnerApiService
         CancellationToken cancellationToken = default);
 
     Task MarkQueueItemAsPlayedAsync(
+        int queueId,
+        CancellationToken cancellationToken = default);
+
+    Task MarkNowPlayingAsPlayedAsync(
+        int streamerId,
+        CancellationToken cancellationToken = default);
+
+    Task PromoteQueueItemToNowPlayingAsync(
         int queueId,
         CancellationToken cancellationToken = default);
 }

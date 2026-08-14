@@ -50,6 +50,17 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
             fields = ["artist", "title"];
         }
 
+        string[] nowPlayingFields;
+        try
+        {
+            nowPlayingFields = JsonSerializer.Deserialize<string[]>(dto.NowPlayingFields, JsonOpts) ??
+                               ["artist", "title"];
+        }
+        catch
+        {
+            nowPlayingFields = ["artist", "title"];
+        }
+
         return new SpinnerConfig
         {
             Debug = dto.DebugMode,
@@ -78,6 +89,15 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
                 FontFamily = dto.PlayedListFontFamily,
                 FontSize = dto.PlayedListFontSize,
                 MaxLines = dto.PlayedListMaxLines
+            },
+            NowPlaying = new SpinnerNowPlayingConfig
+            {
+                Enabled = dto.DisplayNowPlaying,
+                Fields = nowPlayingFields,
+                FontFamily = dto.NowPlayingFontFamily,
+                FontSize = dto.NowPlayingFontSize,
+                Width = dto.NowPlayingWidth,
+                Position = dto.NowPlayingPosition
             },
             Colors = new SpinnerColors
             {

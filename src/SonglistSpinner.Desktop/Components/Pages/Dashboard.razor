@@ -2,7 +2,9 @@
 @page "/dashboard"
 @layout MainLayout
 @inject ISpinnerApiService ApiService
+@inject IStreamerSongListEventSource EventSource
 @inject ILocalSettingsService LocalSettings
+@inject NowPlayingTransitionService NowPlayingTransitions
 @inject IJSRuntime JS
 @inject OverlayStateService OverlayService
 @implements IAsyncDisposable

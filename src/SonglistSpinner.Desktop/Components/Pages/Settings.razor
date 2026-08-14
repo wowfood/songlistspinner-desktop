@@ -3,6 +3,11 @@
 @inject IStreamerSongListCredentialStore CredentialStore
 @inject ISpinnerApiService ApiService
 @inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
+@inject IDialogService DialogService
+@inject NavigationManager Navigation
+
+<NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"
+                OnBeforeInternalNavigation="ConfirmNavigationAsync"/>
 
 <h1 style="color:#6441a5; margin-bottom:1rem;">Settings</h1>
 
@@ -96,10 +101,21 @@ else
                     <h3>Queue Automation</h3>
                     <div class="ss-field">
                         <label>
-                            <InputCheckbox @bind-Value="_dto.UpdateQueueAfterSpin"/>
+                            <InputCheckbox @bind-Value="_dto.UpdateQueueAfterSpin"
+                                           disabled="@_dto.DisplayNowPlaying"/>
                             Mark the winner as played when its popup closes
                         </label>
                         <div class="ss-field-hint">Moves the selected queue entry directly into play history without using the now-playing state.</div>
+                    </div>
+                    <div class="ss-field">
+                        <label>
+                            <InputCheckbox @bind-Value="_dto.DisplayNowPlaying"/>
+                            Display Now Playing
+                        </label>
+                        <div class="ss-field-hint">
+                            When the winner popup closes, completes the current song and promotes the winner to Playing.
+                            This overrides the direct-to-history option above.
+                        </div>
                     </div>
                 </section>
 
@@ -219,6 +235,80 @@ else
                         <div class="ss-field-hint">Enter hex values like #ff6b6b, one per line.</div>
                     </div>
                 </section>
+
+                @if (_dto.DisplayNowPlaying)
+                {
+                    <section class="ss-settings-section">
+                        <h3>Now Playing Overlay</h3>
+                        <div class="ss-field">
+                            <label>Display Fields</label>
+                            <div class="ss-field-multiselect">
+                                @for (var i = 0; i < _vm.NowPlayingDisplayFields.Count; i++)
+                                {
+                                    var idx = i;
+                                    var field = _vm.NowPlayingDisplayFields[i];
+                                    <div
+                                        class="ss-chip @(field.Selected ? "ss-chip-selected" : "ss-chip-unselected") @(_vm.NowPlayingDragOverIdx == idx && _vm.NowPlayingDragIdx != idx ? "ss-chip-drag-over" : "")"
+                                        draggable="true"
+                                        @ondragstart="@(() =>
+                                                      {
+                                                          _vm.NowPlayingDragIdx = idx;
+                                                          _vm.NowPlayingDragOverIdx = -1;
+                                                      })"
+                                        @ondragover="@(_ =>
+                                                     {
+                                                         if (_vm.NowPlayingDragOverIdx != idx) _vm.NowPlayingDragOverIdx = idx;
+                                                     })"
+                                        @ondragover:preventDefault
+                                        @ondrop="@(() => _vm.DropNowPlayingField(idx))"
+                                        @ondragend="@(() =>
+                                                    {
+                                                        _vm.NowPlayingDragIdx = -1;
+                                                        _vm.NowPlayingDragOverIdx = -1;
+                                                    })"
+                                        @onclick="@(() => _vm.ToggleNowPlayingField(idx))">
+                                        <span class="ss-chip-handle">⠿</span>
+                                        @field.Name
+                                    </div>
+                                }
+                            </div>
+                            <div class="ss-field-hint">Click to toggle. Drag to control the field order.</div>
+                        </div>
+                        <div class="ss-field">
+                            <label>Position</label>
+                            <InputSelect @bind-Value="_dto.NowPlayingPosition">
+                                <option value="top-left">Top left</option>
+                                <option value="top-center">Top center</option>
+                                <option value="top-right">Top right</option>
+                                <option value="bottom-left">Bottom left</option>
+                                <option value="bottom-center">Bottom center</option>
+                                <option value="bottom-right">Bottom right</option>
+                            </InputSelect>
+                        </div>
+                        <div class="ss-field">
+                            <label>Panel Width</label>
+                            <InputText @bind-Value="_dto.NowPlayingWidth" placeholder="28rem"/>
+                            <div class="ss-field-hint">Accepts CSS sizes such as 28rem, 480px, or 40vw.</div>
+                        </div>
+                        <div class="ss-field">
+                            <label>Font Family</label>
+                            <InputSelect @bind-Value="_dto.NowPlayingFontFamily">
+                                <option value="sans-serif">Sans-serif</option>
+                                <option value="serif">Serif</option>
+                                <option value="monospace">Monospace</option>
+                                <option value="Arial">Arial</option>
+                                <option value="Helvetica">Helvetica</option>
+                                <option value="Verdana">Verdana</option>
+                                <option value="Georgia">Georgia</option>
+                                <option value="'Courier New'">Courier New</option>
+                            </InputSelect>
+                        </div>
+                        <div class="ss-field">
+                            <label>Font Size</label>
+                            <InputText @bind-Value="_dto.NowPlayingFontSize" placeholder="1.125rem"/>
+                        </div>
+                    </section>
+                }
             </div>
 
             @* Full-width Colors section *@

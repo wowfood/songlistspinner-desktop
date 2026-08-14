@@ -49,7 +49,9 @@ try {
             $response = Invoke-WebRequest -Uri $overlayUri -TimeoutSec 2 -UseBasicParsing
             if ($response.StatusCode -eq 200 -and
                 $response.Content.Contains('<title>Overlay') -and
-                $response.Content.Contains('SonglistSpinner')) {
+                $response.Content.Contains('SonglistSpinner') -and
+                $response.Content.Contains('id="nowPlaying"') -and
+                -not $response.Content.Contains('id="collapseBtn"')) {
                 Write-Host "Smoke test passed: $overlayUri returned the SonglistSpinner overlay."
                 return
             }

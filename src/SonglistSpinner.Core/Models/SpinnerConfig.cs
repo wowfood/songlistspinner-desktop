@@ -14,5 +14,6 @@ public class SpinnerConfig
     public SpinnerStreamerConfig Streamer { get; init; } = new();
     public SpinnerSongListConfig SongList { get; init; } = new();
     public SpinnerPlayedListConfig PlayedList { get; init; } = new();
+    public SpinnerNowPlayingConfig NowPlaying { get; init; } = new();
     public SpinnerColors Colors { get; init; } = new();
 }

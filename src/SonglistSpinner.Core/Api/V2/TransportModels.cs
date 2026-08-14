@@ -2,9 +2,15 @@ using System.Text.Json.Serialization;
 
 namespace SonglistSpinner.Core.Api.V2;
 
+internal sealed class StreamerDetailsDto
+{
+    [JsonPropertyName("id")] public int Id { get; init; }
+}
+
 internal sealed class QueueResponseDto
 {
     [JsonPropertyName("items")] public List<QueueDetailsDto>? Items { get; init; }
+    [JsonPropertyName("playing")] public QueueDetailsDto? Playing { get; init; }
     [JsonPropertyName("total")] public int Total { get; init; }
 }
 

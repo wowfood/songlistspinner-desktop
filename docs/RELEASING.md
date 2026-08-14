@@ -18,10 +18,10 @@ Windows Server 2022 runner. It:
 7. Launches the executable and checks its local OBS overlay endpoint.
 8. Produces a SHA-256 checksum and retains both release assets for 14 days.
 
-The application continues to target .NET 8. The repository-root `global.json`
+The application targets .NET 10 and MAUI 10. The repository-root `global.json`
 pins builds to the .NET 10 SDK family while allowing compatible feature-band
-and servicing updates. The newer SDK remains able to target .NET 8 and provides
-a consistent MAUI toolchain locally and on hosted runners.
+and servicing updates, providing a consistent MAUI toolchain locally and on
+hosted runners.
 
 ## Local candidate build
 
