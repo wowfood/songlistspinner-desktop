@@ -1,76 +1,92 @@
 # Release process
 
-The release pipeline validates and drafts releases for the Windows desktop
-application. The production StreamerSongList API cutover remains a separate,
-intentionally deferred phase.
+The Windows desktop application uses GitHub Releases as both its distribution
+channel and its update-notification source. Releases are immutable and use a
+`vMAJOR.MINOR.PATCH` tag generated from the desktop project's `VersionPrefix`.
 
-## Continuous integration
+## Branch workflow
 
-Every push and pull request to `main` runs the `Windows CI` workflow on a fixed
-Windows Server 2022 runner. It:
+The recommended repository layout is:
 
-1. Installs the current .NET 10 SDK and MAUI Windows workload.
-2. Restores the solution.
-3. Verifies that committed C# formatting is clean.
-4. Runs all tests in Release configuration.
-5. Builds the complete solution in Release configuration.
-6. Runs the same verified single-file publish script used locally.
-7. Launches the executable and checks its local OBS overlay endpoint.
-8. Produces a SHA-256 checksum and retains both release assets for 14 days.
+1. Make and test changes on `develop` or a short-lived branch based on it.
+2. Open a pull request from `develop` into `main`.
+3. Complete interactive QA using the pull request's CI artifact if needed.
+4. Merge only when `VersionPrefix` identifies the release being published.
 
-The application targets .NET 10 and MAUI 10. The repository-root `global.json`
-pins builds to the .NET 10 SDK family while allowing compatible feature-band
-and servicing updates, providing a consistent MAUI toolchain locally and on
-hosted runners.
+Pushes to `develop`, pushes to `main`, and pull requests targeting `main` run
+the complete Windows validation job. Only a successful push to `main` runs the
+release job, so opening or updating a pull request cannot publish a release.
+
+## Versioning requirement
+
+Before each release merge, update these values in
+`src/SonglistSpinner.Desktop/SonglistSpinner.Desktop.csproj`:
+
+- `VersionPrefix` to the next `MAJOR.MINOR.PATCH` version.
+- `ApplicationVersion` to a higher positive Windows build number.
+
+The first automated release may use the current `1.1.0` version because that
+tag does not yet exist. Every later release merge must increment
+`VersionPrefix`. If the generated tag already exists, the release job stops
+without replacing the existing executable.
+
+## Automated validation and publishing
+
+The `Windows CI` workflow:
+
+1. Reads and validates `VersionPrefix`.
+2. Installs the .NET 10 SDK and MAUI Windows workload.
+3. Restores, format-checks, tests, and builds the solution in Release mode.
+4. Creates the verified unpackaged, self-contained `win-x64` executable.
+5. Launches it and checks the local OBS overlay endpoint.
+6. Creates a SHA-256 checksum.
+7. Retains both files as a workflow artifact for 14 days.
+8. On `main` only, creates `v<VersionPrefix>`, generates release notes, marks
+   the release as latest, and attaches:
+   - `SonglistSpinner.Desktop.exe`
+   - `SonglistSpinner.Desktop.exe.sha256`
+
+The executable remains a single-file application. The checksum is a separate
+release download used to verify the executable; users do not need to keep it
+beside the application.
 
 ## Local candidate build
 
-The checked-in application version is `1.1.0`. To create a candidate with an
-explicit semantic version and Windows build number:
+To create a candidate using the checked-in version:
+
+```powershell
+.\scripts\publish-single-file.ps1
+```
+
+To test a proposed semantic version and Windows build number explicitly:
 
 ```powershell
 .\scripts\publish-single-file.ps1 -ReleaseVersion 1.2.0 -BuildNumber 3
 ```
 
-The script accepts only `MAJOR.MINOR.PATCH` release versions and Windows build
-numbers from 1 through 65535. It verifies both the one-file layout and the
+The script accepts only `MAJOR.MINOR.PATCH` release versions and build numbers
+from 1 through 65535. It verifies both the one-file layout and the executable's
 embedded product version before succeeding.
 
-## Draft a GitHub release
+## Release QA
 
-After the intended commit has passed `Windows CI`, update `VersionPrefix` in the
-desktop project (and increment `ApplicationVersion` for the next checked-in
-Windows build), commit that change, and create an annotated tag whose value
-matches `VersionPrefix`:
+Before merging `develop` into `main`:
 
-```powershell
-git tag -a v1.2.0 -m "SonglistSpinner Desktop 1.2.0"
-git push origin v1.2.0
-```
-
-The `Draft Windows release` workflow rejects a tag that differs from the project
-version. It repeats formatting, tests, build, version verification, launch smoke
-testing, and checksum generation before creating a draft GitHub release with
-generated notes. It does not publish the release automatically. Review the notes
-and attached assets, then publish the draft from GitHub when ready.
-
-Re-running a tag workflow replaces the executable only while the release is
-still a draft. It refuses to alter an already published release.
-
-## Release checks
-
-Before publishing the draft:
-
-- Confirm the workflow and all tests passed.
-- Confirm the release contains `SonglistSpinner.Desktop.exe` and its `.sha256` file.
-- Verify the downloaded executable against the SHA-256 checksum.
-- Launch the executable on a clean Windows account or test machine; CI smoke
-  testing verifies startup and the overlay but does not replace interactive QA.
-- Test saving a streamer access token without exposing it in logs or screenshots.
-- Test queue loading, spinning, direct mark-as-played, history refresh, and the
+- Confirm the pull request workflow and all tests passed.
+- Download and launch the CI artifact on a clean Windows account or test
+  machine; automated startup and overlay smoke testing do not replace
+  interactive QA.
+- Test connection setup without exposing the streamer token in logs or
+  screenshots.
+- Test queue loading, spinning, all winner actions, history refresh, and the
   OBS overlay at `http://localhost:5150/overlay`.
+- Confirm the version displayed under Settings > Advanced is the intended
+  release version.
 - Expect an unsigned build to show Windows SmartScreen reputation warnings.
   Code signing can be added later when a suitable certificate and protected
   signing secret are available.
 - Do not switch the default API URL from staging until the production v2 API is
   officially available and separately validated.
+
+After the merge, confirm the release contains the executable and checksum and
+that the update notification in an older build links to the new release.

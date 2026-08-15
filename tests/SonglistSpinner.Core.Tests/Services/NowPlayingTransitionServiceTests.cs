@@ -113,6 +113,10 @@ public class NowPlayingTransitionServiceTests
             StreamerSongListChannel channel,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
+        public Task<StreamerSongListStreamer> ResolveStreamerAsync(
+            StreamerSongListChannel channel,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
         public Task<SpinnerQueueItem[]> FetchQueueAsync(
             StreamerSongListChannel channel,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();

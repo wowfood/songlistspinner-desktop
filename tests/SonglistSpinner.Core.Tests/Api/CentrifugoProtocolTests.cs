@@ -24,15 +24,18 @@ public class CentrifugoProtocolTests
         Assert.Equal(eventType, notification?.EventType);
     }
 
-    [Fact]
-    public void Given_PlayHistoryPublication_When_ParsingNotification_Then_ReturnsPlayHistoryChanged()
+    [Theory]
+    [InlineData("play_history_add")]
+    [InlineData("play_history_remove")]
+    public void Given_PlayHistoryPublication_When_ParsingNotification_Then_ReturnsPlayHistoryChanged(string eventType)
     {
-        var message = Publication("play_history_add", "null");
+        var message = Publication(eventType, "null");
 
         var parsed = CentrifugoProtocol.TryParseNotification(message, out var notification);
 
         Assert.True(parsed);
         Assert.Equal(StreamerSongListEventKind.PlayHistoryChanged, notification?.Kind);
+        Assert.Equal(eventType, notification?.EventType);
     }
 
     [Fact]

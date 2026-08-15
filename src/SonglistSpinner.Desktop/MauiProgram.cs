@@ -22,6 +22,8 @@ public static class MauiProgram
         builder.Services.AddMudServices();
         builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<GitHubReleaseUpdateChecker>();
+        builder.Services.AddSingleton<ApplicationUpdateService>();
         builder.Services.AddSingleton(CreateStreamerSongListApiOptions());
         builder.Services.AddSingleton(CreateStreamerSongListEventsOptions());
         builder.Services.AddSingleton<SecureStorageStreamerSongListCredentialStore>();

@@ -44,6 +44,117 @@ body.spinner-page .ss-nav {
     flex-shrink: 0;
 }
 
+.dashboard-health {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    flex-shrink: 0;
+    padding: 0.45rem 0.75rem;
+    background: rgba(18, 13, 27, 0.96);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 0.25rem 0.8rem rgba(0, 0, 0, 0.24);
+    color: #d8d3df;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    text-align: left;
+    z-index: 2;
+}
+
+.dashboard-health-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    min-height: 1.65rem;
+    padding: 0.2rem 0.55rem;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.055);
+    white-space: nowrap;
+}
+
+.dashboard-health-item strong {
+    color: #fff;
+    font-weight: 650;
+}
+
+.dashboard-health-dot {
+    width: 0.55rem;
+    height: 0.55rem;
+    flex: 0 0 0.55rem;
+    border-radius: 50%;
+    background: #85808c;
+    box-shadow: 0 0 0 0.15rem rgba(133, 128, 140, 0.18);
+}
+
+.dashboard-health-item.healthy .dashboard-health-dot {
+    background: #38d996;
+    box-shadow: 0 0 0 0.15rem rgba(56, 217, 150, 0.17);
+}
+
+.dashboard-health-item.checking .dashboard-health-dot {
+    background: #78a8ff;
+    box-shadow: 0 0 0 0.15rem rgba(120, 168, 255, 0.17);
+    animation: dashboard-health-pulse 1.35s ease-in-out infinite;
+}
+
+.dashboard-health-item.degraded .dashboard-health-dot {
+    background: #ffbd59;
+    box-shadow: 0 0 0 0.15rem rgba(255, 189, 89, 0.17);
+    animation: dashboard-health-pulse 1.35s ease-in-out infinite;
+}
+
+.dashboard-health-item.failed .dashboard-health-dot {
+    background: #ff647c;
+    box-shadow: 0 0 0 0.15rem rgba(255, 100, 124, 0.18);
+}
+
+.dashboard-health-channel {
+    max-width: min(24rem, 35vw);
+    margin-left: auto;
+}
+
+.dashboard-health-channel strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.dashboard-health-environment {
+    padding: 0.25rem 0.55rem;
+    border: 1px solid currentColor;
+    border-radius: 0.3rem;
+    font-size: 0.68rem;
+    font-weight: 750;
+    letter-spacing: 0.055em;
+    text-transform: uppercase;
+}
+
+.dashboard-health-environment.staging {
+    color: #ffbd59;
+    background: rgba(255, 189, 89, 0.09);
+}
+
+.dashboard-health-environment.production {
+    color: #38d996;
+    background: rgba(56, 217, 150, 0.09);
+}
+
+.dashboard-health-environment.custom {
+    color: #c797ff;
+    background: rgba(199, 151, 255, 0.09);
+}
+
+@keyframes dashboard-health-pulse {
+    0%, 100% {
+        opacity: 0.55;
+        transform: scale(0.85);
+    }
+    50% {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
 #container {
     display: flex;
     justify-content: space-between;
@@ -386,6 +497,58 @@ input:checked + .slider:before {
     opacity: 0.95;
 }
 
+.winner-action-prompt {
+    margin: 0.75rem 0;
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.winner-modal-actions {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.75rem;
+}
+
+.winner-action-button {
+    margin: 0;
+    padding: 0.65rem 1rem;
+    border: 2px solid transparent;
+    border-radius: 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.winner-action-primary {
+    background: var(--app-button-bg);
+    color: var(--app-button-text);
+}
+
+.winner-action-secondary {
+    background: transparent;
+    color: var(--app-text-color);
+    border-color: currentColor;
+}
+
+.winner-action-button:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.winner-action-status,
+.winner-action-error {
+    position: relative;
+    z-index: 1;
+    margin: 0.9rem 0 0;
+    font-size: 0.875rem;
+}
+
+.winner-action-error {
+    color: #ffb4b4;
+}
+
 .winner-confetti {
     position: absolute;
     inset: 0;
@@ -447,6 +610,11 @@ body.overlay-mode #changeStreamerBtn {
 }
 
 @media (max-width: 900px) {
+    .dashboard-health-channel {
+        max-width: calc(100vw - 1.5rem);
+        margin-left: 0;
+    }
+
     #container {
         flex-direction: column;
     }
@@ -488,6 +656,15 @@ body.overlay-mode #changeStreamerBtn {
 }
 
 @media (max-width: 600px) {
+    .dashboard-health {
+        gap: 0.35rem;
+        padding: 0.4rem 0.5rem;
+    }
+
+    .dashboard-health-item {
+        padding-inline: 0.45rem;
+    }
+
     #wheelContainer {
         width: clamp(6.25rem, 85vw, 25rem);
         height: clamp(6.25rem, 85vw, 25rem);

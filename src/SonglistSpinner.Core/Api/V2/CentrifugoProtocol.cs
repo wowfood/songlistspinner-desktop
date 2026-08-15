@@ -70,7 +70,7 @@ internal static class CentrifugoProtocol
         {
             "now_playing_update" or "queue_add" or "queue_clear" or "queue_remove" or
                 "queue_reorder" or "queue_update" => StreamerSongListEventKind.QueueChanged,
-            "play_history_add" => StreamerSongListEventKind.PlayHistoryChanged,
+            "play_history_add" or "play_history_remove" => StreamerSongListEventKind.PlayHistoryChanged,
             _ => (StreamerSongListEventKind?)null
         };
 

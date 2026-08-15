@@ -5,6 +5,21 @@ namespace SonglistSpinner.Core.Api.V2;
 internal sealed class StreamerDetailsDto
 {
     [JsonPropertyName("id")] public int Id { get; init; }
+    [JsonPropertyName("platforms")] public StreamerPlatformsDto? Platforms { get; init; }
+}
+
+internal sealed class StreamerPlatformsDto
+{
+    [JsonPropertyName("kick")] public StreamerPlatformDto? Kick { get; init; }
+    [JsonPropertyName("none")] public StreamerPlatformDto? None { get; init; }
+    [JsonPropertyName("twitch")] public StreamerPlatformDto? Twitch { get; init; }
+    [JsonPropertyName("youtube")] public StreamerPlatformDto? YouTube { get; init; }
+}
+
+internal sealed class StreamerPlatformDto
+{
+    [JsonPropertyName("platformID")] public string? PlatformId { get; init; }
+    [JsonPropertyName("username")] public string? Username { get; init; }
 }
 
 internal sealed class QueueResponseDto

@@ -1,0 +1,185 @@
+@page "/setup"
+@layout MainLayout
+@inject ILocalSettingsService LocalSettings
+@inject IStreamerSongListCredentialStore CredentialStore
+@inject ISpinnerApiService ApiService
+@inject IStreamerSongListEventSource EventSource
+@inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
+@inject SonglistSpinner.Core.Api.V2.StreamerSongListEventsOptions EventOptions
+@inject OverlayStateService OverlayService
+@inject HttpClient Http
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<main class="ss-main ss-setup-shell">
+    <div class="ss-setup-heading">
+        <span class="ss-setup-eyebrow">First-run setup</span>
+        <h1>Connect SonglistSpinner</h1>
+        <p>Connect one StreamerSongList channel, verify realtime updates, and prepare the OBS overlay.</p>
+    </div>
+
+    <ol class="ss-setup-progress" aria-label="Setup progress">
+        <li class="@StepClass(1)"><span>1</span>Access</li>
+        <li class="@StepClass(2)"><span>2</span>Channel</li>
+        <li class="@StepClass(3)"><span>3</span>Ready</li>
+    </ol>
+
+    @if (_step == 1)
+    {
+        <section class="ss-setup-card">
+            <h2>StreamerSongList access</h2>
+            <p>For a personal, single-channel setup, create a streamer access token under StreamerSongList <strong>Settings &gt; Access</strong>.</p>
+
+            <div class="ss-setup-field">
+                <label for="setupToken">Streamer access token</label>
+                <InputText id="setupToken" @bind-Value="_token" type="password" autocomplete="off"
+                           placeholder="Paste your token"/>
+                @if (_hasExistingCredential)
+                {
+                    <div class="ss-field-hint">A credential is already configured. Leave this blank to keep using it.</div>
+                }
+                else
+                {
+                    <div class="ss-field-hint">The token is stored in Windows secure storage.</div>
+                }
+            </div>
+
+            <details class="ss-setup-advanced">
+                <summary>Advanced credential options</summary>
+                <div class="ss-setup-field">
+                    <label for="setupCredentialKind">Credential type</label>
+                    <InputSelect id="setupCredentialKind" @bind-Value="_credentialKind">
+                        <option value="@StreamerSongListCredentialKind.Streamer">Streamer token</option>
+                        <option value="@StreamerSongListCredentialKind.User">User token</option>
+                        <option value="@StreamerSongListCredentialKind.OAuthBearer">OAuth bearer token</option>
+                    </InputSelect>
+                </div>
+                @if (_credentialKind == StreamerSongListCredentialKind.OAuthBearer)
+                {
+                    <div class="ss-setup-field">
+                        <label for="setupClientId">OAuth client ID</label>
+                        <InputText id="setupClientId" @bind-Value="_clientId" autocomplete="off"/>
+                    </div>
+                }
+            </details>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="ss-setup-error" role="alert">@_error</div>
+            }
+
+            <div class="ss-setup-actions">
+                <button type="button" class="ss-btn-primary" @onclick="ContinueToChannel">Continue</button>
+                @if (_hasExistingCredential)
+                {
+                    <button type="button" class="ss-btn-secondary" @onclick="FinishSetup">Cancel</button>
+                }
+            </div>
+        </section>
+    }
+    else if (_step == 2)
+    {
+        <section class="ss-setup-card">
+            <h2>Choose your channel</h2>
+            <p>Paste the public StreamerSongList address you normally share, or enter the streamer name directly.</p>
+
+            <div class="ss-setup-field">
+                <label for="setupReference">StreamerSongList URL or streamer name</label>
+                <InputText id="setupReference" @bind-Value="_streamerReference"
+                           placeholder="https://streamersonglist.com/t/username"/>
+                <div class="ss-field-hint">Addresses ending in <code>/t/name</code> or <code>/s/name</code> select the identity automatically.</div>
+            </div>
+
+            <div class="ss-setup-field">
+                <label for="setupPlatform">Identity platform when entering only a name</label>
+                <InputSelect id="setupPlatform" @bind-Value="_fallbackPlatform">
+                    <option value="twitch">Twitch</option>
+                    <option value="youtube">YouTube</option>
+                    <option value="kick">Kick</option>
+                    <option value="none">StreamerSongList</option>
+                </InputSelect>
+            </div>
+
+            <div class="ss-setup-checks" aria-live="polite">
+                <div class="@CheckClass(_apiState)">
+                    <span>@CheckIcon(_apiState)</span>
+                    <div><strong>API and channel</strong><small>@_apiMessage</small></div>
+                </div>
+                <div class="@CheckClass(_eventsState)">
+                    <span>@CheckIcon(_eventsState)</span>
+                    <div><strong>Realtime events</strong><small>@_eventsMessage</small></div>
+                </div>
+                <div class="@CheckClass(_overlayState)">
+                    <span>@CheckIcon(_overlayState)</span>
+                    <div><strong>Local OBS overlay</strong><small>@_overlayMessage</small></div>
+                </div>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_error))
+            {
+                <div class="ss-setup-error" role="alert">@_error</div>
+            }
+
+            <div class="ss-setup-actions">
+                <button type="button" class="ss-btn-secondary" disabled="@_busy" @onclick="BackToAccess">Back</button>
+                <button type="button" class="ss-btn-primary" disabled="@_busy" @onclick="VerifyConnectionAsync">
+                    @(_busy ? "Checking..." : "Connect and verify")
+                </button>
+                @if (_canContinueWithWarnings)
+                {
+                    <button type="button" class="ss-btn-secondary" disabled="@_busy" @onclick="ContinueWithWarnings">
+                        Continue with warnings
+                    </button>
+                }
+            </div>
+        </section>
+    }
+    else
+    {
+        <section class="ss-setup-card ss-setup-complete">
+            <div class="ss-setup-success-mark" aria-hidden="true">✓</div>
+            <h2>SonglistSpinner is ready</h2>
+            <p><strong>@_matchedChannel?.Name</strong> resolved to StreamerSongList channel <strong>#@_resolvedStreamer?.Id</strong>.</p>
+
+            @if (_resolvedStreamer is { Platforms.Count: > 0 } streamerWithPlatforms)
+            {
+                <div class="ss-setup-identities" aria-label="Linked streaming identities">
+                    @foreach (var identity in streamerWithPlatforms.Platforms)
+                    {
+                        <span><strong>@PlatformLabel(identity.Platform)</strong> @identity.Username</span>
+                    }
+                </div>
+            }
+
+            <div class="ss-setup-summary">
+                <div><strong>@_queueCount</strong><span>Queued songs</span></div>
+                <div><strong>@_historyCount</strong><span>History items</span></div>
+                <div><strong>@CheckIcon(_eventsState)</strong><span>Realtime</span></div>
+                <div><strong>@CheckIcon(_overlayState)</strong><span>Overlay</span></div>
+            </div>
+
+            @if (_eventsState == VerificationState.Failed || _overlayState == VerificationState.Failed)
+            {
+                <div class="ss-setup-warning">The API connection is ready, but one optional check needs attention. You can review it later in Settings.</div>
+            }
+
+            <div class="ss-setup-overlay-url">
+                <label>OBS browser source</label>
+                <code>@OverlayService.OverlayUrl</code>
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(_completionMessage))
+            {
+                <div class="ss-setup-notice" role="status">@_completionMessage</div>
+            }
+
+            <div class="ss-setup-actions ss-setup-actions-center">
+                <button type="button" class="ss-btn-secondary" @onclick="CopyOverlayUrlAsync">Copy overlay URL</button>
+                <button type="button" class="ss-btn-secondary" @onclick="OpenOverlayAsync">Open preview</button>
+                <button type="button" class="ss-btn-primary" @onclick="FinishSetup">Open dashboard</button>
+            </div>
+        </section>
+    }
+
+    <p class="ss-setup-endpoints">API: <code>@ApiOptions.BaseAddress</code> · Events: <code>@EventOptions.Endpoint</code></p>
+</main>

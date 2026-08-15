@@ -430,13 +430,12 @@ public class LocalOverlayServer : IAsyncDisposable
                                        </div>
 
                                        <div id="winnerModal" class="winner-modal" style="display:none">
-                                           <div class="winner-modal-backdrop" onclick="handleCloseWinner()"></div>
+                                           <div class="winner-modal-backdrop" aria-hidden="true"></div>
                                            <div class="winner-modal-content" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
                                                <div id="winnerConfetti" class="winner-confetti"></div>
                                                <h2 id="winnerTitle">Winner</h2>
                                                <p id="winnerMainLine" class="winner-main-line"></p>
                                                <p id="winnerDetails" class="winner-details"></p>
-                                               <button class="small-button" onclick="handleCloseWinner()">Close</button>
                                            </div>
                                        </div>
 
@@ -600,6 +599,7 @@ public class LocalOverlayServer : IAsyncDisposable
                                        </script>
                                        <script>
                                        const _overlayState = { config: null, collapsed: false }
+                                       const _isSettingsPreview = new URLSearchParams(window.location.search).get('preview') === '1'
 
                                        function connectSSE() {
                                            const es = new EventSource('/overlay/events')
@@ -685,14 +685,23 @@ public class LocalOverlayServer : IAsyncDisposable
                                            })
                                        }
 
-                                       function handleCloseWinner() {
-                                           document.getElementById('winnerModal').style.display = 'none'
-                                       }
+                                       window.addEventListener('message', event => {
+                                           if (!_isSettingsPreview ||
+                                               !event.data ||
+                                               event.data.type !== 'songlistspinner-settings-preview' ||
+                                               !event.data.payload) return
+
+                                           updateSongs(event.data.payload)
+                                       })
 
                                        window.addEventListener('load', () => {
                                            SpinnerInterop.createWheel([{ label: 'Waiting for Dashboard...' }], [])
                                            SpinnerInterop.setupResizeObserver()
-                                           connectSSE()
+                                           if (_isSettingsPreview) {
+                                               document.body.classList.add('settings-preview-mode')
+                                           } else {
+                                               connectSSE()
+                                           }
                                        })
                                        </script>
                                        </body>
@@ -721,22 +730,26 @@ public class LocalOverlayServer : IAsyncDisposable
             // ignored
         }
 
+        _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _overlay.SetServerHealth(LocalOverlayServerState.Starting);
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://localhost:{_overlay.Port}/");
         try
         {
             _listener.Start();
+            _overlay.SetServerHealth(LocalOverlayServerState.Running);
             _ = ProcessRequestsAsync(_cts.Token);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[OverlayServer] Failed to start on port {_overlay.Port}: {ex.Message}");
+            _overlay.SetServerHealth(LocalOverlayServerState.Failed, ex.Message);
         }
 
         return Task.CompletedTask;
@@ -751,11 +764,13 @@ public class LocalOverlayServer : IAsyncDisposable
         }
         catch (ObjectDisposedException ex) { _ = ex; }
 
+        _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
         return Task.CompletedTask;
     }
 
     private async Task ProcessRequestsAsync(CancellationToken ct)
     {
+        string? failure = null;
         while (!ct.IsCancellationRequested && _listener?.IsListening == true)
         {
             HttpListenerContext context;
@@ -767,16 +782,25 @@ public class LocalOverlayServer : IAsyncDisposable
             {
                 break;
             }
-            catch (HttpListenerException)
+            catch (HttpListenerException ex)
             {
+                if (!ct.IsCancellationRequested) failure = ex.Message;
                 break;
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException ex)
             {
+                if (!ct.IsCancellationRequested) failure = ex.Message;
                 break;
             }
 
             _ = Task.Run(() => HandleRequestAsync(context, ct), CancellationToken.None);
+        }
+
+        if (!ct.IsCancellationRequested)
+        {
+            _overlay.SetServerHealth(
+                LocalOverlayServerState.Failed,
+                failure ?? "The local overlay server stopped unexpectedly.");
         }
     }
 

@@ -243,6 +243,23 @@ window.SpinnerInterop = (function () {
                 el.style.width = width
                 el.style.minWidth = minWidth
             }
+        },
+
+        updateSettingsPreview(frameId, payload) {
+            const frame = document.getElementById(frameId)
+            if (!frame || !frame.contentWindow) return
+
+            let targetOrigin = '*'
+            try {
+                targetOrigin = new URL(frame.src).origin
+            } catch {
+                // The preview is always a local frame; '*' is only a defensive fallback.
+            }
+
+            frame.contentWindow.postMessage({
+                type: 'songlistspinner-settings-preview',
+                payload
+            }, targetOrigin)
         }
     }
 })()

@@ -3,11 +3,39 @@
 @layout MainLayout
 @inject ISpinnerApiService ApiService
 @inject IStreamerSongListEventSource EventSource
+@inject IStreamerSongListCredentialStore CredentialStore
 @inject ILocalSettingsService LocalSettings
 @inject NowPlayingTransitionService NowPlayingTransitions
 @inject IJSRuntime JS
 @inject OverlayStateService OverlayService
+@inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
+@inject NavigationManager Navigation
 @implements IAsyncDisposable
+
+<section class="dashboard-health" aria-label="Service health">
+    <div class="dashboard-health-item @ServiceHealthClass(_apiHealth)" title="@_apiHealthDetail">
+        <span class="dashboard-health-dot" aria-hidden="true"></span>
+        <span>API</span>
+        <strong>@ServiceHealthLabel(_apiHealth)</strong>
+    </div>
+    <div class="dashboard-health-item @ServiceHealthClass(_realtimeHealth)" title="@_realtimeHealthDetail">
+        <span class="dashboard-health-dot" aria-hidden="true"></span>
+        <span>Realtime</span>
+        <strong>@ServiceHealthLabel(_realtimeHealth)</strong>
+    </div>
+    <div class="dashboard-health-item @OverlayHealthClass" title="@OverlayHealthDetail">
+        <span class="dashboard-health-dot" aria-hidden="true"></span>
+        <span>Overlay</span>
+        <strong>@OverlayHealthLabel</strong>
+    </div>
+    <div class="dashboard-health-item dashboard-health-channel" title="The StreamerSongList channel currently loaded">
+        <span>Channel</span>
+        <strong>@(string.IsNullOrWhiteSpace(_currentStreamer) ? "Not loaded" : _currentStreamer)</strong>
+    </div>
+    <div class="dashboard-health-environment @ApiEnvironmentClass" title="@ApiOptions.BaseAddress">
+        @ApiEnvironmentLabel
+    </div>
+</section>
 
 <div id="container">
     @if (_loading)
@@ -84,12 +112,40 @@
 </div>
 
 <div id="winnerModal" class="winner-modal" style="@(_winnerVisible ? "display:block" : "display:none")">
-    <div class="winner-modal-backdrop" @onclick="CloseWinnerModal"></div>
+    <div class="winner-modal-backdrop" aria-hidden="true"></div>
     <div class="winner-modal-content" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
         <div id="winnerConfetti" class="winner-confetti"></div>
         <h2 id="winnerTitle">Winner</h2>
         <p id="winnerMainLine" class="winner-main-line">@_winnerMainLine</p>
         <p id="winnerDetails" class="winner-details">@_winnerDetails</p>
-        <button class="small-button" @onclick="CloseWinnerModal">Close</button>
+        <p class="winner-action-prompt">Choose what happens to this queue entry.</p>
+        <div class="winner-modal-actions">
+            @if (IsNowPlayingWinnerActionEnabled)
+            {
+                <button class="winner-action-button winner-action-primary"
+                        disabled="@_winnerActionPending"
+                        @onclick="SetWinnerNowPlayingAsync">
+                    Set Now Playing
+                </button>
+            }
+            <button class="winner-action-button @(!IsNowPlayingWinnerActionEnabled && _preferMarkWinnerPlayed ? "winner-action-primary" : "winner-action-secondary")"
+                    disabled="@_winnerActionPending"
+                    @onclick="MarkWinnerPlayedAsync">
+                Mark Played
+            </button>
+            <button class="winner-action-button @(!IsNowPlayingWinnerActionEnabled && !_preferMarkWinnerPlayed ? "winner-action-primary" : "winner-action-secondary")"
+                    disabled="@_winnerActionPending"
+                    @onclick="LeaveWinnerInQueueAsync">
+                Leave in Queue
+            </button>
+        </div>
+        @if (_winnerActionPending)
+        {
+            <p class="winner-action-status" role="status" aria-live="polite">Updating StreamerSongList...</p>
+        }
+        @if (!string.IsNullOrWhiteSpace(_winnerActionError))
+        {
+            <p class="winner-action-error" role="alert">@_winnerActionError</p>
+        }
     </div>
 </div>

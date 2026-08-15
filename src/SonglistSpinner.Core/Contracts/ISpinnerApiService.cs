@@ -4,6 +4,10 @@ namespace SonglistSpinner.Core.Contracts;
 
 public interface ISpinnerApiService
 {
+    Task<StreamerSongListStreamer> ResolveStreamerAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default);
+
     Task<int> ResolveStreamerIdAsync(
         StreamerSongListChannel channel,
         CancellationToken cancellationToken = default);
