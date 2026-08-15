@@ -1,8 +1,13 @@
 using System.Diagnostics;
+using System.Text.Json;
+using Microsoft.AspNetCore.Components.Forms;
+using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.JSInterop;
 using MudBlazor.Utilities;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Services;
 using SonglistSpinner.Extensions;
 
 namespace SonglistSpinner.Components.Pages;
@@ -10,23 +15,69 @@ namespace SonglistSpinner.Components.Pages;
 // Injected properties (LocalSettings, Config) come from @inject in Settings.razor.
 public partial class Settings
 {
+    private static readonly (string Value, string Label)[] FontChoices =
+    [
+        ("sans-serif", "Sans-serif"),
+        ("serif", "Serif"),
+        ("monospace", "Monospace"),
+        ("Arial", "Arial"),
+        ("Helvetica", "Helvetica"),
+        ("Verdana", "Verdana"),
+        ("Georgia", "Georgia"),
+        ("'Courier New'", "Courier New")
+    ];
+
+    private static readonly SpinnerQueueItem[] PreviewSongs =
+    [
+        CreatePreviewSong(1, "The Midnight", "Sunset", "mod_jane", 10),
+        CreatePreviewSong(2, "CHVRCHES", "Clearest Blue", "musicfan"),
+        CreatePreviewSong(3, "Daft Punk", "Digital Love", "alex"),
+        CreatePreviewSong(4, "Florence + The Machine", "Dog Days Are Over", "streamviewer")
+    ];
+
     private readonly SettingsViewModel _vm = new();
+    private SettingsSection _activeSection = SettingsSection.Connection;
     private string _credentialClientId = "";
     private StreamerSongListCredentialKind _credentialKind = StreamerSongListCredentialKind.Streamer;
     private string? _credentialTestResult;
     private bool _credentialTestSucceeded;
     private string _credentialToken = "";
+    private bool _clearCredentialOnSave;
     private SettingsDto? _dto;
+    private EditContext? _editContext;
     private StreamerSongListCredential? _existingCredential;
     private bool _hasCredential;
+    private bool _navigationPromptOpen;
+    private bool _allowNavigation;
+    private CancellationTokenSource? _previewRefreshCts;
+    private bool _previewReady;
+    private string? _savedFormState;
     private bool _testingCredential;
+
+    private string PreviewUrl => $"{OverlayService.OverlayUrl}?preview=1";
+
+    private string WheelColorsRaw
+    {
+        get => _vm.WheelColorsRaw;
+        set
+        {
+            _vm.WheelColorsRaw = value;
+            QueuePreviewRefresh();
+        }
+    }
+
+    private bool HasUnsavedChanges =>
+        _savedFormState is not null &&
+        !StringComparer.Ordinal.Equals(_savedFormState, CaptureFormState());
 
     private MudColor ColorBackground
     {
         get => (_dto?.BackgroundColor ?? "#000000").ToMudColor();
         set
         {
-            if (_dto != null) _dto.BackgroundColor = value.ToHexString();
+            if (_dto == null) return;
+            _dto.BackgroundColor = value.ToHexString();
+            QueuePreviewRefresh();
         }
     }
 
@@ -35,7 +86,9 @@ public partial class Settings
         get => (_dto?.ColorText ?? "#000000").ToMudColor();
         set
         {
-            if (_dto != null) _dto.ColorText = value.ToHexString();
+            if (_dto == null) return;
+            _dto.ColorText = value.ToHexString();
+            QueuePreviewRefresh();
         }
     }
 
@@ -44,7 +97,9 @@ public partial class Settings
         get => (_dto?.ColorPointer ?? "#000000").ToMudColor();
         set
         {
-            if (_dto != null) _dto.ColorPointer = value.ToHexString();
+            if (_dto == null) return;
+            _dto.ColorPointer = value.ToHexString();
+            QueuePreviewRefresh();
         }
     }
 
@@ -53,7 +108,9 @@ public partial class Settings
         get => (_dto?.ColorButtonBackground ?? "#000000").ToMudColor();
         set
         {
-            if (_dto != null) _dto.ColorButtonBackground = value.ToHexString();
+            if (_dto == null) return;
+            _dto.ColorButtonBackground = value.ToHexString();
+            QueuePreviewRefresh();
         }
     }
 
@@ -62,7 +119,9 @@ public partial class Settings
         get => (_dto?.ColorButtonText ?? "#000000").ToMudColor();
         set
         {
-            if (_dto != null) _dto.ColorButtonText = value.ToHexString();
+            if (_dto == null) return;
+            _dto.ColorButtonText = value.ToHexString();
+            QueuePreviewRefresh();
         }
     }
 
@@ -73,6 +132,7 @@ public partial class Settings
         {
             _vm.PlayedListBgHex = value.ToHexString();
             _vm.PlayedListBgAlpha = value.A / 255.0;
+            QueuePreviewRefresh();
         }
     }
 
@@ -81,7 +141,9 @@ public partial class Settings
         get => (_dto?.ColorPlayedItemBackground ?? "#000000").ToMudColor();
         set
         {
-            if (_dto != null) _dto.ColorPlayedItemBackground = value.ToHexString();
+            if (_dto == null) return;
+            _dto.ColorPlayedItemBackground = value.ToHexString();
+            QueuePreviewRefresh();
         }
     }
 
@@ -89,6 +151,8 @@ public partial class Settings
     {
         _dto = LocalSettings.LoadSettings();
         _vm.Initialize(_dto);
+        _editContext = new EditContext(_dto);
+        _editContext.OnFieldChanged += OnSettingsFieldChanged;
         _existingCredential = await CredentialStore.GetCredentialAsync();
         if (_existingCredential is not null)
         {
@@ -96,51 +160,249 @@ public partial class Settings
             _credentialClientId = _existingCredential.ClientId ?? "";
             _hasCredential = true;
         }
+
+        _savedFormState = CaptureFormState();
     }
 
-    private async Task Save()
+    public void Dispose()
+    {
+        if (_editContext is not null)
+            _editContext.OnFieldChanged -= OnSettingsFieldChanged;
+
+        _previewRefreshCts?.Cancel();
+        _previewRefreshCts?.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    private void OnSettingsFieldChanged(object? sender, FieldChangedEventArgs args)
+    {
+        _vm.SaveSuccess = false;
+        QueuePreviewRefresh();
+    }
+
+    private void SelectSection(SettingsSection section)
+    {
+        _activeSection = section;
+        _vm.SaveSuccess = false;
+    }
+
+    private string SectionClass(SettingsSection section) =>
+        _activeSection == section ? "ss-settings-nav-item active" : "ss-settings-nav-item";
+
+    private static string FieldLabel(string field) => field switch
+    {
+        "artist" => "Artist",
+        "title" => "Song title",
+        "requester" => "Requester",
+        "donation" => "Donation",
+        _ => field
+    };
+
+    private void BeginPlayedFieldDrag(int index)
+    {
+        _vm.DragIdx = index;
+        _vm.DragOverIdx = -1;
+    }
+
+    private void SetPlayedFieldDragOver(int index)
+    {
+        if (_vm.DragOverIdx != index) _vm.DragOverIdx = index;
+    }
+
+    private void DropPlayedField(int index)
+    {
+        _vm.DropField(index);
+        QueuePreviewRefresh();
+    }
+
+    private void EndPlayedFieldDrag()
+    {
+        _vm.DragIdx = -1;
+        _vm.DragOverIdx = -1;
+    }
+
+    private void TogglePlayedField(int index)
+    {
+        _vm.ToggleField(index);
+        QueuePreviewRefresh();
+    }
+
+    private void BeginNowPlayingFieldDrag(int index)
+    {
+        _vm.NowPlayingDragIdx = index;
+        _vm.NowPlayingDragOverIdx = -1;
+    }
+
+    private void SetNowPlayingFieldDragOver(int index)
+    {
+        if (_vm.NowPlayingDragOverIdx != index) _vm.NowPlayingDragOverIdx = index;
+    }
+
+    private void DropNowPlayingField(int index)
+    {
+        _vm.DropNowPlayingField(index);
+        QueuePreviewRefresh();
+    }
+
+    private void EndNowPlayingFieldDrag()
+    {
+        _vm.NowPlayingDragIdx = -1;
+        _vm.NowPlayingDragOverIdx = -1;
+    }
+
+    private void ToggleNowPlayingField(int index)
+    {
+        _vm.ToggleNowPlayingField(index);
+        QueuePreviewRefresh();
+    }
+
+    private async Task OnPreviewLoadedAsync()
+    {
+        _previewReady = true;
+        await PushPreviewAsync();
+    }
+
+    private void QueuePreviewRefresh()
+    {
+        _vm.SaveSuccess = false;
+        if (!_previewReady || _dto is null) return;
+
+        _previewRefreshCts?.Cancel();
+        _previewRefreshCts?.Dispose();
+        _previewRefreshCts = new CancellationTokenSource();
+        _ = PushPreviewAfterDelayAsync(_previewRefreshCts.Token);
+    }
+
+    private async Task PushPreviewAfterDelayAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(80), cancellationToken);
+            await InvokeAsync(PushPreviewAsync);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+    }
+
+    private async Task PushPreviewAsync()
+    {
+        if (!_previewReady || _dto is null) return;
+
+        try
+        {
+            var previewDto = JsonSerializer.Deserialize<SettingsDto>(JsonSerializer.Serialize(_dto))
+                             ?? new SettingsDto();
+            _vm.ApplyToDto(previewDto);
+            var config = LocalSettings.ToSpinnerConfig(previewDto);
+            var nowPlayingFields = config.NowPlaying.Fields is { Length: > 0 }
+                ? config.NowPlaying.Fields
+                : ["artist", "title"];
+
+            var payload = new
+            {
+                config,
+                streamer = string.IsNullOrWhiteSpace(previewDto.DefaultStreamerName)
+                    ? "your-channel"
+                    : previewDto.DefaultStreamerName.Trim(),
+                wheelItems = PreviewSongs.Select(song => new { label = SpinnerDataService.BuildWheelLabel(song) }),
+                playedTexts = PreviewSongs.Take(3).Select(song => SpinnerDataService.CreatePlayedSongText(song, config)),
+                nowPlayingText = SpinnerDataService.CreateSongTextForFields(PreviewSongs[3], nowPlayingFields),
+                playedCount = 3,
+                availableCount = PreviewSongs.Length
+            };
+
+            await JS.InvokeVoidAsync("SpinnerInterop.updateSettingsPreview", "settingsOverlayPreview", payload);
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
+        {
+            Debug.WriteLine($"[SonglistSpinner] Settings preview is unavailable: {ex.Message}");
+        }
+    }
+
+    private static SpinnerQueueItem CreatePreviewSong(
+        int id,
+        string artist,
+        string title,
+        string requester,
+        decimal? donation = null)
+    {
+        return new SpinnerQueueItem
+        {
+            QueueId = id,
+            Position = id,
+            Song = new SpinnerSong { Id = id, Artist = artist, Title = title },
+            Requests = [new SpinnerRequest { Name = requester, DonationAmount = donation }]
+        };
+    }
+
+    private Task Save()
+    {
+        return SaveCoreAsync();
+    }
+
+    private async Task<bool> SaveCoreAsync()
     {
         _vm.SaveSuccess = false;
         _vm.SaveError = null;
-        if (_dto == null) return;
+        if (_dto == null) return false;
 
         try
         {
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
 
-            var token = string.IsNullOrWhiteSpace(_credentialToken)
-                ? _existingCredential?.Token
-                : _credentialToken.Trim();
-            if (!string.IsNullOrWhiteSpace(token))
+            var submittedToken = _credentialToken.Trim();
+            if (_clearCredentialOnSave && string.IsNullOrWhiteSpace(submittedToken))
             {
-                _existingCredential = new StreamerSongListCredential(
-                    _credentialKind,
-                    token,
-                    string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
-                await CredentialStore.SaveCredentialAsync(_existingCredential);
-                _credentialToken = "";
-                _hasCredential = true;
+                await CredentialStore.ClearCredentialAsync();
+                _existingCredential = null;
+                _clearCredentialOnSave = false;
+                _hasCredential = false;
+            }
+            else
+            {
+                var token = string.IsNullOrWhiteSpace(submittedToken)
+                    ? _existingCredential?.Token
+                    : submittedToken;
+                if (!string.IsNullOrWhiteSpace(token))
+                {
+                    _existingCredential = new StreamerSongListCredential(
+                        _credentialKind,
+                        token,
+                        string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
+                    await CredentialStore.SaveCredentialAsync(_existingCredential);
+                    _credentialToken = "";
+                    _hasCredential = true;
+                    _clearCredentialOnSave = false;
+                }
             }
 
             _vm.SaveSuccess = true;
+            _savedFormState = CaptureFormState();
+            return true;
         }
         catch (Exception ex)
         {
             _vm.SaveError = ex.Message;
+            return false;
         }
     }
 
-    private async Task ClearApiCredential()
+    private void ClearApiCredential()
     {
-        await CredentialStore.ClearCredentialAsync();
-        _existingCredential = null;
         _credentialToken = "";
         _credentialClientId = "";
         _credentialKind = StreamerSongListCredentialKind.Streamer;
+        _clearCredentialOnSave = true;
         _hasCredential = false;
         _credentialTestResult = null;
         _credentialTestSucceeded = false;
+    }
+
+    private void OpenSetupWizard()
+    {
+        Navigation.NavigateTo("/setup");
     }
 
     private async Task TestApiConnection()
@@ -153,8 +415,7 @@ public partial class Settings
 
         try
         {
-            await Save();
-            if (!string.IsNullOrWhiteSpace(_vm.SaveError))
+            if (!await SaveCoreAsync())
             {
                 _credentialTestResult = $"Unable to save the credential: {_vm.SaveError}";
                 return;
@@ -184,5 +445,87 @@ public partial class Settings
         {
             _testingCredential = false;
         }
+    }
+
+    private async Task ConfirmNavigationAsync(LocationChangingContext context)
+    {
+        if (_allowNavigation || !HasUnsavedChanges) return;
+
+        context.PreventNavigation();
+        if (_navigationPromptOpen) return;
+
+        _navigationPromptOpen = true;
+        try
+        {
+            var choice = await DialogService.ShowMessageBoxAsync(
+                "Unsaved settings",
+                "Settings have been changed. Please save them before leaving, or abandon your changes.",
+                yesText: "Save and leave",
+                noText: "Abandon changes",
+                cancelText: "Keep editing");
+
+            if (choice == true)
+            {
+                if (!await SaveCoreAsync()) return;
+            }
+            else if (choice is not false)
+            {
+                return;
+            }
+
+            _allowNavigation = true;
+            Navigation.NavigateTo(context.TargetLocation);
+        }
+        finally
+        {
+            _navigationPromptOpen = false;
+        }
+    }
+
+    private string CaptureFormState()
+    {
+        if (_dto is null) return "";
+
+        return JsonSerializer.Serialize(new SettingsFormSnapshot(
+            JsonSerializer.Serialize(_dto),
+            _vm.WheelColorsRaw,
+            CaptureDisplayFields(_vm.DisplayFields),
+            CaptureDisplayFields(_vm.NowPlayingDisplayFields),
+            _vm.PlayedListBgHex,
+            _vm.PlayedListBgAlpha,
+            _credentialKind,
+            _credentialClientId,
+            _credentialToken,
+            _hasCredential,
+            _clearCredentialOnSave));
+    }
+
+    private static string CaptureDisplayFields(IEnumerable<DisplayField> fields)
+    {
+        return JsonSerializer.Serialize(fields.Select(field => new DisplayFieldSnapshot(field.Name, field.Selected)));
+    }
+
+    private sealed record DisplayFieldSnapshot(string Name, bool Selected);
+
+    private sealed record SettingsFormSnapshot(
+        string Settings,
+        string WheelColors,
+        string DisplayFields,
+        string NowPlayingDisplayFields,
+        string PlayedListBackground,
+        double PlayedListBackgroundAlpha,
+        StreamerSongListCredentialKind CredentialKind,
+        string CredentialClientId,
+        string CredentialToken,
+        bool HasCredential,
+        bool ClearCredentialOnSave);
+
+    private enum SettingsSection
+    {
+        Connection,
+        Spinner,
+        Overlay,
+        Appearance,
+        Advanced
     }
 }

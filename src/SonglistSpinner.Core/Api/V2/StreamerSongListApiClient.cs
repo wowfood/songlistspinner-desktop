@@ -41,13 +41,43 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             throw new ArgumentOutOfRangeException(nameof(options), "Page size must be between 1 and 100.");
     }
 
+    public async Task<StreamerSongListStreamer> ResolveStreamerAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default)
+    {
+        var query = BuildChannelQuery(channel);
+        var dto = await GetAsync<StreamerDetailsDto>($"streamers?{query}", cancellationToken);
+        if (dto.Id <= 0)
+            throw new StreamerSongListApiException("StreamerSongList returned an invalid streamer ID.");
+
+        return new StreamerSongListStreamer(dto.Id, MapPlatforms(dto.Platforms));
+    }
+
+    public async Task<int> ResolveStreamerIdAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default)
+    {
+        return (await ResolveStreamerAsync(channel, cancellationToken)).Id;
+    }
+
     public async Task<SpinnerQueueItem[]> FetchQueueAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default)
+    {
+        return (await FetchQueueSnapshotAsync(channel, cancellationToken)).Items;
+    }
+
+    public async Task<SpinnerQueueSnapshot> FetchQueueSnapshotAsync(
         StreamerSongListChannel channel,
         CancellationToken cancellationToken = default)
     {
         var query = BuildChannelQuery(channel);
         var dto = await GetAsync<QueueResponseDto>($"queue?{query}", cancellationToken);
-        return (dto.Items ?? []).Select(MapQueueItem).ToArray();
+        return new SpinnerQueueSnapshot
+        {
+            Items = (dto.Items ?? []).Select(MapQueueItem).ToArray(),
+            Playing = dto.Playing is null ? null : MapQueueItem(dto.Playing)
+        };
     }
 
     public async Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
@@ -71,6 +101,21 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
     {
         ValidateQueueId(queueId);
         return SendWithoutResponseAsync(HttpMethod.Post, $"queue/played?queue_id={queueId}", cancellationToken);
+    }
+
+    public Task MarkNowPlayingAsPlayedAsync(int streamerId, CancellationToken cancellationToken = default)
+    {
+        ValidateStreamerId(streamerId);
+        return SendWithoutResponseAsync(
+            HttpMethod.Post,
+            $"queue/played?position=playing&streamer_id={streamerId}",
+            cancellationToken);
+    }
+
+    public Task PromoteQueueItemToNowPlayingAsync(int queueId, CancellationToken cancellationToken = default)
+    {
+        ValidateQueueId(queueId);
+        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/{queueId}/play", cancellationToken);
     }
 
     private async Task<T> GetAsync<T>(string relativeUrl, CancellationToken cancellationToken)
@@ -173,6 +218,12 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             throw new ArgumentOutOfRangeException(nameof(queueId), "A positive queue entry ID is required.");
     }
 
+    private static void ValidateStreamerId(int streamerId)
+    {
+        if (streamerId <= 0)
+            throw new ArgumentOutOfRangeException(nameof(streamerId), "A positive streamer ID is required.");
+    }
+
     private DateTimeOffset? GetPlayedAfter(string period)
     {
         var now = _timeProvider.GetUtcNow();
@@ -201,6 +252,30 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             },
             Requests = MapRequests(item.Requests)
         };
+    }
+
+    private static IReadOnlyList<StreamerSongListPlatformIdentity> MapPlatforms(StreamerPlatformsDto? platforms)
+    {
+        if (platforms is null) return [];
+
+        var identities = new List<StreamerSongListPlatformIdentity>();
+        AddPlatformIdentity(identities, "twitch", platforms.Twitch);
+        AddPlatformIdentity(identities, "youtube", platforms.YouTube);
+        AddPlatformIdentity(identities, "kick", platforms.Kick);
+        AddPlatformIdentity(identities, "none", platforms.None);
+        return identities;
+    }
+
+    private static void AddPlatformIdentity(
+        ICollection<StreamerSongListPlatformIdentity> identities,
+        string platform,
+        StreamerPlatformDto? identity)
+    {
+        if (identity is null || string.IsNullOrWhiteSpace(identity.Username)) return;
+        identities.Add(new StreamerSongListPlatformIdentity(
+            platform,
+            identity.Username.Trim(),
+            identity.PlatformId?.Trim() ?? ""));
     }
 
     private static PlayHistoryItem MapPlayHistoryItem(PlayHistoryDetailsDto item)

@@ -220,6 +220,62 @@ public class LocalOverlayServer : IAsyncDisposable
                                            -webkit-box-orient: vertical;
                                            -webkit-line-clamp: var(--app-played-list-max-lines);
                                        }
+                                       #nowPlaying{
+                                           position:fixed;
+                                           z-index:100;
+                                           box-sizing:border-box;
+                                           max-width:calc(100vw - 2rem);
+                                           padding:0.875rem 1rem;
+                                           border-radius:0.5rem;
+                                           background:var(--app-played-list-bg);
+                                           color:var(--app-text-color);
+                                           box-shadow:0 0.25rem 1.25rem rgba(0, 0, 0, 0.35);
+                                           text-align:left;
+                                           pointer-events:none;
+                                       }
+                                       #nowPlaying[hidden]{
+                                           display:none !important;
+                                       }
+                                       #nowPlayingLabel{
+                                           display:block;
+                                           margin-bottom:0.25rem;
+                                           font-size:0.7em;
+                                           font-weight:700;
+                                           letter-spacing:0.08em;
+                                           text-transform:uppercase;
+                                           opacity:0.8;
+                                       }
+                                       #nowPlayingText{
+                                           display:block;
+                                           overflow-wrap:anywhere;
+                                           line-height:1.35;
+                                       }
+                                       #nowPlaying[data-position="top-left"]{
+                                           top:1rem;
+                                           left:1rem;
+                                       }
+                                       #nowPlaying[data-position="top-center"]{
+                                           top:1rem;
+                                           left:50%;
+                                           transform:translateX(-50%);
+                                       }
+                                       #nowPlaying[data-position="top-right"]{
+                                           top:1rem;
+                                           right:1rem;
+                                       }
+                                       #nowPlaying[data-position="bottom-left"]{
+                                           bottom:1rem;
+                                           left:1rem;
+                                       }
+                                       #nowPlaying[data-position="bottom-center"]{
+                                           bottom:1rem;
+                                           left:50%;
+                                           transform:translateX(-50%);
+                                       }
+                                       #nowPlaying[data-position="bottom-right"]{
+                                           right:1rem;
+                                           bottom:1rem;
+                                       }
                                        .winner-modal{
                                            position:fixed;
                                            inset:0;
@@ -344,6 +400,11 @@ public class LocalOverlayServer : IAsyncDisposable
                                        </head>
                                        <body>
 
+                                       <section id="nowPlaying" data-position="bottom-left" hidden aria-live="polite">
+                                           <span id="nowPlayingLabel">Now Playing</span>
+                                           <span id="nowPlayingText"></span>
+                                       </section>
+
                                        <div id="container">
                                            <div id="wheelSection">
                                                <div id="wheelContents">
@@ -354,9 +415,6 @@ public class LocalOverlayServer : IAsyncDisposable
                                            <div id="resizeHandle" style="display:none"></div>
                                            <div id="playedList" data-position="right">
                                                <div id="playedListTop">
-                                                   <button id="collapseBtn" class="collapse-button" onclick="handleToggleCollapse()" title="Collapse/Expand Played List">
-                                                       <span id="collapseIcon">&#9664;</span>
-                                                   </button>
                                                    <div id="streamerSection">
                                                        <span id="streamerLabel">Waiting for Dashboard...</span>
                                                    </div>
@@ -372,13 +430,12 @@ public class LocalOverlayServer : IAsyncDisposable
                                        </div>
 
                                        <div id="winnerModal" class="winner-modal" style="display:none">
-                                           <div class="winner-modal-backdrop" onclick="handleCloseWinner()"></div>
+                                           <div class="winner-modal-backdrop" aria-hidden="true"></div>
                                            <div class="winner-modal-content" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
                                                <div id="winnerConfetti" class="winner-confetti"></div>
                                                <h2 id="winnerTitle">Winner</h2>
                                                <p id="winnerMainLine" class="winner-main-line"></p>
                                                <p id="winnerDetails" class="winner-details"></p>
-                                               <button class="small-button" onclick="handleCloseWinner()">Close</button>
                                            </div>
                                        </div>
 
@@ -467,16 +524,33 @@ public class LocalOverlayServer : IAsyncDisposable
                                                applyPlayedListPosition(position) {
                                                    const container = document.getElementById('container')
                                                    const icon = document.getElementById('collapseIcon')
-                                                   if (!container || !icon) return
+                                                   if (!container) return
                                                    if ((position || 'right').toLowerCase() === 'left') {
                                                        container.classList.add('played-list-left')
-                                                       icon.innerText = '\u25BA'
+                                                       if (icon) icon.innerText = '\u25BA'
                                                    } else {
                                                        container.classList.remove('played-list-left')
-                                                       icon.innerText = '\u25C4'
+                                                       if (icon) icon.innerText = '\u25C4'
                                                    }
                                                    const pl = document.getElementById('playedList')
                                                    if (pl) pl.dataset.position = (position || 'right').toLowerCase()
+                                               },
+
+                                               applyNowPlayingConfig(config) {
+                                                   const el = document.getElementById('nowPlaying')
+                                                   const text = document.getElementById('nowPlayingText')
+                                                   if (!el || !text || !config) return
+                                                   const validPositions = [
+                                                       'top-left', 'top-center', 'top-right',
+                                                       'bottom-left', 'bottom-center', 'bottom-right'
+                                                   ]
+                                                   const position = (config.position || 'bottom-left').toLowerCase()
+                                                   el.dataset.position = validPositions.includes(position)
+                                                       ? position
+                                                       : 'bottom-left'
+                                                   el.style.width = config.width || '28rem'
+                                                   text.style.fontFamily = config.fontFamily || 'sans-serif'
+                                                   text.style.fontSize = config.fontSize || '1.125rem'
                                                },
 
                                                runConfetti(colors) {
@@ -503,14 +577,14 @@ public class LocalOverlayServer : IAsyncDisposable
                                                setPlayedListCollapsed(collapsed, position) {
                                                    const el = document.getElementById('playedList')
                                                    const icon = document.getElementById('collapseIcon')
-                                                   if (!el || !icon) return
+                                                   if (!el) return
                                                    const pos = (position || 'right').toLowerCase()
                                                    if (collapsed) {
                                                        el.classList.add('collapsed')
-                                                       icon.innerText = pos === 'left' ? '\u25C4' : '\u25BA'
+                                                       if (icon) icon.innerText = pos === 'left' ? '\u25C4' : '\u25BA'
                                                    } else {
                                                        el.classList.remove('collapsed')
-                                                       icon.innerText = pos === 'left' ? '\u25BA' : '\u25C4'
+                                                       if (icon) icon.innerText = pos === 'left' ? '\u25BA' : '\u25C4'
                                                    }
                                                },
 
@@ -525,6 +599,7 @@ public class LocalOverlayServer : IAsyncDisposable
                                        </script>
                                        <script>
                                        const _overlayState = { config: null, collapsed: false }
+                                       const _isSettingsPreview = new URLSearchParams(window.location.search).get('preview') === '1'
 
                                        function connectSSE() {
                                            const es = new EventSource('/overlay/events')
@@ -532,11 +607,11 @@ public class LocalOverlayServer : IAsyncDisposable
                                            es.addEventListener('init_state', e => {
                                                const data = JSON.parse(e.data)
                                                _overlayState.config = data.config
-                                               if (data.config) {
-                                                   SpinnerInterop.applyTheme(data.config.colors, data.config.playedList)
-                                                   SpinnerInterop.applyBackground(data.config.background)
-                                                   SpinnerInterop.applyPlayedListPosition(data.config.songList && data.config.songList.playedListPosition)
-                                               }
+                                               _overlayState.collapsed = Boolean(data.playedListCollapsed)
+                                               SpinnerInterop.setPlayedListWidth(data.playedListWidth, data.playedListMinWidth)
+                                               SpinnerInterop.setPlayedListCollapsed(
+                                                   _overlayState.collapsed,
+                                                   data.config && data.config.songList && data.config.songList.playedListPosition)
                                                updateSongs(data)
                                            })
 
@@ -582,11 +657,25 @@ public class LocalOverlayServer : IAsyncDisposable
                                        }
 
                                        function updateSongs(data) {
+                                           if (data.config) {
+                                               _overlayState.config = data.config
+                                               SpinnerInterop.applyTheme(data.config.colors, data.config.playedList)
+                                               SpinnerInterop.applyBackground(data.config.background)
+                                               SpinnerInterop.applyPlayedListPosition(
+                                                   data.config.songList && data.config.songList.playedListPosition)
+                                               SpinnerInterop.applyNowPlayingConfig(data.config.nowPlaying)
+                                           }
                                            const cfg = _overlayState.config
                                            SpinnerInterop.createWheel(data.wheelItems || [], cfg && cfg.wheelColors || [])
                                            document.getElementById('playedCount').textContent = data.playedCount != null ? data.playedCount : 0
                                            document.getElementById('availableCount').textContent = data.availableCount != null ? data.availableCount : 0
                                            if (data.streamer) document.getElementById('streamerLabel').textContent = data.streamer
+                                           const nowPlaying = document.getElementById('nowPlaying')
+                                           const nowPlayingText = document.getElementById('nowPlayingText')
+                                           const showNowPlaying = Boolean(
+                                               cfg && cfg.nowPlaying && cfg.nowPlaying.enabled && data.nowPlayingText)
+                                           nowPlaying.hidden = !showNowPlaying
+                                           nowPlayingText.textContent = showNowPlaying ? data.nowPlayingText : ''
                                            const ul = document.getElementById('playedSongsUl')
                                            ul.innerHTML = ''
                                            ;(data.playedTexts || []).forEach(text => {
@@ -596,20 +685,23 @@ public class LocalOverlayServer : IAsyncDisposable
                                            })
                                        }
 
-                                       function handleToggleCollapse() {
-                                           _overlayState.collapsed = !_overlayState.collapsed
-                                           const pos = _overlayState.config && _overlayState.config.songList && _overlayState.config.songList.playedListPosition
-                                           SpinnerInterop.setPlayedListCollapsed(_overlayState.collapsed, pos)
-                                       }
+                                       window.addEventListener('message', event => {
+                                           if (!_isSettingsPreview ||
+                                               !event.data ||
+                                               event.data.type !== 'songlistspinner-settings-preview' ||
+                                               !event.data.payload) return
 
-                                       function handleCloseWinner() {
-                                           document.getElementById('winnerModal').style.display = 'none'
-                                       }
+                                           updateSongs(event.data.payload)
+                                       })
 
                                        window.addEventListener('load', () => {
                                            SpinnerInterop.createWheel([{ label: 'Waiting for Dashboard...' }], [])
                                            SpinnerInterop.setupResizeObserver()
-                                           connectSSE()
+                                           if (_isSettingsPreview) {
+                                               document.body.classList.add('settings-preview-mode')
+                                           } else {
+                                               connectSSE()
+                                           }
                                        })
                                        </script>
                                        </body>
@@ -638,22 +730,26 @@ public class LocalOverlayServer : IAsyncDisposable
             // ignored
         }
 
+        _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }
 
     public Task StartAsync(CancellationToken cancellationToken)
     {
+        _overlay.SetServerHealth(LocalOverlayServerState.Starting);
         _listener = new HttpListener();
         _listener.Prefixes.Add($"http://localhost:{_overlay.Port}/");
         try
         {
             _listener.Start();
+            _overlay.SetServerHealth(LocalOverlayServerState.Running);
             _ = ProcessRequestsAsync(_cts.Token);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"[OverlayServer] Failed to start on port {_overlay.Port}: {ex.Message}");
+            _overlay.SetServerHealth(LocalOverlayServerState.Failed, ex.Message);
         }
 
         return Task.CompletedTask;
@@ -668,11 +764,13 @@ public class LocalOverlayServer : IAsyncDisposable
         }
         catch (ObjectDisposedException ex) { _ = ex; }
 
+        _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
         return Task.CompletedTask;
     }
 
     private async Task ProcessRequestsAsync(CancellationToken ct)
     {
+        string? failure = null;
         while (!ct.IsCancellationRequested && _listener?.IsListening == true)
         {
             HttpListenerContext context;
@@ -684,16 +782,25 @@ public class LocalOverlayServer : IAsyncDisposable
             {
                 break;
             }
-            catch (HttpListenerException)
+            catch (HttpListenerException ex)
             {
+                if (!ct.IsCancellationRequested) failure = ex.Message;
                 break;
             }
-            catch (ObjectDisposedException)
+            catch (ObjectDisposedException ex)
             {
+                if (!ct.IsCancellationRequested) failure = ex.Message;
                 break;
             }
 
             _ = Task.Run(() => HandleRequestAsync(context, ct), CancellationToken.None);
+        }
+
+        if (!ct.IsCancellationRequested)
+        {
+            _overlay.SetServerHealth(
+                LocalOverlayServerState.Failed,
+                failure ?? "The local overlay server stopped unexpectedly.");
         }
     }
 

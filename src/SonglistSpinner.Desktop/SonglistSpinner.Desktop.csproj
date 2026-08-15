@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk.Razor">
     <PropertyGroup>
-        <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+        <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
         <OutputType>WinExe</OutputType>
         <RootNamespace>SonglistSpinner</RootNamespace>
         <UseMaui>true</UseMaui>
@@ -8,8 +8,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
         <Nullable>enable</Nullable>
-        <CheckEolWorkloads>false</CheckEolWorkloads>
-        <MauiVersion>8.0.100</MauiVersion>
+        <MauiVersion>10.0.90</MauiVersion>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
         <!-- Display name -->
         <ApplicationTitle>SonglistSpinner</ApplicationTitle>
@@ -30,15 +29,18 @@
     <PropertyGroup Condition="'$(Configuration)' == 'Release'">
         <WindowsPackageType>None</WindowsPackageType>
         <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
-        <RuntimeIdentifier>win-x64</RuntimeIdentifier>
         <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
         <EnableMsixTooling>true</EnableMsixTooling>
-        <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
-        <SelfContained>true</SelfContained>
-        <PublishSingleFile>true</PublishSingleFile>
         <DebugType>none</DebugType>
         <DebugSymbols>false</DebugSymbols>
         <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
+    </PropertyGroup>
+
+    <!-- RID-specific settings apply only when the publish command supplies win-x64. -->
+    <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' == 'win-x64'">
+        <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+        <SelfContained>true</SelfContained>
+        <PublishSingleFile>true</PublishSingleFile>
     </PropertyGroup>
 
     <ItemGroup>
@@ -52,10 +54,24 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11"/>
         <PackageReference Include="MudBlazor" Version="9.3.0"/>
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
     </ItemGroup>
+
+    <!--
+      .NET 10 adds both the build and publish static-web-asset endpoint manifests
+      to the bundle with the same relative path. Keep the publish manifest and
+      discard only its redundant build-time counterpart.
+    -->
+    <Target Name="ExcludeBuildStaticWebAssetEndpointsManifestFromBundle"
+            AfterTargets="PrepareForBundle"
+            Condition="'$(PublishSingleFile)' == 'true'">
+        <ItemGroup>
+            <FilesToBundle Remove="@(FilesToBundle)"
+                           Condition="'%(FilesToBundle.Filename)%(FilesToBundle.Extension)' == 'staticwebassets.build.endpoints.json'"/>
+        </ItemGroup>
+    </Target>
 </Project>

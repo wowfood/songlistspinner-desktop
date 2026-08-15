@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using MudBlazor.Services;
 using SonglistSpinner.Core.Api.V2;
 using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.Services;
 using SonglistSpinner.Services;
 
 namespace SonglistSpinner;
@@ -21,13 +22,18 @@ public static class MauiProgram
         builder.Services.AddMudServices();
         builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         builder.Services.AddSingleton(TimeProvider.System);
+        builder.Services.AddSingleton<GitHubReleaseUpdateChecker>();
+        builder.Services.AddSingleton<ApplicationUpdateService>();
         builder.Services.AddSingleton(CreateStreamerSongListApiOptions());
+        builder.Services.AddSingleton(CreateStreamerSongListEventsOptions());
         builder.Services.AddSingleton<SecureStorageStreamerSongListCredentialStore>();
         builder.Services.AddSingleton<IStreamerSongListCredentialProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddSingleton<IStreamerSongListCredentialStore>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
+        builder.Services.AddScoped<NowPlayingTransitionService>();
+        builder.Services.AddSingleton<IStreamerSongListEventSource, CentrifugoStreamerSongListEventSource>();
         builder.Services.AddSingleton<OverlayStateService>();
         builder.Services.AddSingleton<LocalOverlayServer>();
 
@@ -47,5 +53,15 @@ public static class MauiProgram
             : StreamerSongListApiOptions.StagingBaseAddress;
 
         return new StreamerSongListApiOptions { BaseAddress = baseAddress };
+    }
+
+    private static StreamerSongListEventsOptions CreateStreamerSongListEventsOptions()
+    {
+        var configuredEndpoint = Environment.GetEnvironmentVariable("SONGLISTSPINNER_SSL_EVENTS_URL");
+        var endpoint = Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var parsedEndpoint)
+            ? parsedEndpoint
+            : StreamerSongListEventsOptions.StagingEndpoint;
+
+        return new StreamerSongListEventsOptions { Endpoint = endpoint };
     }
 }

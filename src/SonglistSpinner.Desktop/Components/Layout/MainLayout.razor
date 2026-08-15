@@ -1,6 +1,8 @@
 @inherits LayoutComponentBase
 @inject OverlayStateService OverlayService
+@inject ApplicationUpdateService UpdateService
 @inject ISnackbar Snackbar
+@implements IDisposable
 
 <nav class="ss-nav">
     <a class="ss-nav__brand" href="/">SonglistSpinner</a>
@@ -8,17 +10,70 @@
         <a href="/dashboard">Dashboard</a>
         <a href="/settings">Settings</a>
         <button class="ss-nav__btn" @onclick="CopyOverlayUrl">Copy Overlay URL</button>
+        <a href="https://github.com/wowfood/songlistspinner-desktop/releases" target="_blank"
+           rel="noopener noreferrer">Releases</a>
         <a href="https://ko-fi.com/wowfood" target="_blank" rel="noopener noreferrer">Donate</a>
     </div>
 </nav>
 
+@if (_availableUpdate is not null)
+{
+    <aside class="ss-update-banner" role="status" aria-live="polite">
+        <span class="ss-update-banner__icon" aria-hidden="true">&#8593;</span>
+        <div class="ss-update-banner__message">
+            <strong>SonglistSpinner @_availableUpdate.DisplayVersion is available</strong>
+            <span>You are currently using @UpdateService.CurrentVersion.</span>
+        </div>
+        <a class="ss-update-banner__action" href="@_availableUpdate.ReleaseUri" target="_blank"
+           rel="noopener noreferrer">View release</a>
+        <button type="button" class="ss-update-banner__dismiss" @onclick="DismissUpdate"
+                aria-label="Dismiss this update notification">&#10005;</button>
+    </aside>
+}
+
 @Body
 
+<MudThemeProvider/>
 <MudPopoverProvider/>
 <MudDialogProvider/>
 <MudSnackbarProvider/>
 
 @code {
+    private readonly CancellationTokenSource _lifetimeCts = new();
+    private ApplicationUpdateInfo? _availableUpdate;
+
+    public void Dispose()
+    {
+        _lifetimeCts.Cancel();
+        _lifetimeCts.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+
+        try
+        {
+            _availableUpdate = await UpdateService.CheckForUpdateAsync(_lifetimeCts.Token);
+            if (_availableUpdate is not null) await InvokeAsync(StateHasChanged);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"[SonglistSpinner] Update check failed: {ex}");
+        }
+    }
+
+    private void DismissUpdate()
+    {
+        if (_availableUpdate is null) return;
+        UpdateService.Dismiss(_availableUpdate);
+        _availableUpdate = null;
+    }
+
     private async Task CopyOverlayUrl()
     {
         await Clipboard.SetTextAsync(OverlayService.OverlayUrl);

@@ -11,6 +11,81 @@ namespace SonglistSpinner.Core.Tests.Api;
 public class StreamerSongListApiClientTests
 {
     [Fact]
+    public async Task Given_Channel_When_ResolveStreamerIdAsync_Then_UsesStreamerLookupAndReturnsId()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("""{"id":314}"""));
+        var client = CreateClient(handler);
+
+        var streamerId = await client.ResolveStreamerIdAsync(
+            new StreamerSongListChannel("Foo Bar", "YOUTUBE"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(314, streamerId);
+        Assert.Equal(
+            "https://example.test/streamers?streamer_name=Foo%20Bar&platform=youtube",
+            handler.RequestUri?.AbsoluteUri);
+        Assert.Equal("Streamer", handler.Authorization?.Scheme);
+    }
+
+    [Fact]
+    public async Task Given_LinkedPlatforms_When_ResolveStreamerAsync_Then_MapsAvailableIdentities()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(
+            """
+            {
+              "id": 314,
+              "platforms": {
+                "twitch": { "username": "wowfood", "platformID": "tw-1" },
+                "youtube": { "username": "Wow Food", "platformID": "yt-2" },
+                "kick": null,
+                "none": { "username": "wowfood", "platformID": "ssl-3" }
+              }
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var streamer = await client.ResolveStreamerAsync(
+            new StreamerSongListChannel("wowfood", "twitch"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(314, streamer.Id);
+        Assert.Collection(
+            streamer.Platforms,
+            twitch =>
+            {
+                Assert.Equal("twitch", twitch.Platform);
+                Assert.Equal("wowfood", twitch.Username);
+                Assert.Equal("tw-1", twitch.PlatformId);
+            },
+            youtube =>
+            {
+                Assert.Equal("youtube", youtube.Platform);
+                Assert.Equal("Wow Food", youtube.Username);
+                Assert.Equal("yt-2", youtube.PlatformId);
+            },
+            native =>
+            {
+                Assert.Equal("none", native.Platform);
+                Assert.Equal("wowfood", native.Username);
+                Assert.Equal("ssl-3", native.PlatformId);
+            });
+    }
+
+    [Fact]
+    public async Task Given_InvalidStreamerResponse_When_ResolveStreamerIdAsync_Then_RejectsId()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("""{"id":0}"""));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.ResolveStreamerIdAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Contains("invalid streamer ID", exception.Message);
+    }
+
+    [Fact]
     public async Task Given_StreamerCredential_When_FetchQueueAsync_Then_UsesV2QueryAndMapsItems()
     {
         var handler = new RecordingHandler(_ => JsonResponse(
@@ -49,6 +124,43 @@ public class StreamerSongListApiClientTests
         Assert.Equal("https://example.test/queue?streamer_name=Foo%20Bar&platform=twitch", handler.RequestUri?.AbsoluteUri);
         Assert.Equal("Streamer", handler.Authorization?.Scheme);
         Assert.Equal("test-token", handler.Authorization?.Parameter);
+    }
+
+    [Fact]
+    public async Task Given_NowPlayingItem_When_FetchQueueSnapshotAsync_Then_MapsPlayingAndUpcomingItems()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(
+            """
+            {
+              "items": [{
+                "id": 91,
+                "position": 1,
+                "requests": [],
+                "song": { "artist": "Queued Artist", "title": "Queued Song" },
+                "songId": 42
+              }],
+              "playing": {
+                "id": 77,
+                "requests": [{ "amount": null, "name": "viewer", "user": null }],
+                "song": { "artist": "Playing Artist", "title": "Playing Song" },
+                "songId": 31
+              },
+              "total": 1
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var result = await client.FetchQueueSnapshotAsync(
+            new StreamerSongListChannel("wowfood"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(91, Assert.Single(result.Items).QueueId);
+        Assert.NotNull(result.Playing);
+        Assert.Equal(77, result.Playing.QueueId);
+        Assert.Equal(31, result.Playing.Song.Id);
+        Assert.Equal("Playing Artist", result.Playing.Song.Artist);
+        Assert.Equal("Playing Song", result.Playing.Song.Title);
+        Assert.Equal("viewer", Assert.Single(result.Playing.Requests).Name);
     }
 
     [Fact]
@@ -140,6 +252,43 @@ public class StreamerSongListApiClientTests
 
         await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             client.MarkQueueItemAsPlayedAsync(0, TestContext.Current.CancellationToken));
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Given_StreamerId_When_MarkNowPlayingAsPlayedAsync_Then_PostsPlayingPosition()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK));
+        var client = CreateClient(handler);
+
+        await client.MarkNowPlayingAsPlayedAsync(314, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal(
+            "https://example.test/queue/played?position=playing&streamer_id=314",
+            handler.RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task Given_QueueId_When_PromoteQueueItemToNowPlayingAsync_Then_PostsPlayAction()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.NoContent));
+        var client = CreateClient(handler);
+
+        await client.PromoteQueueItemToNowPlayingAsync(91, TestContext.Current.CancellationToken);
+
+        Assert.Equal(HttpMethod.Post, handler.Method);
+        Assert.Equal("https://example.test/queue/91/play", handler.RequestUri?.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task Given_InvalidStreamerId_When_MarkNowPlayingAsPlayedAsync_Then_RejectsRequest()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("{}"));
+        var client = CreateClient(handler);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            client.MarkNowPlayingAsPlayedAsync(0, TestContext.Current.CancellationToken));
         Assert.Equal(0, handler.RequestCount);
     }
 

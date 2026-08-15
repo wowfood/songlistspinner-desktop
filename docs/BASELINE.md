@@ -37,7 +37,7 @@ This repository was established as a clean, desktop-only continuation of ServerS
 - Application, assembly, and publish version metadata share one semantic version.
 - A repository SDK policy keeps local and hosted builds on the .NET 10 toolchain family.
 - Windows CI runs tests, a Release build, and verified single-file publishing.
-- Semantic version tags create draft releases for manual review and publication.
+- Successful `main` builds create immutable semantic-version releases automatically.
 - Release automation does not change the staging API default.
 
 ## Code and product cleanup status
@@ -53,7 +53,8 @@ This repository was established as a clean, desktop-only continuation of ServerS
 - CI enforces formatting in addition to tests and the Release build.
 - The published executable is launched and its local OBS overlay is smoke-tested.
 - Every candidate receives a SHA-256 checksum alongside the single executable.
-- Release tags must match the version declared in the desktop project.
+- Release tags are generated from the version declared in the desktop project.
+- The desktop app checks the latest published GitHub Release and links users to newer versions.
 - Dependabot checks NuGet packages and GitHub Actions weekly.
 
 ## API v2 migration status

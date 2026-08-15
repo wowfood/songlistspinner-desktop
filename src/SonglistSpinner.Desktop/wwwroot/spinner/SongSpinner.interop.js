@@ -4,6 +4,71 @@ window.SpinnerInterop = (function () {
     let _savedWidth = null
     let _savedMinWidth = null
     let _resizeTimeout = null
+    let _resizeObserver = null
+    let _resizeHandle = null
+    let _resizePlayedList = null
+    let _resizeDotNetRef = null
+
+    function resetResizeInteraction() {
+        _isResizing = false
+        document.body.style.cursor = 'default'
+        document.body.style.userSelect = 'auto'
+    }
+
+    function detachResizeHandlers() {
+        if (_resizeHandle) {
+            _resizeHandle.removeEventListener('mousedown', handleResizeMouseDown)
+        }
+        document.removeEventListener('mousemove', handleResizeMouseMove)
+        document.removeEventListener('mouseup', handleResizeMouseUp)
+        _resizeHandle = null
+        _resizePlayedList = null
+        _resizeDotNetRef = null
+        resetResizeInteraction()
+    }
+
+    function handleResizeMouseDown(e) {
+        e.preventDefault()
+        _isResizing = true
+        document.body.style.cursor = 'ew-resize'
+        document.body.style.userSelect = 'none'
+    }
+
+    function handleResizeMouseMove(e) {
+        if (!_isResizing || !_resizePlayedList) return
+        const container = document.getElementById('container')
+        if (!container) return
+
+        e.preventDefault()
+        const containerRect = container.getBoundingClientRect()
+        const position = _resizePlayedList.dataset.position || 'right'
+        const newWidth = position === 'left'
+            ? e.clientX - containerRect.left - 10
+            : containerRect.right - e.clientX - 10
+        const minPx = 300, maxPx = 800
+        if (newWidth >= minPx && newWidth <= maxPx) {
+            const pct = (newWidth / containerRect.width) * 100
+            _resizePlayedList.style.width = `${pct}%`
+            _resizePlayedList.style.minWidth = `${minPx}px`
+        }
+    }
+
+    async function handleResizeMouseUp() {
+        if (!_isResizing || !_resizePlayedList) return
+
+        const playedList = _resizePlayedList
+        const dotNetRef = _resizeDotNetRef
+        resetResizeInteraction()
+        const width = playedList.style.width
+        const minWidth = playedList.style.minWidth
+        if (!width || !dotNetRef) return
+
+        try {
+            await dotNetRef.invokeMethodAsync('OnResizeEnd', width, minWidth)
+        } catch (error) {
+            console.warn('Unable to synchronize the played-list width.', error)
+        }
+    }
 
     return {
         createWheel(items, colors) {
@@ -34,7 +99,8 @@ window.SpinnerInterop = (function () {
         setupResizeObserver() {
             const container = document.getElementById('wheelContainer')
             if (!container || !window.ResizeObserver) return
-            new ResizeObserver(() => {
+            if (_resizeObserver) _resizeObserver.disconnect()
+            _resizeObserver = new ResizeObserver(() => {
                 if (_wheel && !_isResizing) {
                     clearTimeout(_resizeTimeout)
                     _resizeTimeout = setTimeout(() => {
@@ -52,48 +118,32 @@ window.SpinnerInterop = (function () {
                         }
                     }, 200)
                 }
-            }).observe(container)
+            })
+            _resizeObserver.observe(container)
         },
 
         setupResizeHandlers(dotNetRef) {
+            detachResizeHandlers()
             const handle = document.getElementById('resizeHandle')
             const playedList = document.getElementById('playedList')
             if (!handle || !playedList) return
 
-            handle.addEventListener('mousedown', e => {
-                e.preventDefault()
-                _isResizing = true
-                document.body.style.cursor = 'ew-resize'
-                document.body.style.userSelect = 'none'
-            })
+            _resizeHandle = handle
+            _resizePlayedList = playedList
+            _resizeDotNetRef = dotNetRef
+            _resizeHandle.addEventListener('mousedown', handleResizeMouseDown)
+            document.addEventListener('mousemove', handleResizeMouseMove)
+            document.addEventListener('mouseup', handleResizeMouseUp)
+        },
 
-            document.addEventListener('mousemove', e => {
-                if (!_isResizing) return
-                e.preventDefault()
-                const containerRect = document.getElementById('container').getBoundingClientRect()
-                const position = playedList.dataset.position || 'right'
-                let newWidth = position === 'left'
-                    ? e.clientX - containerRect.left - 10
-                    : containerRect.right - e.clientX - 10
-                const minPx = 300, maxPx = 800
-                if (newWidth >= minPx && newWidth <= maxPx) {
-                    const pct = (newWidth / containerRect.width) * 100
-                    playedList.style.width = `${pct}%`
-                    playedList.style.minWidth = `${minPx}px`
-                }
-            })
-
-            document.addEventListener('mouseup', async () => {
-                if (!_isResizing) return
-                _isResizing = false
-                document.body.style.cursor = 'default'
-                document.body.style.userSelect = 'auto'
-                const w = playedList.style.width
-                const mw = playedList.style.minWidth
-                if (w && dotNetRef) {
-                    await dotNetRef.invokeMethodAsync('OnResizeEnd', w, mw)
-                }
-            })
+        disposeDashboardBindings() {
+            detachResizeHandlers()
+            if (_resizeObserver) {
+                _resizeObserver.disconnect()
+                _resizeObserver = null
+            }
+            clearTimeout(_resizeTimeout)
+            _resizeTimeout = null
         },
 
         applyTheme(colors, playedList) {
@@ -193,6 +243,23 @@ window.SpinnerInterop = (function () {
                 el.style.width = width
                 el.style.minWidth = minWidth
             }
+        },
+
+        updateSettingsPreview(frameId, payload) {
+            const frame = document.getElementById(frameId)
+            if (!frame || !frame.contentWindow) return
+
+            let targetOrigin = '*'
+            try {
+                targetOrigin = new URL(frame.src).origin
+            } catch {
+                // The preview is always a local frame; '*' is only a defensive fallback.
+            }
+
+            frame.contentWindow.postMessage({
+                type: 'songlistspinner-settings-preview',
+                payload
+            }, targetOrigin)
         }
     }
 })()
