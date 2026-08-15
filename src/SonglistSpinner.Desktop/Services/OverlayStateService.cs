@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
@@ -15,6 +16,7 @@ public class OverlayStateService
     };
 
     private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
+    private readonly object _healthGate = new();
     private List<SpinnerQueueItem> _availableSongs = [];
 
     private SpinnerConfig _config = new();
@@ -24,8 +26,32 @@ public class OverlayStateService
     private string _playedListWidth = "";
     private SpinnerQueueItem? _nowPlaying;
     private PlayHistoryItem[] _playedSongs = [];
+    private string? _serverError;
+    private LocalOverlayServerState _serverState = LocalOverlayServerState.Stopped;
+
+    public event EventHandler? HealthChanged;
+
     public int Port { get; } = 5150;
     public string OverlayUrl => $"http://localhost:{Port}/overlay";
+
+    public LocalOverlayHealth GetHealth()
+    {
+        lock (_healthGate)
+        {
+            return new LocalOverlayHealth(_serverState, _clients.Count, _serverError);
+        }
+    }
+
+    internal void SetServerHealth(LocalOverlayServerState state, string? error = null)
+    {
+        lock (_healthGate)
+        {
+            _serverState = state;
+            _serverError = error;
+        }
+
+        OnHealthChanged();
+    }
 
     public Task UpdateStateAsync(
         SpinnerConfig config,
@@ -93,17 +119,38 @@ public class OverlayStateService
         var channel = Channel.CreateUnbounded<string>();
         var key = Guid.NewGuid();
         _clients[key] = channel;
+        OnHealthChanged();
 
         try
         {
             yield return BuildInitStateEvent();
 
-            await foreach (var msg in channel.Reader.ReadAllAsync(ct))
-                yield return msg;
+            Task<bool>? messageAvailable = null;
+            while (!ct.IsCancellationRequested)
+            {
+                messageAvailable ??= channel.Reader.WaitToReadAsync(ct).AsTask();
+                using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                var heartbeatDue = Task.Delay(TimeSpan.FromSeconds(15), heartbeatCts.Token);
+                var completed = await Task.WhenAny(messageAvailable, heartbeatDue);
+
+                if (completed == heartbeatDue)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    // SSE comments keep quiet browser sources alive and make disconnects observable.
+                    yield return ": keep-alive\n\n";
+                    continue;
+                }
+
+                await heartbeatCts.CancelAsync();
+                if (!await messageAvailable) break;
+                messageAvailable = null;
+                while (channel.Reader.TryRead(out var message))
+                    yield return message;
+            }
         }
         finally
         {
-            _clients.TryRemove(key, out _);
+            if (_clients.TryRemove(key, out _)) OnHealthChanged();
             channel.Writer.TryComplete();
         }
     }
@@ -146,5 +193,23 @@ public class OverlayStateService
             ? config.NowPlaying.Fields
             : ["artist", "title"];
         return SpinnerDataService.CreateSongTextForFields(item, fields);
+    }
+
+    private void OnHealthChanged()
+    {
+        var handlers = HealthChanged;
+        if (handlers is null) return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"[OverlayState] A health observer failed: {ex}");
+            }
+        }
     }
 }

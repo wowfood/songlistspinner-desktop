@@ -6,6 +6,7 @@ using Microsoft.JSInterop;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
+using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -16,6 +17,8 @@ public partial class Dashboard
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private List<SpinnerQueueItem> _availableSongs = [];
 
+    private DashboardServiceHealth _apiHealth = DashboardServiceHealth.Unknown;
+    private string _apiHealthDetail = "Waiting for a channel to be loaded.";
     private SpinnerConfig _config = new();
     private string _currentStreamer = "";
 
@@ -30,9 +33,13 @@ public partial class Dashboard
     private DateTime _lastSpinTime = DateTime.MinValue;
     private bool _loading = true;
     private SpinnerQueueItem? _nowPlaying;
+    private LocalOverlayHealth _overlayHealth = new(LocalOverlayServerState.Stopped, 0, null);
+    private bool _overlayHealthSubscribed;
     private bool _playedListCollapsed;
     private CancellationTokenSource? _playedRefreshCts;
     private PlayHistoryItem[] _playedSongs = [];
+    private DashboardServiceHealth _realtimeHealth = DashboardServiceHealth.Unknown;
+    private string _realtimeHealthDetail = "Waiting for a channel to be loaded.";
     private bool _showStreamerInput = true;
     private string _spinButtonText = "SPIN";
 
@@ -48,11 +55,52 @@ public partial class Dashboard
     private bool _wheelVisible = true;
     private string _winnerDetails = "";
     private string _winnerMainLine = "";
+    private string? _winnerActionError;
+    private bool _winnerActionPending;
     private int? _winnerQueueId;
     private bool _winnerVisible;
+    private bool _preferMarkWinnerPlayed;
+
+    private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
+    private string ApiEnvironmentLabel => GetApiEnvironment().label;
+    private string ApiEnvironmentClass => GetApiEnvironment().cssClass;
+    private string OverlayHealthClass => _overlayHealth.ServerState switch
+    {
+        LocalOverlayServerState.Running when _overlayHealth.ConnectedClients > 0 => "healthy",
+        LocalOverlayServerState.Running => "healthy",
+        LocalOverlayServerState.Starting => "checking",
+        LocalOverlayServerState.Failed => "failed",
+        _ => "unknown"
+    };
+
+    private string OverlayHealthLabel => _overlayHealth.ServerState switch
+    {
+        LocalOverlayServerState.Running when _overlayHealth.ConnectedClients == 1 => "1 connected",
+        LocalOverlayServerState.Running when _overlayHealth.ConnectedClients > 1 =>
+            $"{_overlayHealth.ConnectedClients} connected",
+        LocalOverlayServerState.Running => "Ready",
+        LocalOverlayServerState.Starting => "Starting",
+        LocalOverlayServerState.Failed => "Error",
+        _ => "Stopped"
+    };
+
+    private string OverlayHealthDetail => _overlayHealth.ServerState switch
+    {
+        LocalOverlayServerState.Running =>
+            $"{OverlayService.OverlayUrl} — {_overlayHealth.ConnectedClients} connected browser source(s).",
+        LocalOverlayServerState.Failed => _overlayHealth.Error ?? "The local overlay server failed.",
+        LocalOverlayServerState.Starting => "The local OBS overlay server is starting.",
+        _ => "The local OBS overlay server is stopped."
+    };
 
     public async ValueTask DisposeAsync()
     {
+        if (_overlayHealthSubscribed)
+        {
+            OverlayService.HealthChanged -= OnOverlayHealthChanged;
+            _overlayHealthSubscribed = false;
+        }
+
         _lifetimeCts.Cancel();
         await StopRealtimeUpdatesAsync();
         _playedRefreshCts?.Cancel();
@@ -88,8 +136,29 @@ public partial class Dashboard
     {
         if (firstRender)
         {
+            StreamerSongListCredential? credential;
+            try
+            {
+                credential = await CredentialStore.GetCredentialAsync(_lifetimeCts.Token);
+            }
+            catch
+            {
+                credential = null;
+            }
+
+            if (credential is null)
+            {
+                Navigation.NavigateTo("/setup", replace: true);
+                return;
+            }
+
+            _overlayHealth = OverlayService.GetHealth();
+            OverlayService.HealthChanged += OnOverlayHealthChanged;
+            _overlayHealthSubscribed = true;
             await JS.InvokeVoidAsync("document.body.classList.add", "spinner-page");
-            _config = LocalSettings.ToSpinnerConfig(LocalSettings.LoadSettings());
+            var settings = LocalSettings.LoadSettings();
+            _config = LocalSettings.ToSpinnerConfig(settings);
+            _preferMarkWinnerPlayed = settings.UpdateQueueAfterSpin && !settings.DisplayNowPlaying;
             _isLockedDefault = _config.Streamer.HideChangeOptionWhenDefault
                                && !string.IsNullOrWhiteSpace(_config.Streamer.DefaultName);
 
@@ -135,6 +204,8 @@ public partial class Dashboard
         await StopRealtimeUpdatesAsync();
         _currentStreamer = name;
         _showStreamerInput = false;
+        SetApiHealth(DashboardServiceHealth.Checking, $"Resolving {name} and loading its queue.");
+        SetRealtimeHealth(DashboardServiceHealth.Unknown, "Waiting for the API connection.");
         SetStatus("Loading songs...");
         StateHasChanged();
 
@@ -159,6 +230,7 @@ public partial class Dashboard
         }
         catch (Exception ex)
         {
+            SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
             SetStatus($"Error: {ex.Message}");
         }
 
@@ -220,8 +292,8 @@ public partial class Dashboard
 
             var winner = _availableSongs[winnerIndex];
             await Task.Delay(5100, _lifetimeCts.Token);
-            ShowWinnerModal(winner);
             _winnerQueueId = winner.QueueId;
+            ShowWinnerModal(winner);
             SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(winner)}");
             StateHasChanged();
 
@@ -276,42 +348,92 @@ public partial class Dashboard
         _winnerMainLine = $"{song.Song.Artist} - {song.Song.Title}";
         _winnerDetails = SpinnerDataService.CreateSongTextForFields(
             song, SpinnerDataService.GetWinnerFields(_config));
+        _winnerActionError = null;
+        _winnerActionPending = false;
         _winnerVisible = true;
         _ = JS.InvokeVoidAsync("SpinnerInterop.runConfetti", (object)_config.WheelColors);
     }
 
-    private async Task CloseWinnerModal()
+    private Task MarkWinnerPlayedAsync()
+    {
+        return ExecuteWinnerActionAsync(
+            "marking the winner played",
+            "Winner marked as played.",
+            (queueId, cancellationToken) => ApiService.MarkQueueItemAsPlayedAsync(queueId, cancellationToken));
+    }
+
+    private Task SetWinnerNowPlayingAsync()
+    {
+        return ExecuteWinnerActionAsync(
+            "updating Now Playing",
+            "Winner promoted to Now Playing.",
+            TransitionWinnerToNowPlayingAsync);
+    }
+
+    private async Task LeaveWinnerInQueueAsync()
+    {
+        if (_winnerActionPending || !_winnerVisible) return;
+
+        _winnerActionPending = true;
+        _winnerActionError = null;
+        try
+        {
+            await CompleteWinnerActionAsync("Winner left in the queue.");
+        }
+        finally
+        {
+            _winnerActionPending = false;
+        }
+    }
+
+    private async Task ExecuteWinnerActionAsync(
+        string actionDescription,
+        string successMessage,
+        Func<int, CancellationToken, Task> action)
+    {
+        if (_winnerActionPending || !_winnerVisible) return;
+        if (_winnerQueueId is not { } queueId)
+        {
+            _winnerActionError = "The selected queue entry is unavailable. Leave it in the queue and spin again.";
+            SetStatus(_winnerActionError);
+            return;
+        }
+
+        _winnerActionPending = true;
+        _winnerActionError = null;
+        try
+        {
+            await action(queueId, _lifetimeCts.Token);
+            await CompleteWinnerActionAsync(successMessage);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
+            _winnerActionError = $"StreamerSongList failed while {actionDescription}: {ex.Message}";
+            SetStatus(_winnerActionError);
+        }
+        finally
+        {
+            _winnerActionPending = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task CompleteWinnerActionAsync(string statusMessage)
     {
         _winnerVisible = false;
         _isSpinning = false;
-        _ = OverlayService.BroadcastCloseWinnerAsync();
-        var settings = LocalSettings.LoadSettings();
-        if (_winnerQueueId is { } queueId && (settings.DisplayNowPlaying || settings.UpdateQueueAfterSpin))
-        {
-            try
-            {
-                if (settings.DisplayNowPlaying)
-                {
-                    await TransitionWinnerToNowPlayingAsync(queueId, _lifetimeCts.Token);
-                    SetStatus("Winner promoted to Now Playing.");
-                }
-                else
-                {
-                    await ApiService.MarkQueueItemAsPlayedAsync(queueId, _lifetimeCts.Token);
-                }
-            }
-            catch (Exception ex)
-            {
-                var action = settings.DisplayNowPlaying ? "updating Now Playing" : "marking it played";
-                SetStatus($"The winner closed, but {action} failed: {ex.Message}");
-            }
-        }
+        await OverlayService.BroadcastCloseWinnerAsync();
+        SetStatus(statusMessage);
 
         _winnerQueueId = null;
         _playedRefreshCts?.Cancel();
         _playedRefreshCts = new CancellationTokenSource();
         await RefreshAfterWinnerAsync(_playedRefreshCts.Token);
-        StateHasChanged();
+        await InvokeAsync(StateHasChanged);
     }
 
     [JSInvokable]
@@ -322,12 +444,23 @@ public partial class Dashboard
         string streamer,
         CancellationToken cancellationToken)
     {
-        var period = _config.SongList.PlayHistoryPeriod;
-        var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
-        var queueTask = ApiService.FetchQueueSnapshotAsync(channel, cancellationToken);
-        var historyTask = ApiService.FetchPlayHistoryAsync(channel, period, cancellationToken);
-        await Task.WhenAll(queueTask, historyTask);
-        return (await queueTask, await historyTask);
+        try
+        {
+            var period = _config.SongList.PlayHistoryPeriod;
+            var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
+            var queueTask = ApiService.FetchQueueSnapshotAsync(channel, cancellationToken);
+            var historyTask = ApiService.FetchPlayHistoryAsync(channel, period, cancellationToken);
+            await Task.WhenAll(queueTask, historyTask);
+            SetApiHealth(
+                DashboardServiceHealth.Healthy,
+                $"Queue and history last synchronized at {DateTime.Now:t}.");
+            return (await queueTask, await historyTask);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+        {
+            SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
+            throw;
+        }
     }
 
     private async Task TransitionWinnerToNowPlayingAsync(int queueId, CancellationToken cancellationToken)
@@ -390,6 +523,7 @@ public partial class Dashboard
 
     private void StartRealtimeUpdates(int streamerId, string streamer)
     {
+        SetRealtimeHealth(DashboardServiceHealth.Checking, $"Connecting to realtime updates for {streamer}.");
         _eventSubscriptionCts = CancellationTokenSource.CreateLinkedTokenSource(_lifetimeCts.Token);
         _eventRefreshSignals = Channel.CreateBounded<bool>(new BoundedChannelOptions(1)
         {
@@ -437,6 +571,11 @@ public partial class Dashboard
         }
 
         cancellationSource?.Dispose();
+        SetRealtimeHealth(
+            DashboardServiceHealth.Unknown,
+            string.IsNullOrWhiteSpace(_currentStreamer)
+                ? "Waiting for a channel to be loaded."
+                : "Realtime updates are not connected.");
     }
 
     private async Task RunRealtimeEventsAsync(
@@ -452,6 +591,11 @@ public partial class Dashboard
                 if (notification.Kind == StreamerSongListEventKind.Connected)
                 {
                     refreshSignals.TryWrite(true);
+                    await InvokeAsync(() =>
+                    {
+                        SetRealtimeHealth(DashboardServiceHealth.Healthy, "Receiving live queue and history events.");
+                        StateHasChanged();
+                    });
                     if (wasDisconnected)
                     {
                         wasDisconnected = false;
@@ -477,6 +621,9 @@ public partial class Dashboard
                     wasDisconnected = true;
                     await InvokeAsync(() =>
                     {
+                        SetRealtimeHealth(
+                            DashboardServiceHealth.Degraded,
+                            notification.Error ?? "The event connection was interrupted and is reconnecting.");
                         SetStatus("Realtime updates disconnected; reconnecting...");
                         StateHasChanged();
                     });
@@ -490,6 +637,7 @@ public partial class Dashboard
         {
             await InvokeAsync(() =>
             {
+                SetRealtimeHealth(DashboardServiceHealth.Failed, ex.Message);
                 SetStatus($"Realtime updates stopped: {ex.Message}");
                 Debug.WriteLine($"[SonglistSpinner] Realtime updates stopped: {ex}");
                 StateHasChanged();
@@ -537,6 +685,7 @@ public partial class Dashboard
         {
             await InvokeAsync(() =>
             {
+                SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
                 SetStatus($"Realtime refresh failed: {ex.Message}");
                 Debug.WriteLine($"[SonglistSpinner] Realtime refresh failed: {ex}");
                 StateHasChanged();
@@ -576,5 +725,68 @@ public partial class Dashboard
         {
             _refreshGate.Release();
         }
+    }
+
+    private void OnOverlayHealthChanged(object? sender, EventArgs e)
+    {
+        var health = OverlayService.GetHealth();
+        try
+        {
+            _ = InvokeAsync(() =>
+            {
+                _overlayHealth = health;
+                StateHasChanged();
+            });
+        }
+        catch (InvalidOperationException)
+        {
+        }
+    }
+
+    private void SetApiHealth(DashboardServiceHealth health, string detail)
+    {
+        _apiHealth = health;
+        _apiHealthDetail = detail;
+    }
+
+    private void SetRealtimeHealth(DashboardServiceHealth health, string detail)
+    {
+        _realtimeHealth = health;
+        _realtimeHealthDetail = detail;
+    }
+
+    private static string ServiceHealthClass(DashboardServiceHealth health) => health switch
+    {
+        DashboardServiceHealth.Healthy => "healthy",
+        DashboardServiceHealth.Checking => "checking",
+        DashboardServiceHealth.Degraded => "degraded",
+        DashboardServiceHealth.Failed => "failed",
+        _ => "unknown"
+    };
+
+    private static string ServiceHealthLabel(DashboardServiceHealth health) => health switch
+    {
+        DashboardServiceHealth.Healthy => "Connected",
+        DashboardServiceHealth.Checking => "Checking",
+        DashboardServiceHealth.Degraded => "Reconnecting",
+        DashboardServiceHealth.Failed => "Error",
+        _ => "Not connected"
+    };
+
+    private (string label, string cssClass) GetApiEnvironment()
+    {
+        var host = ApiOptions.BaseAddress.Host;
+        if (host.Contains("staging", StringComparison.OrdinalIgnoreCase)) return ("Staging", "staging");
+        if (host.Equals("api.streamersonglist.com", StringComparison.OrdinalIgnoreCase)) return ("Production", "production");
+        return ("Custom API", "custom");
+    }
+
+    private enum DashboardServiceHealth
+    {
+        Unknown,
+        Checking,
+        Healthy,
+        Degraded,
+        Failed
     }
 }

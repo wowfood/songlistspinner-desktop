@@ -28,6 +28,50 @@ public class StreamerSongListApiClientTests
     }
 
     [Fact]
+    public async Task Given_LinkedPlatforms_When_ResolveStreamerAsync_Then_MapsAvailableIdentities()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(
+            """
+            {
+              "id": 314,
+              "platforms": {
+                "twitch": { "username": "wowfood", "platformID": "tw-1" },
+                "youtube": { "username": "Wow Food", "platformID": "yt-2" },
+                "kick": null,
+                "none": { "username": "wowfood", "platformID": "ssl-3" }
+              }
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var streamer = await client.ResolveStreamerAsync(
+            new StreamerSongListChannel("wowfood", "twitch"),
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(314, streamer.Id);
+        Assert.Collection(
+            streamer.Platforms,
+            twitch =>
+            {
+                Assert.Equal("twitch", twitch.Platform);
+                Assert.Equal("wowfood", twitch.Username);
+                Assert.Equal("tw-1", twitch.PlatformId);
+            },
+            youtube =>
+            {
+                Assert.Equal("youtube", youtube.Platform);
+                Assert.Equal("Wow Food", youtube.Username);
+                Assert.Equal("yt-2", youtube.PlatformId);
+            },
+            native =>
+            {
+                Assert.Equal("none", native.Platform);
+                Assert.Equal("wowfood", native.Username);
+                Assert.Equal("ssl-3", native.PlatformId);
+            });
+    }
+
+    [Fact]
     public async Task Given_InvalidStreamerResponse_When_ResolveStreamerIdAsync_Then_RejectsId()
     {
         var handler = new RecordingHandler(_ => JsonResponse("""{"id":0}"""));

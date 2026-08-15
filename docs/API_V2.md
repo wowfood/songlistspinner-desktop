@@ -9,11 +9,13 @@ The typed client currently uses:
 - `GET /streamers?streamer_name={name}&platform={platform}` to resolve the numeric streamer ID used by event channels
 - `GET /queue?streamer_name={name}&platform={platform}` for both upcoming queue entries and the current `playing` entry
 - `GET /play_history?streamer_name={name}&platform={platform}&limit=100&order_by=played_at&order_dir=desc`
-- `POST /queue/played?queue_id={queueId}` to move the selected winner directly into play history when its popup closes
+- `POST /queue/played?queue_id={queueId}` to move the selected winner directly into play history when **Mark Played** is chosen
 - `POST /queue/played?position=playing&streamer_id={streamerId}` to complete the current now-playing entry
 - `POST /queue/{queueId}/play` to promote a selected winner to the now-playing slot
 
 Supported platform values are `twitch`, `youtube`, `kick`, and `none`. Queue and play-history transport DTOs are internal to the v2 client and are mapped to the existing `SpinnerQueueItem` and `PlayHistoryItem` models.
+
+The first-run connection wizard accepts a plain streamer name or a public route such as `/t/name` or `/s/name`. It resolves the internal streamer ID and linked platform identities, then independently verifies authenticated API reads, Centrifugo subscriptions, and the local OBS overlay before opening the dashboard.
 
 The `day`, `week`, and `month` history settings add an RFC3339 `played_after` value using rolling UTC windows. API v2 does not expose the legacy `period=stream` parameter, so the `stream` setting currently means the most recent page of history.
 
@@ -54,7 +56,7 @@ streamer:{streamerId}-play_history
 
 ## Now Playing workflow
 
-When **Display Now Playing** is disabled, the existing queue automation can continue to move a winner directly to play history. When it is enabled, closing the winner popup performs an ordered transition:
+The winner popup always requires an explicit action: **Mark Played**, **Leave in Queue**, or, when **Display Now Playing** is enabled, **Set Now Playing**. Dismissing the popup leaves the queue unchanged. Choosing **Set Now Playing** performs an ordered transition:
 
 1. Read the current queue snapshot.
 2. If the now-playing slot is occupied, explicitly mark that entry played.

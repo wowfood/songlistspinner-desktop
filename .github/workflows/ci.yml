@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
   pull_request:
     branches:
       - main
@@ -21,12 +22,36 @@ jobs:
     name: Test, build, smoke-test, and publish
     runs-on: windows-2022
     timeout-minutes: 45
+    outputs:
+      release-version: ${{ steps.version.outputs.number }}
+      release-tag: ${{ steps.version.outputs.tag }}
 
     steps:
       - name: Check out source
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+
+      - name: Read application version
+        id: version
+        shell: pwsh
+        run: |
+          [xml] $project = Get-Content `
+              'src/SonglistSpinner.Desktop/SonglistSpinner.Desktop.csproj' `
+              -Raw
+          $versionNode = $project.SelectSingleNode('/Project/PropertyGroup/VersionPrefix')
+          if ($null -eq $versionNode) {
+              throw 'VersionPrefix is missing from the desktop project.'
+          }
+
+          $version = $versionNode.InnerText.Trim()
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+              throw "VersionPrefix must use MAJOR.MINOR.PATCH; found '$version'."
+          }
+
+          .\scripts\assert-release-version.ps1 -ReleaseVersion $version
+          "number=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
 
       - name: Set up .NET and MAUI Windows
         uses: actions/setup-dotnet@v6
@@ -48,7 +73,10 @@ jobs:
 
       - name: Create verified single executable
         shell: pwsh
-        run: .\scripts\publish-single-file.ps1 -BuildNumber ${{ github.run_number }}
+        run: >-
+          .\scripts\publish-single-file.ps1
+          -ReleaseVersion '${{ steps.version.outputs.number }}'
+          -BuildNumber ${{ github.run_number }}
 
       - name: Smoke-test executable
         shell: pwsh
@@ -68,3 +96,52 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+  release:
+    name: Publish GitHub release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: write
+
+    steps:
+      - name: Download verified release candidate
+        uses: actions/download-artifact@v8
+        with:
+          name: songlistspinner-desktop-win-x64-${{ github.sha }}
+          path: release-assets
+
+      - name: Publish versioned GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          $tag = '${{ needs.validate.outputs.release-tag }}'
+          $version = '${{ needs.validate.outputs.release-version }}'
+
+          gh api "repos/$env:GH_REPO/git/ref/tags/$tag" --silent 2>$null
+          if ($LASTEXITCODE -eq 0) {
+              throw "Tag $tag already exists. Increment VersionPrefix before merging another release to main."
+          }
+
+          $executables = @(Get-ChildItem 'release-assets' -Recurse -File -Filter 'SonglistSpinner.Desktop.exe')
+          $checksums = @(Get-ChildItem 'release-assets' -Recurse -File -Filter 'SonglistSpinner.Desktop.exe.sha256')
+          if ($executables.Count -ne 1 -or $checksums.Count -ne 1) {
+              throw "Expected one executable and one checksum; found $($executables.Count) executable(s) and $($checksums.Count) checksum(s)."
+          }
+
+          $executablePath = $executables[0].FullName
+          $checksumPath = $checksums[0].FullName
+          gh release create $tag $executablePath $checksumPath `
+              --target '${{ github.sha }}' `
+              --title "SonglistSpinner Desktop $version" `
+              --generate-notes `
+              --latest
+
+          if ($LASTEXITCODE -ne 0) {
+              throw "GitHub release creation failed with exit code $LASTEXITCODE."
+          }

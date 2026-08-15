@@ -41,7 +41,7 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             throw new ArgumentOutOfRangeException(nameof(options), "Page size must be between 1 and 100.");
     }
 
-    public async Task<int> ResolveStreamerIdAsync(
+    public async Task<StreamerSongListStreamer> ResolveStreamerAsync(
         StreamerSongListChannel channel,
         CancellationToken cancellationToken = default)
     {
@@ -50,7 +50,14 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         if (dto.Id <= 0)
             throw new StreamerSongListApiException("StreamerSongList returned an invalid streamer ID.");
 
-        return dto.Id;
+        return new StreamerSongListStreamer(dto.Id, MapPlatforms(dto.Platforms));
+    }
+
+    public async Task<int> ResolveStreamerIdAsync(
+        StreamerSongListChannel channel,
+        CancellationToken cancellationToken = default)
+    {
+        return (await ResolveStreamerAsync(channel, cancellationToken)).Id;
     }
 
     public async Task<SpinnerQueueItem[]> FetchQueueAsync(
@@ -245,6 +252,30 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             },
             Requests = MapRequests(item.Requests)
         };
+    }
+
+    private static IReadOnlyList<StreamerSongListPlatformIdentity> MapPlatforms(StreamerPlatformsDto? platforms)
+    {
+        if (platforms is null) return [];
+
+        var identities = new List<StreamerSongListPlatformIdentity>();
+        AddPlatformIdentity(identities, "twitch", platforms.Twitch);
+        AddPlatformIdentity(identities, "youtube", platforms.YouTube);
+        AddPlatformIdentity(identities, "kick", platforms.Kick);
+        AddPlatformIdentity(identities, "none", platforms.None);
+        return identities;
+    }
+
+    private static void AddPlatformIdentity(
+        ICollection<StreamerSongListPlatformIdentity> identities,
+        string platform,
+        StreamerPlatformDto? identity)
+    {
+        if (identity is null || string.IsNullOrWhiteSpace(identity.Username)) return;
+        identities.Add(new StreamerSongListPlatformIdentity(
+            platform,
+            identity.Username.Trim(),
+            identity.PlatformId?.Trim() ?? ""));
     }
 
     private static PlayHistoryItem MapPlayHistoryItem(PlayHistoryDetailsDto item)
