@@ -16,8 +16,10 @@ The recommended repository layout is:
 Pushes to `develop` and `main`, plus pull requests targeting either branch, run
 the complete Windows validation job. A pull request targeting `main` also
 verifies that its proposed `v<VersionPrefix>` tag does not already exist. Only
-a successful push to `main` runs the release job, so opening or updating a pull
-request cannot publish a release.
+a successful push to `main` that GitHub associates with a merged
+`develop`-to-`main` pull request runs the release job, so opening or updating a
+pull request cannot publish a release and a direct push cannot publish an
+artifact even if repository protections are later loosened.
 
 ## Versioning requirement
 

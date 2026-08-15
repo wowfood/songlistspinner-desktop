@@ -10,6 +10,7 @@ namespace SonglistSpinner.Services;
 
 public class OverlayStateService
 {
+    private const int ClientBufferCapacity = 32;
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -17,15 +18,8 @@ public class OverlayStateService
 
     private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
     private readonly object _healthGate = new();
-    private List<SpinnerQueueItem> _availableSongs = [];
-
-    private SpinnerConfig _config = new();
-    private string _currentStreamer = "";
-    private bool _playedListCollapsed;
-    private string _playedListMinWidth = "";
-    private string _playedListWidth = "";
-    private SpinnerQueueItem? _nowPlaying;
-    private PlayHistoryItem[] _playedSongs = [];
+    private readonly object _stateGate = new();
+    private OverlaySnapshot _snapshot = OverlaySnapshot.Empty;
     private string? _serverError;
     private LocalOverlayServerState _serverState = LocalOverlayServerState.Stopped;
 
@@ -60,31 +54,55 @@ public class OverlayStateService
         SpinnerQueueItem? nowPlaying,
         string streamer)
     {
-        _config = config;
-        _availableSongs = available;
-        _playedSongs = played;
-        _nowPlaying = nowPlaying;
-        _currentStreamer = streamer;
+        OverlaySnapshot snapshot;
+        lock (_stateGate)
+        {
+            snapshot = _snapshot = _snapshot with
+            {
+                Config = config,
+                AvailableSongs = [.. available],
+                PlayedSongs = [.. played],
+                NowPlaying = nowPlaying,
+                CurrentStreamer = streamer
+            };
+        }
 
-        var wheelItems = BuildWheelItems(available);
-        var playedTexts = played.Select(s => SpinnerDataService.CreatePlayedSongText(s, config)).ToList();
-        var nowPlayingText = BuildNowPlayingText(nowPlaying, config);
+        return BroadcastStateAsync(snapshot);
+    }
 
+    public Task UpdateConfigAsync(SpinnerConfig config)
+    {
+        OverlaySnapshot snapshot;
+        lock (_stateGate)
+            snapshot = _snapshot = _snapshot with { Config = config };
+
+        return BroadcastStateAsync(snapshot);
+    }
+
+    private Task BroadcastStateAsync(OverlaySnapshot snapshot)
+    {
         return BroadcastAsync("update_songs", new
         {
-            config,
-            streamer,
-            wheelItems,
-            playedTexts,
-            nowPlayingText,
-            playedCount = played.Length,
-            availableCount = available.Count
+            config = snapshot.Config,
+            streamer = snapshot.CurrentStreamer,
+            wheelItems = BuildWheelItems(snapshot.AvailableSongs),
+            playedTexts = snapshot.PlayedSongs
+                .Select(song => SpinnerDataService.CreatePlayedSongText(song, snapshot.Config))
+                .ToList(),
+            nowPlayingText = BuildNowPlayingText(snapshot.NowPlaying, snapshot.Config),
+            playedCount = snapshot.PlayedSongs.Length,
+            availableCount = snapshot.AvailableSongs.Length
         });
     }
 
-    public Task BroadcastSpinCommandAsync(int winnerIndex, int duration, string mainLine, string details)
+    public Task BroadcastSpinCommandAsync(
+        int winnerIndex,
+        int winnerQueueId,
+        int duration,
+        string mainLine,
+        string details)
     {
-        return BroadcastAsync("spin_command", new { winnerIndex, duration, mainLine, details });
+        return BroadcastAsync("spin_command", new { winnerIndex, winnerQueueId, duration, mainLine, details });
     }
 
     public Task BroadcastCloseWinnerAsync()
@@ -94,14 +112,15 @@ public class OverlayStateService
 
     public Task UpdatePlayedListCollapsedAsync(bool collapsed)
     {
-        _playedListCollapsed = collapsed;
+        lock (_stateGate)
+            _snapshot = _snapshot with { PlayedListCollapsed = collapsed };
         return BroadcastAsync("set_collapse", new { collapsed });
     }
 
     public Task UpdatePlayedListWidthAsync(string width, string minWidth)
     {
-        _playedListWidth = width;
-        _playedListMinWidth = minWidth;
+        lock (_stateGate)
+            _snapshot = _snapshot with { PlayedListWidth = width, PlayedListMinWidth = minWidth };
         return BroadcastAsync("set_played_list_width", new { width, minWidth });
     }
 
@@ -116,7 +135,13 @@ public class OverlayStateService
 
     public async IAsyncEnumerable<string> SubscribeAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
-        var channel = Channel.CreateUnbounded<string>();
+        var channel = Channel.CreateBounded<string>(new BoundedChannelOptions(ClientBufferCapacity)
+        {
+            SingleReader = true,
+            SingleWriter = false,
+            FullMode = BoundedChannelFullMode.DropOldest,
+            AllowSynchronousContinuations = false
+        });
         var key = Guid.NewGuid();
         _clients[key] = channel;
         OnHealthChanged();
@@ -157,32 +182,42 @@ public class OverlayStateService
 
     private string BuildInitStateEvent()
     {
-        var wheelItems = BuildWheelItems(_availableSongs);
-        var playedTexts = _playedSongs.Select(s => SpinnerDataService.CreatePlayedSongText(s, _config)).ToList();
-        var nowPlayingText = BuildNowPlayingText(_nowPlaying, _config);
+        OverlaySnapshot snapshot;
+        lock (_stateGate)
+            snapshot = _snapshot;
+
+        var wheelItems = BuildWheelItems(snapshot.AvailableSongs);
+        var playedTexts = snapshot.PlayedSongs
+            .Select(song => SpinnerDataService.CreatePlayedSongText(song, snapshot.Config))
+            .ToList();
+        var nowPlayingText = BuildNowPlayingText(snapshot.NowPlaying, snapshot.Config);
 
         var payload = new
         {
-            config = _config,
-            streamer = _currentStreamer,
+            config = snapshot.Config,
+            streamer = snapshot.CurrentStreamer,
             wheelItems,
             playedTexts,
             nowPlayingText,
-            playedCount = _playedSongs.Length,
-            availableCount = _availableSongs.Count,
-            playedListCollapsed = _playedListCollapsed,
-            playedListWidth = _playedListWidth,
-            playedListMinWidth = _playedListMinWidth
+            playedCount = snapshot.PlayedSongs.Length,
+            availableCount = snapshot.AvailableSongs.Length,
+            playedListCollapsed = snapshot.PlayedListCollapsed,
+            playedListWidth = snapshot.PlayedListWidth,
+            playedListMinWidth = snapshot.PlayedListMinWidth
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOpts);
         return $"event: init_state\ndata: {json}\n\n";
     }
 
-    private static object[] BuildWheelItems(List<SpinnerQueueItem> songs)
+    private static object[] BuildWheelItems(IReadOnlyCollection<SpinnerQueueItem> songs)
     {
         return songs.Count > 0
-            ? songs.Select(s => (object)new { label = SpinnerDataService.BuildWheelLabel(s) }).ToArray()
+            ? songs.Select(song => (object)new
+            {
+                queueId = song.QueueId,
+                label = SpinnerDataService.BuildWheelLabel(song)
+            }).ToArray()
             : [new { label = "Waiting for Dashboard..." }];
     }
 
@@ -208,8 +243,29 @@ public class OverlayStateService
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[OverlayState] A health observer failed: {ex}");
+                Trace.WriteLine($"[OverlayState] A health observer failed: {ex}");
             }
         }
+    }
+
+    private sealed record OverlaySnapshot(
+        SpinnerConfig Config,
+        SpinnerQueueItem[] AvailableSongs,
+        PlayHistoryItem[] PlayedSongs,
+        SpinnerQueueItem? NowPlaying,
+        string CurrentStreamer,
+        bool PlayedListCollapsed,
+        string PlayedListWidth,
+        string PlayedListMinWidth)
+    {
+        public static OverlaySnapshot Empty { get; } = new(
+            new SpinnerConfig(),
+            [],
+            [],
+            null,
+            "",
+            false,
+            "",
+            "");
     }
 }

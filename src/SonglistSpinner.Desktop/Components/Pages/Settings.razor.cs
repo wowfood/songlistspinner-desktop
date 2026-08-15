@@ -9,6 +9,7 @@ using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
 using SonglistSpinner.Extensions;
+using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -316,7 +317,7 @@ public partial class Settings
         }
         catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
         {
-            Debug.WriteLine($"[SonglistSpinner] Settings preview is unavailable: {ex.Message}");
+            Trace.WriteLine($"[SonglistSpinner] Settings preview is unavailable: {ex.Message}");
         }
     }
 
@@ -351,6 +352,8 @@ public partial class Settings
         {
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
+            DiagnosticLog.Configure(_dto.DebugMode);
+            await OverlayService.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
 
             var submittedToken = _credentialToken.Trim();
             if (_clearCredentialOnSave && string.IsNullOrWhiteSpace(submittedToken))
@@ -367,11 +370,12 @@ public partial class Settings
                     : submittedToken;
                 if (!string.IsNullOrWhiteSpace(token))
                 {
-                    _existingCredential = new StreamerSongListCredential(
+                    var credential = new StreamerSongListCredential(
                         _credentialKind,
                         token,
                         string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
-                    await CredentialStore.SaveCredentialAsync(_existingCredential);
+                    await CredentialStore.SaveCredentialAsync(credential);
+                    _existingCredential = credential;
                     _credentialToken = "";
                     _hasCredential = true;
                     _clearCredentialOnSave = false;
@@ -405,6 +409,23 @@ public partial class Settings
         Navigation.NavigateTo("/setup");
     }
 
+    private void OpenDiagnosticLogFolder()
+    {
+        try
+        {
+            Directory.CreateDirectory(DiagnosticLog.LogDirectory);
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = DiagnosticLog.LogDirectory,
+                UseShellExecute = true
+            });
+        }
+        catch (Exception ex)
+        {
+            _vm.SaveError = $"The diagnostic log folder could not be opened: {ex.Message}";
+        }
+    }
+
     private async Task TestApiConnection()
     {
         if (_dto == null || _testingCredential) return;
@@ -412,21 +433,25 @@ public partial class Settings
         _testingCredential = true;
         _credentialTestResult = null;
         _credentialTestSucceeded = false;
+        var previousCredential = _existingCredential;
+        var credentialWasChanged = false;
 
         try
         {
-            if (!await SaveCoreAsync())
-            {
-                _credentialTestResult = $"Unable to save the credential: {_vm.SaveError}";
-                return;
-            }
-
             var streamerName = _dto.DefaultStreamerName.Trim();
             if (string.IsNullOrWhiteSpace(streamerName))
             {
                 _credentialTestResult = "Enter a Default StreamerSongList Name before testing.";
                 return;
             }
+
+            if (!await SaveCoreAsync())
+            {
+                _credentialTestResult = $"Unable to save the credential: {_vm.SaveError}";
+                return;
+            }
+
+            credentialWasChanged = !Equals(previousCredential, _existingCredential);
 
             var channel = new StreamerSongListChannel(streamerName, _dto.StreamerPlatform);
             var queue = await ApiService.FetchQueueAsync(channel);
@@ -438,13 +463,45 @@ public partial class Settings
         }
         catch (Exception ex)
         {
-            _credentialTestResult = $"Connection failed: {ex.Message}";
-            Debug.WriteLine($"[SonglistSpinner] API connection test failed: {ex}");
+            string? rollbackError = null;
+            if (credentialWasChanged)
+            {
+                try
+                {
+                    await RestoreCredentialAsync(previousCredential);
+                }
+                catch (Exception restoreException)
+                {
+                    rollbackError = $" The previous credential could not be restored: {restoreException.Message}";
+                }
+            }
+
+            _credentialTestResult = $"Connection failed: {ex.Message}" +
+                                    (credentialWasChanged && rollbackError is null
+                                        ? " The previous credential was restored."
+                                        : rollbackError);
+            Trace.WriteLine($"[SonglistSpinner] API connection test failed: {ex}");
         }
         finally
         {
             _testingCredential = false;
         }
+    }
+
+    private async Task RestoreCredentialAsync(StreamerSongListCredential? credential)
+    {
+        if (credential is null)
+            await CredentialStore.ClearCredentialAsync();
+        else
+            await CredentialStore.SaveCredentialAsync(credential);
+
+        _existingCredential = credential;
+        _hasCredential = credential is not null;
+        _credentialKind = credential?.Kind ?? StreamerSongListCredentialKind.Streamer;
+        _credentialClientId = credential?.ClientId ?? "";
+        _credentialToken = "";
+        _clearCredentialOnSave = false;
+        _savedFormState = CaptureFormState();
     }
 
     private async Task ConfirmNavigationAsync(LocationChangingContext context)
@@ -495,7 +552,7 @@ public partial class Settings
             _vm.PlayedListBgAlpha,
             _credentialKind,
             _credentialClientId,
-            _credentialToken,
+            !string.IsNullOrWhiteSpace(_credentialToken),
             _hasCredential,
             _clearCredentialOnSave));
     }
@@ -516,7 +573,7 @@ public partial class Settings
         double PlayedListBackgroundAlpha,
         StreamerSongListCredentialKind CredentialKind,
         string CredentialClientId,
-        string CredentialToken,
+        bool CredentialTokenEdited,
         bool HasCredential,
         bool ClearCredentialOnSave);
 

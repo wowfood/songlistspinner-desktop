@@ -60,6 +60,11 @@
     <ItemGroup>
         <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
     </ItemGroup>
+    <ItemGroup>
+        <!-- Also embed the vendored wheel script so the local OBS server can serve it from the single executable. -->
+        <EmbeddedResource Include="wwwroot\spinner\spin-wheel-iife.js"
+                          LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
+    </ItemGroup>
 
     <!--
       .NET 10 adds both the build and publish static-web-asset endpoint manifests

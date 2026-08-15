@@ -100,14 +100,20 @@ public sealed class SettingsViewModel
 
     public void InitPlayedListBg(string value)
     {
-        if (value.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase))
+        if (value.Length > 6 &&
+            value.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) &&
+            value.EndsWith(')'))
         {
             var parts = value[5..^1].Split(',');
             if (parts.Length == 4 &&
                 int.TryParse(parts[0].Trim(), out var r) &&
                 int.TryParse(parts[1].Trim(), out var g) &&
                 int.TryParse(parts[2].Trim(), out var b) &&
-                double.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var a))
+                double.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var a) &&
+                r is >= 0 and <= 255 &&
+                g is >= 0 and <= 255 &&
+                b is >= 0 and <= 255 &&
+                a is >= 0 and <= 1)
             {
                 PlayedListBgHex = $"#{r:X2}{g:X2}{b:X2}";
                 PlayedListBgAlpha = a;

@@ -33,6 +33,8 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         if (_options.MaximumReconnectDelay < _options.InitialReconnectDelay)
             throw new ArgumentOutOfRangeException(nameof(options),
                 "The maximum reconnect delay must not be shorter than the initial delay.");
+        if (_options.ReceiveIdleTimeout <= TimeSpan.Zero)
+            throw new ArgumentOutOfRangeException(nameof(options), "The receive idle timeout must be positive.");
         if (_options.MaximumMessageBytes < ReceiveBufferBytes)
             throw new ArgumentOutOfRangeException(nameof(options),
                 $"The maximum event message size must be at least {ReceiveBufferBytes} bytes.");
@@ -65,7 +67,9 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
                     {
                         yield break;
                     }
-                    catch (Exception ex) when (ex is WebSocketException or InvalidDataException or IOException or JsonException)
+                    catch (Exception ex) when (ex is WebSocketException or InvalidDataException or IOException or
+                                                   JsonException or InvalidOperationException or FormatException or
+                                                   OverflowException)
                     {
                         failure = ex;
                         break;
@@ -86,7 +90,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
 
             cancellationToken.ThrowIfCancellationRequested();
             var error = failure?.Message ?? "The StreamerSongList event connection closed.";
-            Debug.WriteLine($"[SonglistSpinner Events] {error} Reconnecting...");
+            Trace.WriteLine($"[SonglistSpinner Events] {error} Reconnecting...");
             yield return new StreamerSongListEvent(StreamerSongListEventKind.Reconnecting, Error: error);
 
             var reconnectDelay = GetReconnectDelay(reconnectAttempt++);
@@ -195,7 +199,16 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
             WebSocketReceiveResult result;
             do
             {
-                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+                try
+                {
+                    result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken)
+                        .WaitAsync(_options.ReceiveIdleTimeout, _timeProvider, cancellationToken);
+                }
+                catch (TimeoutException)
+                {
+                    throw new WebSocketException(
+                        $"No StreamerSongList event data was received for {_options.ReceiveIdleTimeout.TotalSeconds:0} seconds.");
+                }
                 if (result.MessageType == WebSocketMessageType.Close) return null;
                 if (result.MessageType != WebSocketMessageType.Text)
                     throw new InvalidDataException("StreamerSongList sent an unsupported binary event message.");
