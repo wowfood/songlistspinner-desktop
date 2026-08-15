@@ -24,7 +24,11 @@ internal static class CentrifugoProtocol
     {
         using var document = JsonDocument.Parse(message);
         var root = document.RootElement;
-        if (!root.TryGetProperty("id", out var id) || id.GetInt32() != commandId)
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("id", out var id) ||
+            id.ValueKind != JsonValueKind.Number ||
+            !id.TryGetInt32(out var replyId) ||
+            replyId != commandId)
         {
             error = null;
             return false;
@@ -32,7 +36,9 @@ internal static class CentrifugoProtocol
 
         if (root.TryGetProperty("error", out var errorElement))
         {
-            error = errorElement.TryGetProperty("message", out var errorMessage)
+            error = errorElement.ValueKind == JsonValueKind.Object &&
+                    errorElement.TryGetProperty("message", out var errorMessage) &&
+                    errorMessage.ValueKind == JsonValueKind.String
                 ? errorMessage.GetString() ?? "Centrifugo rejected the command."
                 : "Centrifugo rejected the command.";
         }
@@ -47,7 +53,9 @@ internal static class CentrifugoProtocol
     public static bool IsDisconnect(string message)
     {
         using var document = JsonDocument.Parse(message);
-        return document.RootElement.TryGetProperty("push", out var push) &&
+        return document.RootElement.ValueKind == JsonValueKind.Object &&
+               document.RootElement.TryGetProperty("push", out var push) &&
+               push.ValueKind == JsonValueKind.Object &&
                push.TryGetProperty("disconnect", out _);
     }
 
@@ -55,11 +63,15 @@ internal static class CentrifugoProtocol
     {
         using var document = JsonDocument.Parse(message);
         var root = document.RootElement;
-        if (!root.TryGetProperty("push", out var push) ||
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("push", out var push) ||
+            push.ValueKind != JsonValueKind.Object ||
             !push.TryGetProperty("pub", out var publication) ||
+            publication.ValueKind != JsonValueKind.Object ||
             !publication.TryGetProperty("data", out var envelope) ||
             envelope.ValueKind != JsonValueKind.Object ||
-            !envelope.TryGetProperty("type", out var typeProperty))
+            !envelope.TryGetProperty("type", out var typeProperty) ||
+            typeProperty.ValueKind != JsonValueKind.String)
         {
             notification = null;
             return false;

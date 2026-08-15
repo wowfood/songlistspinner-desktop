@@ -122,13 +122,13 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
     {
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(relativeUrl));
         await AddCredentialAsync(request, cancellationToken);
-        Debug.WriteLine($"[SonglistSpinner API] GET {request.RequestUri}");
+        Trace.WriteLine($"[SonglistSpinner API] GET {request.RequestUri}");
 
         using var response = await _http.SendAsync(
             request,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
-        Debug.WriteLine(
+        Trace.WriteLine(
             $"[SonglistSpinner API] HTTP {(int)response.StatusCode} {response.StatusCode} for {request.RequestUri}");
 
         if (!response.IsSuccessStatusCode)
@@ -155,13 +155,13 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
     {
         using var request = new HttpRequestMessage(method, BuildUri(relativeUrl));
         await AddCredentialAsync(request, cancellationToken);
-        Debug.WriteLine($"[SonglistSpinner API] {method} {request.RequestUri}");
+        Trace.WriteLine($"[SonglistSpinner API] {method} {request.RequestUri}");
 
         using var response = await _http.SendAsync(
             request,
             HttpCompletionOption.ResponseHeadersRead,
             cancellationToken);
-        Debug.WriteLine(
+        Trace.WriteLine(
             $"[SonglistSpinner API] HTTP {(int)response.StatusCode} {response.StatusCode} for {request.RequestUri}");
         if (!response.IsSuccessStatusCode)
             throw await CreateApiExceptionAsync(response, cancellationToken);

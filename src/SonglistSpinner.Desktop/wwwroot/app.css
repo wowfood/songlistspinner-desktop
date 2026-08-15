@@ -1124,6 +1124,12 @@ h1:focus {
     cursor: pointer;
 }
 
+.ss-settings-inline-actions {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.75rem;
+}
+
 .ss-settings-endpoints {
     display: grid;
     gap: 0.65rem;

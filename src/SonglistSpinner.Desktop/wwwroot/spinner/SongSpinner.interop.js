@@ -74,6 +74,10 @@ window.SpinnerInterop = (function () {
         createWheel(items, colors) {
             const container = document.getElementById('wheelContainer')
             if (!container) return
+            if (!window.spinWheel || !window.spinWheel.Wheel) {
+                container.textContent = 'The wheel component could not be loaded.'
+                return
+            }
             if (_wheel) {
                 _wheel.remove();
                 _wheel = null
@@ -106,10 +110,11 @@ window.SpinnerInterop = (function () {
                     _resizeTimeout = setTimeout(() => {
                         if (_wheel) {
                             const items = _wheel.items
+                            const colors = _wheel.itemBackgroundColors
                             _wheel.remove()
                             _wheel = new spinWheel.Wheel(container, {
                                 items,
-                                itemBackgroundColors: _wheel?.itemBackgroundColors || [],
+                                itemBackgroundColors: colors || [],
                                 borderWidth: 0,
                                 lineWidth: 0,
                                 radius: 0.95,

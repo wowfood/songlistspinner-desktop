@@ -37,6 +37,8 @@ need Twitch chat commands or a separate chatbot connection.
 - A 64-bit PC running Windows 10 version 1809 or newer, or Windows 11
 - A [StreamerSongList](https://streamersonglist.com/) account and channel
 - A StreamerSongList streamer access token created under **Settings > Access**
+- An internet connection for StreamerSongList API and realtime event access;
+  update checks also contact GitHub Releases
 - OBS Studio or Streamlabs Desktop if the overlay will be shown on stream
 - Microsoft Edge WebView2 Evergreen Runtime
 
@@ -289,8 +291,8 @@ When the Now Playing workflow is enabled, its panel additionally supports:
 
 ### Advanced
 
-- **Enable diagnostic output** writes additional information when a debugger is
-  attached.
+- **Enable diagnostic output** writes a rolling support log under
+  `%LOCALAPPDATA%\SonglistSpinner\logs`. Streamer access tokens are not logged.
 - **Service Endpoints** shows the application version, active API address, and
   local overlay URL.
 - **Open GitHub Releases** provides a permanent route to updates even after an
@@ -355,16 +357,17 @@ does not need that administrator login.
 - Use URL mode, not **Local file**.
 - Confirm the source URL is exactly `http://localhost:5150/overlay`.
 - Confirm port `5150` is not occupied by another application or another running
-  SonglistSpinner instance.
+  SonglistSpinner instance. The overlay port is currently fixed and cannot be
+  changed in Settings.
 - Open the Dashboard and confirm the Overlay indicator reports **Ready** or a
   connected source.
 - Refresh the browser source after restarting SonglistSpinner.
 
 ### Settings appear in preview but not in OBS
 
-Select **Save Settings**, return to the Dashboard, and reload the browser source
-if necessary. The settings preview intentionally uses an unsaved draft that is
-isolated from the live overlay.
+The settings preview intentionally uses an unsaved draft that is isolated from
+the live overlay. Select **Save Settings** to push the saved configuration to
+connected OBS or Streamlabs browser sources immediately.
 
 ### No update notification appears
 
@@ -418,6 +421,13 @@ Development and automation can override connection values with:
 
 Do not commit tokens, local environment files, or screenshots containing
 credentials.
+
+## Third-party software
+
+The wheel renderer is `spin-wheel` 5.0.2, bundled into the executable so the UI
+does not depend on a CDN at runtime. It is distributed under the MIT License;
+the bundled license text is stored beside the script in
+`src/SonglistSpinner.Desktop/wwwroot/spinner`.
 
 ## Additional documentation
 

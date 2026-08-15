@@ -6,6 +6,8 @@ namespace SonglistSpinner.Services;
 
 public class LocalOverlayServer : IAsyncDisposable
 {
+    private const string SpinWheelResourceName = "SonglistSpinner.WebAssets.spin-wheel-iife.js";
+    private static readonly Lazy<byte[]> SpinWheelScript = new(LoadSpinWheelScript);
     private const string OverlayHtml = """
                                        <!DOCTYPE html>
                                        <html lang="en">
@@ -18,16 +20,16 @@ public class LocalOverlayServer : IAsyncDisposable
                                            --app-text-color: #ffffff;
                                            --app-status-bg: rgba(0, 0, 0, 0.7);
                                            --app-played-list-bg: rgba(0, 0, 0, 0.7);
-                                           --app-played-item-bg: #222;
+                                           --app-played-item-bg: #222222;
                                            --app-resize-handle-bg: #333;
                                            --app-resize-handle-hover-bg: #555;
                                            --app-toggle-bg: #222;
-                                           --app-button-bg: #ffffff;
-                                           --app-button-text: #111111;
+                                           --app-button-bg: #555555;
+                                           --app-button-text: #cccccc;
                                            --app-pointer-color: wheat;
                                            --app-played-list-font-family: sans-serif;
                                            --app-played-list-font-size: 0.875rem;
-                                           --app-played-list-max-lines: 1;
+                                           --app-played-list-max-lines: 2;
                                        }
                                        html, body {
                                            height: 100%;
@@ -439,7 +441,7 @@ public class LocalOverlayServer : IAsyncDisposable
                                            </div>
                                        </div>
 
-                                       <script src="https://cdn.jsdelivr.net/npm/spin-wheel@5.0.2/dist/spin-wheel-iife.js"></script>
+                                       <script src="/overlay/spin-wheel-iife.js"></script>
                                        <script>
                                        window.SpinnerInterop = (function () {
                                            let _wheel = null
@@ -449,6 +451,10 @@ public class LocalOverlayServer : IAsyncDisposable
                                                createWheel(items, colors) {
                                                    const container = document.getElementById('wheelContainer')
                                                    if (!container) return
+                                                   if (!window.spinWheel || !window.spinWheel.Wheel) {
+                                                       container.textContent = 'The wheel component could not be loaded.'
+                                                       return
+                                                   }
                                                    if (_wheel) { _wheel.remove(); _wheel = null }
                                                    _wheel = new spinWheel.Wheel(container, {
                                                        items,
@@ -598,7 +604,7 @@ public class LocalOverlayServer : IAsyncDisposable
                                        })()
                                        </script>
                                        <script>
-                                       const _overlayState = { config: null, collapsed: false }
+                                       const _overlayState = { config: null, collapsed: false, wheelItems: [] }
                                        const _isSettingsPreview = new URLSearchParams(window.location.search).get('preview') === '1'
 
                                        function connectSSE() {
@@ -621,7 +627,17 @@ public class LocalOverlayServer : IAsyncDisposable
 
                                            es.addEventListener('spin_command', e => {
                                                const data = JSON.parse(e.data)
-                                               SpinnerInterop.spinToItem(data.winnerIndex, data.duration)
+                                               let winnerIndex = data.winnerIndex
+                                               if (data.winnerQueueId != null) {
+                                                   const resolvedIndex = _overlayState.wheelItems.findIndex(
+                                                       item => Number(item.queueId) === Number(data.winnerQueueId))
+                                                   if (resolvedIndex < 0) {
+                                                       console.error('The selected winner is not present in the overlay wheel.')
+                                                       return
+                                                   }
+                                                   winnerIndex = resolvedIndex
+                                               }
+                                               SpinnerInterop.spinToItem(winnerIndex, data.duration)
                                                setTimeout(() => {
                                                    document.getElementById('winnerMainLine').textContent = data.mainLine
                                                    document.getElementById('winnerDetails').textContent = data.details
@@ -666,7 +682,8 @@ public class LocalOverlayServer : IAsyncDisposable
                                                SpinnerInterop.applyNowPlayingConfig(data.config.nowPlaying)
                                            }
                                            const cfg = _overlayState.config
-                                           SpinnerInterop.createWheel(data.wheelItems || [], cfg && cfg.wheelColors || [])
+                                           _overlayState.wheelItems = data.wheelItems || []
+                                           SpinnerInterop.createWheel(_overlayState.wheelItems, cfg && cfg.wheelColors || [])
                                            document.getElementById('playedCount').textContent = data.playedCount != null ? data.playedCount : 0
                                            document.getElementById('availableCount').textContent = data.availableCount != null ? data.availableCount : 0
                                            if (data.streamer) document.getElementById('streamerLabel').textContent = data.streamer
@@ -726,8 +743,7 @@ public class LocalOverlayServer : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Console.WriteLine(ex);
-            // ignored
+            Trace.WriteLine($"[OverlayServer] Listener close failed: {ex}");
         }
 
         _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
@@ -748,7 +764,7 @@ public class LocalOverlayServer : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Debug.WriteLine($"[OverlayServer] Failed to start on port {_overlay.Port}: {ex.Message}");
+            Trace.WriteLine($"[OverlayServer] Failed to start on port {_overlay.Port}: {ex.Message}");
             _overlay.SetServerHealth(LocalOverlayServerState.Failed, ex.Message);
         }
 
@@ -809,6 +825,13 @@ public class LocalOverlayServer : IAsyncDisposable
         var path = context.Request.Url?.AbsolutePath.TrimEnd('/') ?? "";
         try
         {
+            if (!IsAllowedHost(context.Request.Url?.Host))
+            {
+                context.Response.StatusCode = (int)HttpStatusCode.BadRequest;
+                context.Response.Close();
+                return;
+            }
+
             switch (path)
             {
                 case "" or "/":
@@ -820,6 +843,9 @@ public class LocalOverlayServer : IAsyncDisposable
                     break;
                 case "/overlay/events":
                     await ServeSSEAsync(context, ct);
+                    break;
+                case "/overlay/spin-wheel-iife.js":
+                    await ServeSpinWheelScriptAsync(context);
                     break;
                 default:
                     context.Response.StatusCode = 404;
@@ -841,6 +867,10 @@ public class LocalOverlayServer : IAsyncDisposable
     {
         var bytes = Encoding.UTF8.GetBytes(OverlayHtml);
         context.Response.ContentType = "text/html; charset=utf-8";
+        context.Response.AddHeader(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; " +
+            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'");
         context.Response.ContentLength64 = bytes.Length;
         await context.Response.OutputStream.WriteAsync(bytes);
         context.Response.Close();
@@ -851,7 +881,6 @@ public class LocalOverlayServer : IAsyncDisposable
         context.Response.ContentType = "text/event-stream";
         context.Response.AddHeader("Cache-Control", "no-cache");
         context.Response.AddHeader("X-Accel-Buffering", "no");
-        context.Response.AddHeader("Access-Control-Allow-Origin", "*");
         context.Response.SendChunked = true;
 
         await using var writer = new StreamWriter(context.Response.OutputStream, Encoding.UTF8, leaveOpen: true);
@@ -872,6 +901,32 @@ public class LocalOverlayServer : IAsyncDisposable
             }
             catch (Exception ex) { _ = ex; }
         }
+    }
+
+    private static async Task ServeSpinWheelScriptAsync(HttpListenerContext context)
+    {
+        var bytes = SpinWheelScript.Value;
+        context.Response.ContentType = "text/javascript; charset=utf-8";
+        context.Response.AddHeader("Cache-Control", "public, max-age=31536000, immutable");
+        context.Response.ContentLength64 = bytes.Length;
+        await context.Response.OutputStream.WriteAsync(bytes);
+        context.Response.Close();
+    }
+
+    private static bool IsAllowedHost(string? host)
+    {
+        return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
+               string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static byte[] LoadSpinWheelScript()
+    {
+        using var stream = typeof(LocalOverlayServer).Assembly.GetManifestResourceStream(SpinWheelResourceName)
+                           ?? throw new InvalidOperationException("The embedded wheel script is missing.");
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        return buffer.ToArray();
     }
 
 }
