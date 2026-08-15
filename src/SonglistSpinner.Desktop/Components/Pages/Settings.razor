@@ -430,7 +430,15 @@
                                         <InputCheckbox @bind-Value="_dto.DebugMode"/>
                                         Enable diagnostic output
                                     </label>
-                                    <div class="ss-field-hint">Writes additional application diagnostics when a debugger is attached.</div>
+                                    <div class="ss-field-hint">
+                                        Writes a rolling diagnostic log under <code>%LOCALAPPDATA%\SonglistSpinner\logs</code>.
+                                        Streamer access tokens are not logged.
+                                    </div>
+                                    <div class="ss-settings-inline-actions">
+                                        <button type="button" class="ss-btn-secondary" @onclick="OpenDiagnosticLogFolder">
+                                            Open log folder
+                                        </button>
+                                    </div>
                                 </div>
                             </section>
 

@@ -60,6 +60,41 @@ public class CentrifugoProtocolTests
         Assert.Equal("permission denied", error);
     }
 
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{\"id\":\"2\"}")]
+    [InlineData("{\"id\":2.5}")]
+    public void Given_MalformedCommandReply_When_ParsingReply_Then_IgnoresIt(string message)
+    {
+        var isReply = CentrifugoProtocol.IsCommandReply(message, 2, out var error);
+
+        Assert.False(isReply);
+        Assert.Null(error);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("{\"push\":null}")]
+    [InlineData("{\"push\":{\"pub\":null}}")]
+    [InlineData("{\"push\":{\"pub\":{\"data\":{\"type\":42}}}}")]
+    public void Given_MalformedPublication_When_ParsingNotification_Then_IgnoresIt(string message)
+    {
+        var parsed = CentrifugoProtocol.TryParseNotification(message, out var notification);
+
+        Assert.False(parsed);
+        Assert.Null(notification);
+    }
+
+    [Theory]
+    [InlineData("null")]
+    [InlineData("[]")]
+    [InlineData("{\"push\":null}")]
+    public void Given_MalformedFrame_When_CheckingDisconnect_Then_IgnoresIt(string message)
+    {
+        Assert.False(CentrifugoProtocol.IsDisconnect(message));
+    }
+
     [Fact]
     public void Given_EmptyObject_When_CheckingApplicationPing_Then_ReturnsTrue()
     {
@@ -87,6 +122,14 @@ public class CentrifugoProtocolTests
         };
 
         Assert.Throws<ArgumentException>(() => new CentrifugoStreamerSongListEventSource(options));
+    }
+
+    [Fact]
+    public void Given_NonPositiveReceiveTimeout_When_ConstructingEventSource_Then_RejectsOptions()
+    {
+        var options = new StreamerSongListEventsOptions { ReceiveIdleTimeout = TimeSpan.Zero };
+
+        Assert.Throws<ArgumentOutOfRangeException>(() => new CentrifugoStreamerSongListEventSource(options));
     }
 
     private static string Publication(string eventType, string data)

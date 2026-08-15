@@ -13,6 +13,8 @@ namespace SonglistSpinner.Components.Pages;
 // Injected properties are generated from @inject directives in Dashboard.razor.
 public partial class Dashboard
 {
+    private const int SpinDurationMilliseconds = 5000;
+    private const int WinnerRevealDelayMilliseconds = 100;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private List<SpinnerQueueItem> _availableSongs = [];
@@ -29,6 +31,7 @@ public partial class Dashboard
     private Task? _eventSubscriptionTask;
     private bool _isLockedDefault;
     private bool _isSpinning;
+    private TaskCompletionSource<bool>? _spinCompletion;
     private bool _jsInitialized;
     private DateTime _lastSpinTime = DateTime.MinValue;
     private bool _loading = true;
@@ -254,9 +257,9 @@ public partial class Dashboard
         _lastSpinTime = DateTime.UtcNow;
         _spinDisabled = true;
         _isSpinning = true;
+        _spinCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _winnerQueueId = null;
         _wheelCts.Cancel();
-        _wheelCts.Dispose();
         _wheelCts = new CancellationTokenSource();
         SetStatus("Fetching queue...");
         StateHasChanged();
@@ -272,7 +275,7 @@ public partial class Dashboard
             {
                 SetStatus("No songs left to spin!");
                 _spinDisabled = false;
-                _isSpinning = false;
+                SignalSpinCompleted();
                 await InvokeAsync(StateHasChanged);
                 return;
             }
@@ -286,15 +289,21 @@ public partial class Dashboard
             var spinMainLine = $"{spinWinner.Song.Artist} - {spinWinner.Song.Title}";
             var spinDetails =
                 SpinnerDataService.CreateSongTextForFields(spinWinner, SpinnerDataService.GetWinnerFields(_config));
-            _ = OverlayService.BroadcastSpinCommandAsync(winnerIndex, 5000, spinMainLine, spinDetails);
+            await OverlayService.UpdateStateAsync(
+                _config, _availableSongs, _playedSongs, _nowPlaying, _currentStreamer);
+            await OverlayService.BroadcastSpinCommandAsync(
+                winnerIndex,
+                spinWinner.QueueId,
+                SpinDurationMilliseconds,
+                spinMainLine,
+                spinDetails);
 
-            await JS.InvokeVoidAsync("SpinnerInterop.spinToItem", winnerIndex, 5000);
+            await JS.InvokeVoidAsync("SpinnerInterop.spinToItem", winnerIndex, SpinDurationMilliseconds);
 
-            var winner = _availableSongs[winnerIndex];
-            await Task.Delay(5100, _lifetimeCts.Token);
-            _winnerQueueId = winner.QueueId;
-            ShowWinnerModal(winner);
-            SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(winner)}");
+            await Task.Delay(SpinDurationMilliseconds + WinnerRevealDelayMilliseconds, _lifetimeCts.Token);
+            _winnerQueueId = spinWinner.QueueId;
+            ShowWinnerModal(spinWinner);
+            SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(spinWinner)}");
             StateHasChanged();
 
             for (var i = 1; i >= 0; i--)
@@ -312,7 +321,7 @@ public partial class Dashboard
         {
             SetStatus($"Error: {ex.Message}");
             _spinDisabled = false;
-            _isSpinning = false;
+            SignalSpinCompleted();
             StateHasChanged();
         }
     }
@@ -325,6 +334,13 @@ public partial class Dashboard
         _streamerInput = "";
         _streamerId = 0;
         _nowPlaying = null;
+        _availableSongs = [];
+        _playedSongs = [];
+        _winnerVisible = false;
+        _winnerQueueId = null;
+        SignalSpinCompleted();
+        await RebuildWheel(_wheelCts.Token);
+        await OverlayService.UpdateStateAsync(_config, _availableSongs, _playedSongs, null, "");
         StateHasChanged();
     }
 
@@ -425,7 +441,7 @@ public partial class Dashboard
     private async Task CompleteWinnerActionAsync(string statusMessage)
     {
         _winnerVisible = false;
-        _isSpinning = false;
+        SignalSpinCompleted();
         await OverlayService.BroadcastCloseWinnerAsync();
         SetStatus(statusMessage);
 
@@ -497,7 +513,7 @@ public partial class Dashboard
     {
         _status = message;
         _statusVisible = visible && !string.IsNullOrWhiteSpace(message);
-        Debug.WriteLine($"[SonglistSpinner] {message}");
+        Trace.WriteLine($"[SonglistSpinner] {message}");
     }
 
     private async Task OnStreamerKeyDown(KeyboardEventArgs e)
@@ -516,7 +532,7 @@ public partial class Dashboard
         catch (Exception ex)
         {
             SetStatus($"Post-spin refresh failed: {ex.Message}");
-            Debug.WriteLine($"[SonglistSpinner] Post-spin refresh failed: {ex}");
+            Trace.WriteLine($"[SonglistSpinner] Post-spin refresh failed: {ex}");
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -639,7 +655,7 @@ public partial class Dashboard
             {
                 SetRealtimeHealth(DashboardServiceHealth.Failed, ex.Message);
                 SetStatus($"Realtime updates stopped: {ex.Message}");
-                Debug.WriteLine($"[SonglistSpinner] Realtime updates stopped: {ex}");
+                Trace.WriteLine($"[SonglistSpinner] Realtime updates stopped: {ex}");
                 StateHasChanged();
             });
         }
@@ -667,13 +683,13 @@ public partial class Dashboard
                 {
                 }
 
-                var isSpinning = false;
-                await InvokeAsync(() => { isSpinning = _isSpinning; });
-                while (isSpinning)
+                Task? spinCompletion = null;
+                await InvokeAsync(() =>
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(250), cancellationToken);
-                    await InvokeAsync(() => { isSpinning = _isSpinning; });
-                }
+                    if (_isSpinning) spinCompletion = _spinCompletion?.Task;
+                });
+                if (spinCompletion is not null)
+                    await spinCompletion.WaitAsync(cancellationToken);
 
                 await RefreshSnapshotAsync(streamer, cancellationToken);
             }
@@ -687,7 +703,7 @@ public partial class Dashboard
             {
                 SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
                 SetStatus($"Realtime refresh failed: {ex.Message}");
-                Debug.WriteLine($"[SonglistSpinner] Realtime refresh failed: {ex}");
+                Trace.WriteLine($"[SonglistSpinner] Realtime refresh failed: {ex}");
                 StateHasChanged();
             });
         }
@@ -747,6 +763,13 @@ public partial class Dashboard
     {
         _apiHealth = health;
         _apiHealthDetail = detail;
+    }
+
+    private void SignalSpinCompleted()
+    {
+        _isSpinning = false;
+        _spinCompletion?.TrySetResult(true);
+        _spinCompletion = null;
     }
 
     private void SetRealtimeHealth(DashboardServiceHealth health, string detail)

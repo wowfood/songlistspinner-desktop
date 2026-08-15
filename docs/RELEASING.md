@@ -13,9 +13,13 @@ The recommended repository layout is:
 3. Complete interactive QA using the pull request's CI artifact if needed.
 4. Merge only when `VersionPrefix` identifies the release being published.
 
-Pushes to `develop`, pushes to `main`, and pull requests targeting `main` run
-the complete Windows validation job. Only a successful push to `main` runs the
-release job, so opening or updating a pull request cannot publish a release.
+Pushes to `develop` and `main`, plus pull requests targeting either branch, run
+the complete Windows validation job. A pull request targeting `main` also
+verifies that its proposed `v<VersionPrefix>` tag does not already exist. Only
+a successful push to `main` that GitHub associates with a merged
+`develop`-to-`main` pull request runs the release job, so opening or updating a
+pull request cannot publish a release and a direct push cannot publish an
+artifact even if repository protections are later loosened.
 
 ## Versioning requirement
 
@@ -25,23 +29,24 @@ Before each release merge, update these values in
 - `VersionPrefix` to the next `MAJOR.MINOR.PATCH` version.
 - `ApplicationVersion` to a higher positive Windows build number.
 
-The first automated release may use the current `1.1.0` version because that
-tag does not yet exist. Every later release merge must increment
-`VersionPrefix`. If the generated tag already exists, the release job stops
-without replacing the existing executable.
+Release `v1.1.0` already exists. Every later release merge must increment
+`VersionPrefix`. If the generated tag already exists, the `develop` to `main`
+pull request fails validation before it can be merged. The release job repeats
+the check defensively and never replaces an existing executable.
 
 ## Automated validation and publishing
 
 The `Windows CI` workflow:
 
 1. Reads and validates `VersionPrefix`.
-2. Installs the .NET 10 SDK and MAUI Windows workload.
-3. Restores, format-checks, tests, and builds the solution in Release mode.
-4. Creates the verified unpackaged, self-contained `win-x64` executable.
-5. Launches it and checks the local OBS overlay endpoint.
-6. Creates a SHA-256 checksum.
-7. Retains both files as a workflow artifact for 14 days.
-8. On `main` only, creates `v<VersionPrefix>`, generates release notes, marks
+2. For a `main` promotion, confirms that the generated release tag is unused.
+3. Installs the .NET 10 SDK and MAUI Windows workload.
+4. Restores, format-checks, tests, and builds the solution in Release mode.
+5. Creates the verified unpackaged, self-contained `win-x64` executable.
+6. Launches it and checks the local OBS overlay endpoint.
+7. Creates a SHA-256 checksum.
+8. Retains both files as a workflow artifact for 14 days.
+9. On `main` only, creates `v<VersionPrefix>`, generates release notes, marks
    the release as latest, and attaches:
    - `SonglistSpinner.Desktop.exe`
    - `SonglistSpinner.Desktop.exe.sha256`

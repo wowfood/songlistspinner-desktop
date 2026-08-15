@@ -20,6 +20,7 @@ if ([IO.Path]::GetExtension($resolvedExecutable) -ne '.exe') {
 }
 
 $overlayUri = [Uri] 'http://localhost:5150/overlay'
+$wheelScriptUri = [Uri] 'http://localhost:5150/overlay/spin-wheel-iife.js'
 $probeClient = [Net.Sockets.TcpClient]::new()
 try {
     $probeTask = $probeClient.ConnectAsync($overlayUri.Host, $overlayUri.Port)
@@ -47,10 +48,14 @@ try {
 
         try {
             $response = Invoke-WebRequest -Uri $overlayUri -TimeoutSec 2 -UseBasicParsing
+            $wheelScriptResponse = Invoke-WebRequest -Uri $wheelScriptUri -TimeoutSec 2 -UseBasicParsing
             if ($response.StatusCode -eq 200 -and
                 $response.Content.Contains('<title>Overlay') -and
                 $response.Content.Contains('SonglistSpinner') -and
                 $response.Content.Contains('id="nowPlaying"') -and
+                $response.Content.Contains('src="/overlay/spin-wheel-iife.js"') -and
+                $wheelScriptResponse.StatusCode -eq 200 -and
+                $wheelScriptResponse.Content.Contains('spinWheel') -and
                 -not $response.Content.Contains('id="collapseBtn"')) {
                 Write-Host "Smoke test passed: $overlayUri returned the SonglistSpinner overlay."
                 return

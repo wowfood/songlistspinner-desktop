@@ -6,6 +6,7 @@ namespace SonglistSpinner.Services;
 public sealed class ApplicationUpdateService
 {
     private const string DismissedReleaseKey = "dismissed_application_update";
+    private readonly object _checkGate = new();
     private readonly GitHubReleaseUpdateChecker _checker;
     private readonly Version _currentVersion;
     private Task<ApplicationUpdateInfo?>? _checkTask;
@@ -24,8 +25,22 @@ public sealed class ApplicationUpdateService
 
     public async Task<ApplicationUpdateInfo?> CheckForUpdateAsync(CancellationToken cancellationToken = default)
     {
-        _checkTask ??= CheckCoreAsync(CancellationToken.None);
-        return await _checkTask.WaitAsync(cancellationToken);
+        Task<ApplicationUpdateInfo?> checkTask;
+        lock (_checkGate)
+            checkTask = _checkTask ??= CheckCoreAsync(CancellationToken.None);
+
+        try
+        {
+            return await checkTask.WaitAsync(cancellationToken);
+        }
+        catch when (checkTask.IsFaulted)
+        {
+            lock (_checkGate)
+            {
+                if (ReferenceEquals(_checkTask, checkTask)) _checkTask = null;
+            }
+            throw;
+        }
     }
 
     public void Dismiss(ApplicationUpdateInfo update)
