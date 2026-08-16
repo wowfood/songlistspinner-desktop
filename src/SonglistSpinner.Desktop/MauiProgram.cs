@@ -50,7 +50,7 @@ public static class MauiProgram
         var configuredAddress = Environment.GetEnvironmentVariable("SONGLISTSPINNER_SSL_API_BASE_URL");
         var baseAddress = Uri.TryCreate(configuredAddress, UriKind.Absolute, out var parsedAddress)
             ? parsedAddress
-            : StreamerSongListApiOptions.StagingBaseAddress;
+            : StreamerSongListApiOptions.ProductionBaseAddress;
 
         return new StreamerSongListApiOptions { BaseAddress = baseAddress };
     }
@@ -60,7 +60,7 @@ public static class MauiProgram
         var configuredEndpoint = Environment.GetEnvironmentVariable("SONGLISTSPINNER_SSL_EVENTS_URL");
         var endpoint = Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var parsedEndpoint)
             ? parsedEndpoint
-            : StreamerSongListEventsOptions.StagingEndpoint;
+            : StreamerSongListEventsOptions.ProductionEndpoint;
 
         return new StreamerSongListEventsOptions { Endpoint = endpoint };
     }

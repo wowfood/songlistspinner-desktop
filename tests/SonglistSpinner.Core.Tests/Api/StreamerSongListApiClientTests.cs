@@ -11,6 +11,14 @@ namespace SonglistSpinner.Core.Tests.Api;
 public class StreamerSongListApiClientTests
 {
     [Fact]
+    public void Given_DefaultOptions_When_ReadingBaseAddress_Then_UsesProductionApiEndpoint()
+    {
+        var options = new StreamerSongListApiOptions();
+
+        Assert.Equal("https://api.streamersonglist.com/", options.BaseAddress.AbsoluteUri);
+    }
+
+    [Fact]
     public async Task Given_Channel_When_ResolveStreamerIdAsync_Then_UsesStreamerLookupAndReturnsId()
     {
         var handler = new RecordingHandler(_ => JsonResponse("""{"id":314}"""));

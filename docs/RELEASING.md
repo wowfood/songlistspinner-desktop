@@ -29,7 +29,7 @@ Before each release merge, update these values in
 - `VersionPrefix` to the next `MAJOR.MINOR.PATCH` version.
 - `ApplicationVersion` to a higher positive Windows build number.
 
-Release `v1.1.0` already exists. Every later release merge must increment
+Release `v1.1.1` already exists. Every later release merge must increment
 `VersionPrefix`. If the generated tag already exists, the `develop` to `main`
 pull request fails validation before it can be merged. The release job repeats
 the check defensively and never replaces an existing executable.
@@ -90,8 +90,8 @@ Before merging `develop` into `main`:
 - Expect an unsigned build to show Windows SmartScreen reputation warnings.
   Code signing can be added later when a suitable certificate and protected
   signing secret are available.
-- Do not switch the default API URL from staging until the production v2 API is
-  officially available and separately validated.
+- Confirm the production API and realtime health indicators connect successfully
+  with a real streamer token.
 
 After the merge, confirm the release contains the executable and checksum and
 that the update notification in an older build links to the new release.
