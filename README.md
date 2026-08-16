@@ -11,8 +11,8 @@ access token. Queue changes, play history, and Now Playing updates no longer
 need Twitch chat commands or a separate chatbot connection.
 
 > A StreamerSongList account, a configured song queue, and a streamer access
-> token are required. The current build uses the StreamerSongList staging v2
-> API until that API is promoted to production.
+> token are required. The application connects to the production
+> StreamerSongList API v2 and realtime event service.
 
 ## Features
 
@@ -94,7 +94,7 @@ credential. It can also be reopened later from **Settings > Connection**.
 4. Copy the token and keep it private.
 
 Streamer tokens are recommended for a personal, single-channel installation.
-See the [StreamerSongList authentication documentation](https://dev.staging.streamersonglist.com/docs/authentication#streamer-access-tokens)
+See the [StreamerSongList authentication documentation](https://dev.streamersonglist.com/docs/authentication#streamer-access-tokens)
 for the available credential types.
 
 ### 2. Enter the credential
@@ -431,7 +431,7 @@ the bundled license text is stored beside the script in
 
 ## Additional documentation
 
-- [API v2 integration and current staging limitations](docs/API_V2.md)
+- [API v2 integration](docs/API_V2.md)
 - [Single-file Windows distribution](docs/SINGLE_FILE_DISTRIBUTION.md)
 - [Release workflow and QA](docs/RELEASING.md)
 - [Desktop migration baseline](docs/BASELINE.md)

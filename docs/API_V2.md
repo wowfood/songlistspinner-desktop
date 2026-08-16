@@ -1,6 +1,6 @@
 # StreamerSongList API v2
 
-This migration is based on the StreamerSongList API reference version 2.0.0 at <https://dev.staging.streamersonglist.com/api-reference> and its authentication guide at <https://dev.staging.streamersonglist.com/docs/authentication>.
+This integration is based on the StreamerSongList API reference version 2.0.0 at <https://dev.streamersonglist.com/api-reference> and its authentication guide at <https://dev.streamersonglist.com/docs/authentication>.
 
 ## Implemented contract
 
@@ -36,8 +36,8 @@ Use **Save and test connection** on the Settings page after entering a token, st
 Environment-variable fallback is available for development:
 
 ```text
-SONGLISTSPINNER_SSL_API_BASE_URL=https://api.staging.streamersonglist.com/
-SONGLISTSPINNER_SSL_EVENTS_URL=wss://events.staging.streamersonglist.com/connection/websocket
+SONGLISTSPINNER_SSL_API_BASE_URL=https://api.streamersonglist.com/
+SONGLISTSPINNER_SSL_EVENTS_URL=wss://events.streamersonglist.com/connection/websocket
 SONGLISTSPINNER_SSL_ACCESS_TOKEN=<token>
 SONGLISTSPINNER_SSL_TOKEN_TYPE=streamer
 SONGLISTSPINNER_SSL_CLIENT_ID=<oauth-client-id>
@@ -65,13 +65,17 @@ The winner popup always requires an explicit action: **Mark Played**, **Leave in
 
 The overlay displays the confirmed `playing` entry from the REST snapshot rather than optimistically displaying the winner. Its fields, font, width, and screen position are configurable in Settings.
 
-The staging event endpoint is `wss://events.staging.streamersonglist.com/connection/websocket`. Its HTTPS root displays Centrifugo's password-protected administrative console; application clients connect to the WebSocket path anonymously and do not use that login.
+The production event endpoint is `wss://events.streamersonglist.com/connection/websocket`. Its HTTPS root displays Centrifugo's password-protected administrative console; application clients connect to the WebSocket path anonymously and do not use that login.
 
-## Promotion checklist
+## Production validation
 
-- Confirm the production v2 server URL before changing the checked-in default.
-- Confirm the production event WebSocket URL before changing the checked-in default.
-- Exercise the client against a real staging account and token; automated tests currently verify the published request and response contract with HTTP fixtures.
+- The production REST host responds at `https://api.streamersonglist.com/` and
+  requires the documented authorization header.
+- The production event service accepts anonymous Centrifugo connections at
+  `wss://events.streamersonglist.com/connection/websocket`.
+- Exercise queue reads and mutations with a real production channel and token;
+  automated tests verify the published request and response contract with HTTP
+  fixtures but do not store a live credential.
 - Implement cursor traversal when the first 100 play-history entries are insufficient.
 - Revisit the `stream` history option if the API publishes a session boundary or equivalent filter.
 - Add OAuth with PKCE only if a future distribution model needs third-party user sign-in instead of a streamer-supplied token.
