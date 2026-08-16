@@ -8,6 +8,72 @@ window.SpinnerInterop = (function () {
     let _resizeHandle = null
     let _resizePlayedList = null
     let _resizeDotNetRef = null
+    let _wheelItems = []
+    let _wheelColors = []
+
+    const wheelLabelRadius = 0.9
+    const wheelLabelRadiusMax = 0.08
+    const wheelLabelFontSizeMin = 12
+    const wheelLabelFontSizeMax = 28
+
+    function calculateWheelLabelFontSize(itemCount) {
+        if (itemCount <= 1) return wheelLabelFontSizeMax
+
+        // spin-wheel uses a 500px reference size. Size the font from the chord
+        // available at the middle of each slice, then let the library scale it
+        // with the rendered wheel.
+        const referenceLabelRadius = 250 * 0.95 * 0.55
+        const sliceHeight = 2 * referenceLabelRadius * Math.sin(Math.PI / itemCount)
+        return Math.max(
+            wheelLabelFontSizeMin,
+            Math.min(wheelLabelFontSizeMax, Math.floor(sliceHeight * 0.68)))
+    }
+
+    function fitWheelLabel(context, label, fontSize, maxWidth) {
+        if (!context || typeof label !== 'string') return label || ''
+
+        context.font = `${fontSize}px sans-serif`
+        if (context.measureText(label).width <= maxWidth) return label
+
+        const ellipsis = '…'
+        let lower = 0
+        let upper = label.length
+        while (lower < upper) {
+            const length = Math.ceil((lower + upper) / 2)
+            const candidate = `${label.slice(0, length).trimEnd()}${ellipsis}`
+            if (context.measureText(candidate).width <= maxWidth) {
+                lower = length
+            } else {
+                upper = length - 1
+            }
+        }
+
+        return `${label.slice(0, lower).trimEnd()}${ellipsis}`
+    }
+
+    function buildWheel(container) {
+        const fontSize = calculateWheelLabelFontSize(_wheelItems.length)
+        const referenceRadius = 250 * 0.95
+        const maxLabelWidth = referenceRadius * (wheelLabelRadius - wheelLabelRadiusMax)
+        const measureContext = document.createElement('canvas').getContext('2d')
+        const fittedItems = _wheelItems.map(item => ({
+            ...item,
+            label: fitWheelLabel(measureContext, item.label, fontSize, maxLabelWidth)
+        }))
+
+        return new spinWheel.Wheel(container, {
+            items: fittedItems,
+            itemBackgroundColors: _wheelColors,
+            itemLabelFontSizeMax: fontSize,
+            itemLabelRadius: wheelLabelRadius,
+            itemLabelRadiusMax: wheelLabelRadiusMax,
+            itemLabelStrokeWidth: 1,
+            borderWidth: 0,
+            lineWidth: 0,
+            radius: 0.95,
+            isInteractive: false
+        })
+    }
 
     function resetResizeInteraction() {
         _isResizing = false
@@ -82,14 +148,9 @@ window.SpinnerInterop = (function () {
                 _wheel.remove();
                 _wheel = null
             }
-            _wheel = new spinWheel.Wheel(container, {
-                items,
-                itemBackgroundColors: colors,
-                borderWidth: 0,
-                lineWidth: 0,
-                radius: 0.95,
-                isInteractive: false
-            })
+            _wheelItems = Array.isArray(items) ? items : []
+            _wheelColors = Array.isArray(colors) ? colors : []
+            _wheel = buildWheel(container)
         },
 
         spinToItem(index, duration) {
@@ -109,17 +170,8 @@ window.SpinnerInterop = (function () {
                     clearTimeout(_resizeTimeout)
                     _resizeTimeout = setTimeout(() => {
                         if (_wheel) {
-                            const items = _wheel.items
-                            const colors = _wheel.itemBackgroundColors
                             _wheel.remove()
-                            _wheel = new spinWheel.Wheel(container, {
-                                items,
-                                itemBackgroundColors: colors || [],
-                                borderWidth: 0,
-                                lineWidth: 0,
-                                radius: 0.95,
-                                isInteractive: false
-                            })
+                            _wheel = buildWheel(container)
                         }
                     }, 200)
                 }
