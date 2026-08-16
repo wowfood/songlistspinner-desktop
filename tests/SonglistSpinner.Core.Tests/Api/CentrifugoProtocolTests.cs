@@ -102,14 +102,14 @@ public class CentrifugoProtocolTests
     }
 
     [Fact]
-    public void Given_DefaultOptions_When_ConstructingEventSource_Then_UsesStagingWebSocketEndpoint()
+    public void Given_DefaultOptions_When_ConstructingEventSource_Then_UsesProductionWebSocketEndpoint()
     {
         var options = new StreamerSongListEventsOptions();
 
         _ = new CentrifugoStreamerSongListEventSource(options);
 
         Assert.Equal(
-            "wss://events.staging.streamersonglist.com/connection/websocket",
+            "wss://events.streamersonglist.com/connection/websocket",
             options.Endpoint.AbsoluteUri);
     }
 

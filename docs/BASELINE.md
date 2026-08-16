@@ -38,7 +38,7 @@ This repository was established as a clean, desktop-only continuation of ServerS
 - A repository SDK policy keeps local and hosted builds on the .NET 10 toolchain family.
 - Windows CI runs tests, a Release build, and verified single-file publishing.
 - Successful `main` builds create immutable semantic-version releases automatically.
-- Release automation does not change the staging API default.
+- Release automation does not override the application's API defaults.
 
 ## Code and product cleanup status
 
@@ -61,7 +61,7 @@ This repository was established as a clean, desktop-only continuation of ServerS
 
 Completed in the next baseline:
 
-1. Modelled queue and play-history transport contracts from the v2 staging reference.
+1. Modelled queue and play-history transport contracts from the v2 API reference.
 2. Replaced the hard-coded v1 client with a configurable typed client.
 3. Added request, mapping, authentication, date-filter, and error-response tests.
 4. Added a compatibility boundary that maps v2 DTOs into the existing wheel models.
@@ -70,6 +70,6 @@ Completed in the next baseline:
 
 Remaining before a production release:
 
-1. Confirm the production v2 base URL and change the default from staging when StreamerSongList promotes the contract.
+1. Confirmed the production v2 API and event URLs and promoted them to the application defaults.
 2. Add cursor traversal if more than 100 play-history entries must be loaded.
 3. Consider OAuth with PKCE only if the application later needs a multi-user sign-in experience instead of manually entered streamer tokens.
