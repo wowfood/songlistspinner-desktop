@@ -85,6 +85,11 @@ checksum.
 The connection wizard opens automatically when the app cannot find a saved API
 credential. It can also be reopened later from **Settings > Connection**.
 
+> **Important:** In your StreamerSongList queue settings, disable
+> **Auto-promote to Now Playing** before using the spinner. SonglistSpinner
+> manages Played and Now Playing transitions explicitly; leaving this option
+> enabled can move a queue entry to Now Playing before the wheel selects it.
+
 ### 1. Create a streamer access token
 
 1. Sign in to StreamerSongList.
