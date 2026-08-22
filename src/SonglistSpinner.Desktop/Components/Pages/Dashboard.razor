@@ -68,7 +68,12 @@
                 <div id="streamerSection">
                     @if (_showStreamerInput)
                     {
-                        <input type="text" id="streamerInput" @bind="_streamerInput"
+                        <input type="text" id="streamerInput"
+                               class="@(_streamerInputError is null ? null : "streamer-input-invalid")"
+                               aria-invalid="@(_streamerInputError is null ? "false" : "true")"
+                               aria-describedby="@(_streamerInputError is null ? null : "streamerInputError")"
+                               @bind="StreamerInput"
+                               @bind:event="oninput"
                                placeholder="Enter streamer name..."
                                @onkeydown="OnStreamerKeyDown"/>
                         <button class="small-button" @onclick="LoadStreamer">Load</button>
@@ -83,6 +88,13 @@
                         }
                     }
                     <button id="refreshSongsBtn" class="small-button" @onclick="LoadStreamer">Refresh</button>
+                    @if (_showStreamerInput && _streamerInputError is not null)
+                    {
+                        <div id="streamerInputError" class="streamer-input-error-message" role="alert">
+                            <span aria-hidden="true">&#9888;</span>
+                            <span>@_streamerInputError</span>
+                        </div>
+                    }
                 </div>
             </div>
             <div id="playedListContent">

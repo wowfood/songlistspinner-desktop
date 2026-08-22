@@ -54,6 +54,7 @@ public partial class Dashboard
     private bool _statusVisible;
 
     private string _streamerInput = "";
+    private string? _streamerInputError;
     private int _streamerId;
     private CancellationTokenSource _wheelCts = new();
 
@@ -67,6 +68,20 @@ public partial class Dashboard
     private bool _preferMarkWinnerPlayed;
 
     private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
+    private string StreamerInput
+    {
+        get => _streamerInput;
+        set
+        {
+            _streamerInput = value;
+            if (_streamerInputError is null) return;
+
+            _streamerInputError = null;
+            _status = "";
+            _statusVisible = false;
+        }
+    }
+
     private string NowPlayingDisplayText => _nowPlaying is null
         ? ""
         : SpinnerDataService.CreateSongTextForFields(
@@ -199,7 +214,7 @@ public partial class Dashboard
         var defaultName = _config.Streamer.DefaultName.Trim();
         if (!string.IsNullOrEmpty(defaultName))
         {
-            _streamerInput = defaultName;
+            StreamerInput = defaultName;
             await LoadStreamer();
         }
 
@@ -208,12 +223,15 @@ public partial class Dashboard
     private async Task LoadStreamer()
     {
         var name = _streamerInput.Trim();
+        _streamerInputError = null;
         if (string.IsNullOrEmpty(name))
         {
+            _streamerInputError = "Enter a streamer name before loading.";
             SetStatus("Please enter a streamer name");
             return;
         }
 
+        var previousStreamer = _currentStreamer;
         await StopRealtimeUpdatesAsync();
         _currentStreamer = name;
         _showStreamerInput = false;
@@ -231,6 +249,7 @@ public partial class Dashboard
             _nowPlaying = queue.Playing;
             _playedSongs = played;
             _availableSongs = SpinnerDataService.FilterAvailableSongs(queue.Items, played, _config);
+            StreamerInput = name;
 
             await RebuildWheel(_wheelCts.Token);
             SetStatus($"Loaded {_availableSongs.Count} songs. Press SPIN!");
@@ -243,6 +262,10 @@ public partial class Dashboard
         }
         catch (Exception ex)
         {
+            _currentStreamer = previousStreamer;
+            _showStreamerInput = true;
+            _streamerInputError =
+                $"Could not find or load streamer \"{name}\". Check the name and platform, then try again.";
             SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
             SetStatus($"Error: {ex.Message}");
         }
@@ -352,7 +375,7 @@ public partial class Dashboard
         await StopRealtimeUpdatesAsync();
         _showStreamerInput = true;
         _currentStreamer = "";
-        _streamerInput = "";
+        StreamerInput = "";
         _streamerId = 0;
         _nowPlaying = null;
         _availableSongs = [];
