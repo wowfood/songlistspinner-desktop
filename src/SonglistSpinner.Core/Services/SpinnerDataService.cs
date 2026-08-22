@@ -33,12 +33,14 @@ public static class SpinnerDataService
 
     public static string GetSongFieldValue(SpinnerQueueItem song, string field)
     {
-        return field.ToLowerInvariant() switch
+        if (!SongFieldNames.TryNormalize(field, out var normalizedField)) return "";
+
+        return normalizedField switch
         {
-            "artist" => song.Song.Artist is { Length: > 0 } a ? a : "Unknown",
-            "title" => song.Song.Title is { Length: > 0 } t ? t : "Unknown",
-            "requester" => GetPrimaryRequester(song),
-            "donation" => FormatDonation(song),
+            SongFieldNames.Artist => song.Song.Artist is { Length: > 0 } a ? a : "Unknown",
+            SongFieldNames.Title => song.Song.Title is { Length: > 0 } t ? t : "Unknown",
+            SongFieldNames.Requester => GetPrimaryRequester(song),
+            SongFieldNames.Donation => FormatDonation(song),
             _ => ""
         };
     }
@@ -46,26 +48,34 @@ public static class SpinnerDataService
     public static string CreateSongTextForFields(SpinnerQueueItem song, IEnumerable<string> fields)
     {
         var parts = fields
-            .Select(f => (field: f, value: GetSongFieldValue(song, f)))
-            .Where(x => x.field.Length > 0 && !string.IsNullOrEmpty(x.value))
+            .Select(field => SongFieldNames.TryNormalize(field, out var normalized) ? normalized : "")
+            .Where(field => field.Length > 0)
+            .Select(field => (field, value: GetSongFieldValue(song, field)))
+            .Where(x => !string.IsNullOrEmpty(x.value))
             .Select(x => $"{char.ToUpperInvariant(x.field[0])}{x.field[1..]}: {x.value}");
         return string.Join(" | ", parts);
     }
 
     public static string CreatePlayedSongText(SpinnerQueueItem song, SpinnerConfig config)
     {
-        var fields = config.SongList.Fields is { Length: > 0 } f ? f : ["artist", "title"];
+        var fields = config.SongList.Fields is { Length: > 0 } f
+            ? f
+            : SongFieldNames.CreateDefaultSelection();
         return CreateSongTextForFields(song, fields);
+    }
+
+    public static string[] CreatePlayedSongTexts(
+        IReadOnlyList<SpinnerQueueItem> songs,
+        SpinnerConfig config)
+    {
+        return CreatePlayedSongTexts(songs, config, song => CreatePlayedSongText(song, config));
     }
 
     public static string[] GetWinnerFields(SpinnerConfig config)
     {
-        var fields = config.WinnerDialog.Fields
-            .Where(field => !string.IsNullOrWhiteSpace(field))
-            .Select(field => field.ToLowerInvariant())
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        return fields.Length > 0 ? fields : ["artist", "title", "requester"];
+        return SongFieldNames.NormalizeSelection(
+            config.WinnerDialog.Fields,
+            SongFieldNames.CreateWinnerDefaultSelection());
     }
 
     public static WinnerDialogField[] CreateWinnerDialogFields(
@@ -90,23 +100,56 @@ public static class SpinnerDataService
 
     public static string CreatePlayedSongText(PlayHistoryItem item, SpinnerConfig config)
     {
-        var fields = config.SongList.Fields is { Length: > 0 } f ? f : (string[])["artist", "title"];
+        var fields = config.SongList.Fields is { Length: > 0 } f
+            ? f
+            : SongFieldNames.CreateDefaultSelection();
         var parts = fields
-            .Where(fieldName => fieldName.Length > 0)
+            .Select(field => SongFieldNames.TryNormalize(field, out var normalized) ? normalized : "")
+            .Where(field => field.Length > 0)
             .Select(field => (field, value: GetHistoryFieldValue(item, field)))
             .Where(x => !string.IsNullOrEmpty(x.value))
             .Select(x => $"{char.ToUpperInvariant(x.field[0])}{x.field[1..]}: {x.value}");
         return string.Join(" | ", parts);
     }
 
+    public static string[] CreatePlayedSongTexts(
+        IReadOnlyList<PlayHistoryItem> songs,
+        SpinnerConfig config)
+    {
+        return CreatePlayedSongTexts(songs, config, song => CreatePlayedSongText(song, config));
+    }
+
+    private static string[] CreatePlayedSongTexts<T>(
+        IReadOnlyList<T> songs,
+        SpinnerConfig config,
+        Func<T, string> createText)
+    {
+        if (!config.PlayedList.ShowNumbers) return songs.Select(createText).ToArray();
+
+        var startsAtTop = string.Equals(
+            config.PlayedList.NumberingStart,
+            SpinnerSettingValues.PlayedListNumberingStarts.Top,
+            StringComparison.OrdinalIgnoreCase);
+        return songs
+            .Select((song, index) =>
+            {
+                var number = startsAtTop ? index + 1 : songs.Count - index;
+                return $"{number}. {createText(song)}";
+            })
+            .ToArray();
+    }
+
     private static string GetHistoryFieldValue(PlayHistoryItem item, string field)
     {
-        return field.ToLowerInvariant() switch
+        if (!SongFieldNames.TryNormalize(field, out var normalizedField)) return "";
+
+        return normalizedField switch
         {
-            "artist" => item.Song?.Artist is { Length: > 0 } a ? a : "Unknown",
-            "title" => item.Song?.Title is { Length: > 0 } t ? t : "Unknown",
-            "requester" => item.Requests.FirstOrDefault()?.Name is { Length: > 0 } n ? n : "Unknown",
-            "donation" => FormatDonationFromRequest(item.Requests.FirstOrDefault(), ""),
+            SongFieldNames.Artist => item.Song?.Artist is { Length: > 0 } a ? a : "Unknown",
+            SongFieldNames.Title => item.Song?.Title is { Length: > 0 } t ? t : "Unknown",
+            SongFieldNames.Requester =>
+                item.Requests.FirstOrDefault()?.Name is { Length: > 0 } n ? n : "Unknown",
+            SongFieldNames.Donation => FormatDonationFromRequest(item.Requests.FirstOrDefault(), ""),
             _ => ""
         };
     }

@@ -64,6 +64,8 @@
         <!-- Embed the standalone overlay assets so the local OBS server can serve them from the single executable. -->
         <EmbeddedResource Include="wwwroot\overlay\Overlay.html"
                           LogicalName="SonglistSpinner.WebAssets.Overlay.html"/>
+        <EmbeddedResource Include="wwwroot\overlay\SongSpinner.contracts.js"
+                          LogicalName="SonglistSpinner.WebAssets.SongSpinner.contracts.js"/>
         <EmbeddedResource Include="wwwroot\spinner\spin-wheel-iife.js"
                           LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
     </ItemGroup>

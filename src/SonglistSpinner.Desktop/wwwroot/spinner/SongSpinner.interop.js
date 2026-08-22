@@ -1,3 +1,5 @@
+const _spinnerContracts = window.SonglistSpinnerContracts
+
 window.SpinnerInterop = (function () {
     let _wheel = null
     let _isResizing = false
@@ -107,8 +109,8 @@ window.SpinnerInterop = (function () {
 
         e.preventDefault()
         const containerRect = container.getBoundingClientRect()
-        const position = _resizePlayedList.dataset.position || 'right'
-        const newWidth = position === 'left'
+        const position = _resizePlayedList.dataset.position || _spinnerContracts.playedListPositions.default
+        const newWidth = position === _spinnerContracts.playedListPositions.left
             ? e.clientX - containerRect.left - 10
             : containerRect.right - e.clientX - 10
         const minPx = 300, maxPx = 800
@@ -231,12 +233,13 @@ window.SpinnerInterop = (function () {
 
         applyBackground(background) {
             if (!background) return
-            const mode = (background.mode || 'color').toLowerCase()
+            const modes = _spinnerContracts.backgroundModes
+            const mode = (background.mode || modes.color).toLowerCase()
             document.body.style.backgroundColor = background.color || ''
-            if (mode === 'transparent' || mode === 'transparant') {
-                document.body.style.backgroundColor = 'transparent'
+            if (mode === modes.transparent || mode === modes.legacyTransparent) {
+                document.body.style.backgroundColor = modes.transparent
                 document.body.style.backgroundImage = 'none'
-            } else if (mode === 'color') {
+            } else if (mode === modes.color) {
                 document.body.style.backgroundImage = 'none'
             }
         },
@@ -250,7 +253,8 @@ window.SpinnerInterop = (function () {
             const container = document.getElementById('container')
             const icon = document.getElementById('collapseIcon')
             if (!container || !icon) return
-            if ((position || 'right').toLowerCase() === 'left') {
+            const positions = _spinnerContracts.playedListPositions
+            if ((position || positions.default).toLowerCase() === positions.left) {
                 container.classList.add('played-list-left')
                 icon.innerText = '◀'
             } else {
@@ -284,17 +288,18 @@ window.SpinnerInterop = (function () {
             const el = document.getElementById('playedList')
             const icon = document.getElementById('collapseIcon')
             if (!el || !icon) return
-            const pos = (position || 'right').toLowerCase()
+            const positions = _spinnerContracts.playedListPositions
+            const pos = (position || positions.default).toLowerCase()
             if (collapsed) {
                 _savedWidth = el.style.width || ''
                 _savedMinWidth = el.style.minWidth || ''
                 el.classList.add('collapsed')
                 el.style.width = '3rem'
                 el.style.minWidth = '3rem'
-                icon.innerText = pos === 'left' ? '▶' : '◀'
+                icon.innerText = pos === positions.left ? '▶' : '◀'
             } else {
                 el.classList.remove('collapsed')
-                icon.innerText = pos === 'left' ? '◀' : '▶'
+                icon.innerText = pos === positions.left ? '◀' : '▶'
                 el.style.width = _savedWidth || ''
                 el.style.minWidth = _savedMinWidth || ''
             }
@@ -320,7 +325,7 @@ window.SpinnerInterop = (function () {
             }
 
             frame.contentWindow.postMessage({
-                type: 'songlistspinner-settings-preview',
+                type: _spinnerContracts.messageTypes.settingsPreview,
                 payload
             }, targetOrigin)
         }

@@ -22,7 +22,7 @@ public interface ISpinnerApiService
 
     Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
         StreamerSongListChannel channel,
-        string period = "week",
+        string period = SpinnerSettingValues.PlayHistoryPeriods.Default,
         CancellationToken cancellationToken = default);
 
     Task MarkQueueItemAsPlayedAsync(

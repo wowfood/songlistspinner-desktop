@@ -93,10 +93,10 @@
             <div class="ss-setup-field">
                 <label for="setupPlatform">Identity platform when entering only a name</label>
                 <InputSelect id="setupPlatform" @bind-Value="_fallbackPlatform">
-                    <option value="twitch">Twitch</option>
-                    <option value="youtube">YouTube</option>
-                    <option value="kick">Kick</option>
-                    <option value="none">StreamerSongList</option>
+                    @foreach (var option in SettingsOptions.Platforms)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
                 </InputSelect>
             </div>
 

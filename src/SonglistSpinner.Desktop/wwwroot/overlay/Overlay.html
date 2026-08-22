@@ -452,8 +452,11 @@ button{
     </div>
 </div>
 
+<script src="/overlay/SongSpinner.contracts.js"></script>
 <script src="/overlay/spin-wheel-iife.js"></script>
 <script>
+const _spinnerContracts = window.SonglistSpinnerContracts
+
 window.SpinnerInterop = (function () {
     let _wheel = null
     let _resizeTimeout = null
@@ -583,12 +586,13 @@ window.SpinnerInterop = (function () {
 
         applyBackground(background) {
             if (!background) return
-            const mode = (background.mode || 'color').toLowerCase()
+            const modes = _spinnerContracts.backgroundModes
+            const mode = (background.mode || modes.color).toLowerCase()
             document.body.style.backgroundColor = background.color || ''
-            if (mode === 'transparent' || mode === 'transparant') {
-                document.body.style.backgroundColor = 'transparent'
+            if (mode === modes.transparent || mode === modes.legacyTransparent) {
+                document.body.style.backgroundColor = modes.transparent
                 document.body.style.backgroundImage = 'none'
-            } else if (mode === 'color') {
+            } else if (mode === modes.color) {
                 document.body.style.backgroundImage = 'none'
             }
         },
@@ -597,7 +601,8 @@ window.SpinnerInterop = (function () {
             const container = document.getElementById('container')
             const icon = document.getElementById('collapseIcon')
             if (!container) return
-            if ((position || 'right').toLowerCase() === 'left') {
+            const positions = _spinnerContracts.playedListPositions
+            if ((position || positions.default).toLowerCase() === positions.left) {
                 container.classList.add('played-list-left')
                 if (icon) icon.innerText = '\u25BA'
             } else {
@@ -605,21 +610,18 @@ window.SpinnerInterop = (function () {
                 if (icon) icon.innerText = '\u25C4'
             }
             const pl = document.getElementById('playedList')
-            if (pl) pl.dataset.position = (position || 'right').toLowerCase()
+            if (pl) pl.dataset.position = (position || positions.default).toLowerCase()
         },
 
         applyNowPlayingConfig(config) {
             const el = document.getElementById('nowPlaying')
             const text = document.getElementById('nowPlayingText')
             if (!el || !text || !config) return
-            const validPositions = [
-                'top-left', 'top-center', 'top-right',
-                'bottom-left', 'bottom-center', 'bottom-right'
-            ]
-            const position = (config.position || 'bottom-left').toLowerCase()
-            el.dataset.position = validPositions.includes(position)
+            const positions = _spinnerContracts.nowPlayingPositions
+            const position = (config.position || positions.default).toLowerCase()
+            el.dataset.position = positions.values.includes(position)
                 ? position
-                : 'bottom-left'
+                : positions.default
             el.style.width = config.width || '28rem'
             text.style.fontFamily = config.fontFamily || 'sans-serif'
             text.style.fontSize = config.fontSize || '1.125rem'
@@ -650,13 +652,14 @@ window.SpinnerInterop = (function () {
             const el = document.getElementById('playedList')
             const icon = document.getElementById('collapseIcon')
             if (!el) return
-            const pos = (position || 'right').toLowerCase()
+            const positions = _spinnerContracts.playedListPositions
+            const pos = (position || positions.default).toLowerCase()
             if (collapsed) {
                 el.classList.add('collapsed')
-                if (icon) icon.innerText = pos === 'left' ? '\u25C4' : '\u25BA'
+                if (icon) icon.innerText = pos === positions.left ? '\u25C4' : '\u25BA'
             } else {
                 el.classList.remove('collapsed')
-                if (icon) icon.innerText = pos === 'left' ? '\u25BA' : '\u25C4'
+                if (icon) icon.innerText = pos === positions.left ? '\u25BA' : '\u25C4'
             }
         },
 
@@ -675,8 +678,9 @@ const _isSettingsPreview = new URLSearchParams(window.location.search).get('prev
 
 function connectSSE() {
     const es = new EventSource('/overlay/events')
+    const events = _spinnerContracts.overlayEvents
 
-    es.addEventListener('init_state', e => {
+    es.addEventListener(events.initialState, e => {
         const data = JSON.parse(e.data)
         _overlayState.config = data.config
         _overlayState.collapsed = Boolean(data.playedListCollapsed)
@@ -687,11 +691,11 @@ function connectSSE() {
         updateSongs(data)
     })
 
-    es.addEventListener('update_songs', e => {
+    es.addEventListener(events.updateSongs, e => {
         updateSongs(JSON.parse(e.data))
     })
 
-    es.addEventListener('spin_command', e => {
+    es.addEventListener(events.spinCommand, e => {
         const data = JSON.parse(e.data)
         let winnerIndex = data.winnerIndex
         if (data.winnerQueueId != null) {
@@ -706,7 +710,7 @@ function connectSSE() {
         SpinnerInterop.spinToItem(winnerIndex, data.duration)
     })
 
-    es.addEventListener('winner_reveal', e => {
+    es.addEventListener(events.winnerReveal, e => {
         const data = JSON.parse(e.data)
         const queuePosition = Number(data.queuePosition)
         const hasQueuePosition = Number.isInteger(queuePosition) && queuePosition > 0
@@ -741,22 +745,22 @@ function connectSSE() {
         if (_overlayState.config) SpinnerInterop.runConfetti(_overlayState.config.wheelColors)
     })
 
-    es.addEventListener('close_winner', () => {
+    es.addEventListener(events.closeWinner, () => {
         document.getElementById('winnerModal').style.display = 'none'
     })
 
-    es.addEventListener('set_wheel_visible', e => {
+    es.addEventListener(events.setWheelVisible, e => {
         SpinnerInterop.setWheelVisible(JSON.parse(e.data).visible)
     })
 
-    es.addEventListener('set_collapse', e => {
+    es.addEventListener(events.setCollapse, e => {
         const data = JSON.parse(e.data)
         _overlayState.collapsed = data.collapsed
         const pos = _overlayState.config && _overlayState.config.songList && _overlayState.config.songList.playedListPosition
         SpinnerInterop.setPlayedListCollapsed(data.collapsed, pos)
     })
 
-    es.addEventListener('set_played_list_width', e => {
+    es.addEventListener(events.setPlayedListWidth, e => {
         const data = JSON.parse(e.data)
         SpinnerInterop.setPlayedListWidth(data.width, data.minWidth)
     })
@@ -803,7 +807,7 @@ function updateSongs(data) {
 window.addEventListener('message', event => {
     if (!_isSettingsPreview ||
         !event.data ||
-        event.data.type !== 'songlistspinner-settings-preview' ||
+        event.data.type !== _spinnerContracts.messageTypes.settingsPreview ||
         !event.data.payload) return
 
     updateSongs(event.data.payload)

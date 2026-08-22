@@ -19,7 +19,7 @@ public partial class Setup
     private string? _error;
     private VerificationState _eventsState;
     private string _eventsMessage = "Not checked yet";
-    private string _fallbackPlatform = "twitch";
+    private string _fallbackPlatform = StreamerSongListPlatformNames.Default;
     private bool _hasExistingCredential;
     private int _historyCount;
     private StreamerSongListChannel? _matchedChannel;
@@ -292,14 +292,7 @@ public partial class Setup
         _ => "○"
     };
 
-    private static string PlatformLabel(string platform) => platform switch
-    {
-        "twitch" => "Twitch",
-        "youtube" => "YouTube",
-        "kick" => "Kick",
-        "none" => "StreamerSongList",
-        _ => platform
-    };
+    private static string PlatformLabel(string platform) => SettingsOptions.GetPlatformLabel(platform);
 
     public void Dispose()
     {

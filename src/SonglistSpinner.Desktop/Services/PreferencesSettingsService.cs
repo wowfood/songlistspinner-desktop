@@ -14,7 +14,8 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
         if (string.IsNullOrEmpty(json)) return new SettingsDto();
         try
         {
-            return JsonSerializer.Deserialize<SettingsDto>(json, JsonOpts) ?? new SettingsDto();
+            return SettingsDtoNormalizer.Normalize(
+                JsonSerializer.Deserialize<SettingsDto>(json, JsonOpts) ?? new SettingsDto());
         }
         catch
         {
@@ -24,11 +25,13 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
 
     public void SaveSettings(SettingsDto dto)
     {
-        Preferences.Set(SettingsKey, JsonSerializer.Serialize(dto, JsonOpts));
+        Preferences.Set(SettingsKey, JsonSerializer.Serialize(SettingsDtoNormalizer.Normalize(dto), JsonOpts));
     }
 
     public SpinnerConfig ToSpinnerConfig(SettingsDto dto)
     {
+        SettingsDtoNormalizer.Normalize(dto);
+
         string[] wheelColors;
         try
         {
@@ -40,43 +43,15 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
             wheelColors = SpinnerConfig.DefaultWheelColors;
         }
 
-        string[] fields;
-        try
-        {
-            fields = JsonSerializer.Deserialize<string[]>(dto.SongListFields, JsonOpts) ?? ["artist", "title"];
-        }
-        catch
-        {
-            fields = ["artist", "title"];
-        }
+        var fields = SettingsDtoNormalizer.ParseFields(dto.SongListFields);
+        var nowPlayingFields = SettingsDtoNormalizer.ParseFields(dto.NowPlayingFields);
 
-        string[] nowPlayingFields;
-        try
-        {
-            nowPlayingFields = JsonSerializer.Deserialize<string[]>(dto.NowPlayingFields, JsonOpts) ??
-                               ["artist", "title"];
-        }
-        catch
-        {
-            nowPlayingFields = ["artist", "title"];
-        }
-
-        var legacyWinnerFields = (fields.Length > 0 ? fields : ["artist", "title"])
-            .Select(field => field.ToLowerInvariant())
-            .Append("requester")
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToArray();
-        string[] winnerDialogFields;
-        try
-        {
-            winnerDialogFields = string.IsNullOrWhiteSpace(dto.WinnerDialogFields)
-                ? legacyWinnerFields
-                : JsonSerializer.Deserialize<string[]>(dto.WinnerDialogFields, JsonOpts) ?? legacyWinnerFields;
-        }
-        catch
-        {
-            winnerDialogFields = legacyWinnerFields;
-        }
+        var legacyWinnerFields = SongFieldNames.NormalizeSelection(
+            fields.Append(SongFieldNames.Requester),
+            SongFieldNames.CreateWinnerDefaultSelection());
+        var winnerDialogFields = string.IsNullOrWhiteSpace(dto.WinnerDialogFields)
+            ? legacyWinnerFields
+            : SettingsDtoNormalizer.ParseFields(dto.WinnerDialogFields, legacyWinnerFields);
 
         return new SpinnerConfig
         {
@@ -105,7 +80,10 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
             {
                 FontFamily = dto.PlayedListFontFamily,
                 FontSize = dto.PlayedListFontSize,
-                MaxLines = dto.PlayedListMaxLines
+                MaxLines = dto.PlayedListMaxLines,
+                ShowNumbers = dto.PlayedListShowNumbers,
+                NumberingStart = SpinnerSettingValues.PlayedListNumberingStarts.NormalizeOrDefault(
+                    dto.PlayedListNumberingStart)
             },
             NowPlaying = new SpinnerNowPlayingConfig
             {

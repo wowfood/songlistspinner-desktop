@@ -278,6 +278,8 @@ Played-panel options include:
 - Left or right screen position
 - Font family and CSS font size
 - One to five lines per song
+- Optional sequence numbers that can start at the top or bottom of the displayed
+  newest-first history
 
 When the Now Playing workflow is enabled, its panel additionally supports:
 

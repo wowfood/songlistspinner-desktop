@@ -11,9 +11,6 @@ namespace SonglistSpinner.Core.Api.V2;
 
 public sealed class StreamerSongListApiClient : ISpinnerApiService
 {
-    private static readonly HashSet<string> SupportedPlatforms =
-        new(StringComparer.OrdinalIgnoreCase) { "kick", "none", "twitch", "youtube" };
-
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
         PropertyNameCaseInsensitive = true
@@ -82,7 +79,7 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
 
     public async Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
         StreamerSongListChannel channel,
-        string period = "week",
+        string period = SpinnerSettingValues.PlayHistoryPeriods.Default,
         CancellationToken cancellationToken = default)
     {
         var query = $"{BuildChannelQuery(channel)}&limit={_options.PageSize}" +
@@ -180,9 +177,9 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
 
         var scheme = credential.Kind switch
         {
-            StreamerSongListCredentialKind.OAuthBearer => "Bearer",
-            StreamerSongListCredentialKind.Streamer => "Streamer",
-            StreamerSongListCredentialKind.User => "User",
+            StreamerSongListCredentialKind.OAuthBearer => StreamerSongListAuthenticationSchemes.Bearer,
+            StreamerSongListCredentialKind.Streamer => StreamerSongListAuthenticationSchemes.Streamer,
+            StreamerSongListCredentialKind.User => StreamerSongListAuthenticationSchemes.User,
             _ => throw new ArgumentOutOfRangeException(nameof(credential.Kind))
         };
 
@@ -203,10 +200,9 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
     private static string BuildChannelQuery(StreamerSongListChannel channel)
     {
         var name = channel.Name.Trim();
-        var platform = channel.Platform.Trim().ToLowerInvariant();
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("A streamer name is required.", nameof(channel));
-        if (!SupportedPlatforms.Contains(platform))
+        if (!StreamerSongListPlatformNames.TryNormalize(channel.Platform, out var platform))
             throw new ArgumentException($"Unsupported StreamerSongList platform '{channel.Platform}'.", nameof(channel));
 
         return $"streamer_name={Uri.EscapeDataString(name)}&platform={Uri.EscapeDataString(platform)}";
@@ -226,13 +222,17 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
 
     private DateTimeOffset? GetPlayedAfter(string period)
     {
+        if (!SpinnerSettingValues.PlayHistoryPeriods.TryNormalize(period, out var normalizedPeriod))
+            throw new ArgumentOutOfRangeException(nameof(period), period, "Unknown play-history period.");
+
         var now = _timeProvider.GetUtcNow();
-        return period.Trim().ToLowerInvariant() switch
+        return normalizedPeriod switch
         {
-            "day" => now.AddDays(-1),
-            "week" => now.AddDays(-7),
-            "month" => now.AddMonths(-1),
-            "all" or "stream" => null,
+            SpinnerSettingValues.PlayHistoryPeriods.Day => now.AddDays(-1),
+            SpinnerSettingValues.PlayHistoryPeriods.Week => now.AddDays(-7),
+            SpinnerSettingValues.PlayHistoryPeriods.Month => now.AddMonths(-1),
+            SpinnerSettingValues.PlayHistoryPeriods.All or
+                SpinnerSettingValues.PlayHistoryPeriods.Stream => null,
             _ => throw new ArgumentOutOfRangeException(nameof(period), period, "Unknown play-history period.")
         };
     }
@@ -259,10 +259,10 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         if (platforms is null) return [];
 
         var identities = new List<StreamerSongListPlatformIdentity>();
-        AddPlatformIdentity(identities, "twitch", platforms.Twitch);
-        AddPlatformIdentity(identities, "youtube", platforms.YouTube);
-        AddPlatformIdentity(identities, "kick", platforms.Kick);
-        AddPlatformIdentity(identities, "none", platforms.None);
+        AddPlatformIdentity(identities, StreamerSongListPlatformNames.Twitch, platforms.Twitch);
+        AddPlatformIdentity(identities, StreamerSongListPlatformNames.YouTube, platforms.YouTube);
+        AddPlatformIdentity(identities, StreamerSongListPlatformNames.Kick, platforms.Kick);
+        AddPlatformIdentity(identities, StreamerSongListPlatformNames.None, platforms.None);
         return identities;
     }
 

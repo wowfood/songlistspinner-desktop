@@ -6,8 +6,6 @@ namespace SonglistSpinner.Components.Pages;
 
 public sealed class SettingsViewModel
 {
-    private static readonly string[] ValidFields = ["artist", "title", "requester", "donation"];
-
     public string WheelColorsRaw { get; set; } = "";
     public bool SaveSuccess { get; set; }
     public string? SaveError { get; set; }
@@ -27,6 +25,8 @@ public sealed class SettingsViewModel
 
     public void Initialize(SettingsDto dto)
     {
+        SettingsDtoNormalizer.Normalize(dto);
+
         try
         {
             WheelColorsRaw = string.Join("\n", JsonSerializer.Deserialize<string[]>(dto.WheelColors) ?? []);
@@ -60,32 +60,26 @@ public sealed class SettingsViewModel
     {
         if (!string.IsNullOrWhiteSpace(json))
         {
-            WinnerDialogDisplayFields = BuildDisplayFields(json, ["artist", "title", "requester"]);
+            WinnerDialogDisplayFields = BuildDisplayFields(json, SongFieldNames.CreateWinnerDefaultSelection());
             return;
         }
 
         WinnerDialogDisplayFields = BuildDisplayFields(legacySongListFields);
-        var requester = WinnerDialogDisplayFields.First(field => field.Name == "requester");
+        var requester = WinnerDialogDisplayFields.First(field => field.Name == SongFieldNames.Requester);
         requester.Selected = true;
     }
 
     private static List<DisplayField> BuildDisplayFields(string json, string[]? fallback = null)
     {
-        fallback ??= ["artist", "title"];
-        string[] selected;
-        try
-        {
-            selected = JsonSerializer.Deserialize<string[]>(json) ?? fallback;
-        }
-        catch
-        {
-            selected = fallback;
-        }
+        var selected = SettingsDtoNormalizer.ParseFields(
+            json,
+            fallback ?? SongFieldNames.CreateDefaultSelection());
 
         return selected
-            .Where(f => ValidFields.Contains(f))
             .Select(f => new DisplayField { Name = f, Selected = true })
-            .Concat(ValidFields.Except(selected).Select(f => new DisplayField { Name = f, Selected = false }))
+            .Concat(SongFieldNames.Values
+                .Except(selected, StringComparer.OrdinalIgnoreCase)
+                .Select(f => new DisplayField { Name = f, Selected = false }))
             .ToList();
     }
 
@@ -183,15 +177,18 @@ public sealed class SettingsViewModel
         dto.WheelColors = JsonSerializer.Serialize(colors);
 
         var fields = DisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
-        dto.SongListFields = JsonSerializer.Serialize(fields.Length > 0 ? fields : new[] { "artist", "title" });
+        dto.SongListFields = JsonSerializer.Serialize(
+            SongFieldNames.NormalizeSelection(fields, SongFieldNames.CreateDefaultSelection()));
 
         var nowPlayingFields = NowPlayingDisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
         dto.NowPlayingFields = JsonSerializer.Serialize(
-            nowPlayingFields.Length > 0 ? nowPlayingFields : new[] { "artist", "title" });
+            SongFieldNames.NormalizeSelection(nowPlayingFields, SongFieldNames.CreateDefaultSelection()));
 
         var winnerDialogFields = WinnerDialogDisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
         dto.WinnerDialogFields = JsonSerializer.Serialize(
-            winnerDialogFields.Length > 0 ? winnerDialogFields : new[] { "artist", "title", "requester" });
+            SongFieldNames.NormalizeSelection(
+                winnerDialogFields,
+                SongFieldNames.CreateWinnerDefaultSelection()));
 
         dto.ColorPlayedListBackground = ComputedPlayedListBg();
         dto.NowPlayingBackgroundOpacity = UseIndependentNowPlayingBgAlpha
