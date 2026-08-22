@@ -1135,6 +1135,28 @@ h1:focus {
     font-size: 0.82rem;
 }
 
+.ss-btn-reset-subset {
+    flex: 0 0 auto;
+    padding: 0.3rem 0.55rem;
+    border: 1px solid #cdbde3;
+    border-radius: 0.38rem;
+    background: #f8f5fc;
+    color: #60418d;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.ss-btn-reset-subset:hover {
+    background: #eee7f7;
+}
+
+.ss-btn-reset-subset:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
 .ss-reset-dialog-intro {
     margin: 0 0 1rem;
     color: #3e3745;
@@ -1198,7 +1220,14 @@ h1:focus {
     margin: 0;
 }
 
-.ss-settings-section-title-row > span {
+.ss-settings-section-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+}
+
+.ss-settings-section-title-row > span,
+.ss-settings-section-title-actions > span {
     padding: 0.25rem 0.5rem;
     border-radius: 2rem;
     background: #ece5f7;

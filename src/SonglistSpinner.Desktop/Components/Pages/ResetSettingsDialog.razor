@@ -1,7 +1,7 @@
 <MudDialog>
     <DialogContent>
         <p class="ss-reset-dialog-intro">
-            The following fields differ from their default values and will be reset:
+            The following fields in <strong>@ScopeLabel</strong> differ from their shipped defaults and will be reset:
         </p>
 
         <div class="ss-reset-dialog-fields" aria-label="Settings that will be reset">
@@ -20,7 +20,8 @@
         </div>
 
         <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
-            This updates the draft only. Choose <strong>Save Settings</strong> to apply it.
+            This restores shipped defaults, not your last-saved values. It updates the draft only;
+            choose <strong>Save Settings</strong> to apply it.
             Your StreamerSongList API credential is not affected.
         </MudAlert>
     </DialogContent>
@@ -38,6 +39,9 @@
 
     [Parameter]
     public IReadOnlyList<SettingsResetField> Fields { get; set; } = [];
+
+    [Parameter]
+    public string ScopeLabel { get; set; } = "Settings";
 
     private void Cancel() => MudDialog.Cancel();
 

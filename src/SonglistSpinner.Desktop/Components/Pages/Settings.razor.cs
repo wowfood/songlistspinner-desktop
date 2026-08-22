@@ -490,18 +490,20 @@ public partial class Settings
         }
     }
 
-    private async Task ReviewSettingsResetAsync()
+    private async Task ReviewSettingsResetAsync(SettingsResetScope scope)
     {
         if (_dto is null || _resetDialogOpen) return;
 
         _vm.ApplyToDto(_dto);
         var defaults = CreateDefaultSettingsDraft();
-        var affectedFields = SettingsResetPlan.GetAffectedFields(_dto, defaults);
+        var scopeLabel = SettingsResetPlan.GetScopeLabel(scope);
+        var affectedFields = SettingsResetPlan.GetAffectedFields(_dto, defaults, scope);
         if (affectedFields.Count == 0)
         {
             await DialogService.ShowMessageBoxAsync(
-                "Settings already use defaults",
-                "No application settings need to be reset. The API credential was not inspected or changed.",
+                $"{scopeLabel} already uses defaults",
+                "No fields in this area differ from their shipped defaults. Nothing was changed, " +
+                "and the API credential was not inspected.",
                 yesText: "OK");
             return;
         }
@@ -511,6 +513,7 @@ public partial class Settings
         {
             var parameters = new DialogParameters<ResetSettingsDialog>();
             parameters.Add(dialog => dialog.Fields, affectedFields);
+            parameters.Add(dialog => dialog.ScopeLabel, scopeLabel);
             var options = new DialogOptions
             {
                 BackdropClick = false,
@@ -520,13 +523,14 @@ public partial class Settings
                 MaxWidth = MaxWidth.Small
             };
             var dialog = await DialogService.ShowAsync<ResetSettingsDialog>(
-                "Review settings reset",
+                $"Review {scopeLabel} reset",
                 parameters,
                 options);
             var result = await dialog.Result;
             if (result?.Canceled != false) return;
 
-            ReplaceSettingsDraft(defaults);
+            SettingsResetPlan.ApplyDefaults(_dto, defaults, scope);
+            ReplaceSettingsDraft(_dto);
         }
         finally
         {
