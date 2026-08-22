@@ -61,7 +61,9 @@
         <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
     </ItemGroup>
     <ItemGroup>
-        <!-- Also embed the vendored wheel script so the local OBS server can serve it from the single executable. -->
+        <!-- Embed the standalone overlay assets so the local OBS server can serve them from the single executable. -->
+        <EmbeddedResource Include="wwwroot\overlay\Overlay.html"
+                          LogicalName="SonglistSpinner.WebAssets.Overlay.html"/>
         <EmbeddedResource Include="wwwroot\spinner\spin-wheel-iife.js"
                           LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
     </ItemGroup>

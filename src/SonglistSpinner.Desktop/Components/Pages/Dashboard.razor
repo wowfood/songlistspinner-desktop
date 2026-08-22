@@ -108,7 +108,11 @@
                 <ul id="playedSongsUl">
                     @foreach (var song in _playedSongs)
                     {
-                        <li>@SpinnerDataService.CreatePlayedSongText(song, _config ?? new SpinnerConfig())</li>
+                        <li>
+                            <span class="played-song-text">
+                                @SpinnerDataService.CreatePlayedSongText(song, _config ?? new SpinnerConfig())
+                            </span>
+                        </li>
                     }
                 </ul>
             </div>

@@ -413,9 +413,13 @@ input {
     border-radius: 0.25rem;
     font-size: var(--app-played-list-font-size);
     font-family: var(--app-played-list-font-family);
+}
+
+#playedList li > .played-song-text {
     line-height: 1.4em;
-    max-height: calc(var(--app-played-list-max-lines) * 1.4em + 1rem);
+    max-height: calc(var(--app-played-list-max-lines) * 1.4em);
     overflow: hidden;
+    overflow-wrap: anywhere;
     display: -webkit-box;
     -webkit-box-orient: vertical;
     -webkit-line-clamp: var(--app-played-list-max-lines);
