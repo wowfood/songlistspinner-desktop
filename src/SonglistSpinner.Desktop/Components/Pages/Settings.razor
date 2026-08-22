@@ -455,7 +455,43 @@
                                     <div class="ss-field ss-field-row">
                                         <label>Played Panel Background</label>
                                         <div class="ss-color-preview" style="background:@_vm.ComputedPlayedListBg()">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" @bind-Value="ColorPlayedListBg"/>
+                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false"
+                                                            @bind-Value="ColorPlayedListBg"/>
+                                        </div>
+                                        <div class="ss-opacity-control">
+                                            <div class="ss-opacity-heading">
+                                                <label for="playedPanelOpacity">Opacity</label>
+                                                <output for="playedPanelOpacity">@PlayedListOpacityPercent%</output>
+                                            </div>
+                                            <input id="playedPanelOpacity" class="ss-opacity-range" type="range"
+                                                   min="0" max="100" step="1"
+                                                   @bind="PlayedListOpacityPercent" @bind:event="oninput"/>
+                                            <div class="ss-field-hint">0% is fully transparent; text and controls remain fully visible.</div>
+                                        </div>
+                                    </div>
+                                    <div class="ss-field ss-field-row">
+                                        <label>Now Playing Background</label>
+                                        <div class="ss-panel-background-swatch" aria-hidden="true">
+                                            <span style="background:@_vm.ComputedNowPlayingBg()"></span>
+                                        </div>
+                                        <label class="ss-checkbox-label">
+                                            <input type="checkbox" @bind="UseIndependentNowPlayingOpacity"/>
+                                            Use separate opacity
+                                        </label>
+                                        <div class="ss-opacity-control">
+                                            <div class="ss-opacity-heading">
+                                                <label for="nowPlayingOpacity">Opacity</label>
+                                                <output for="nowPlayingOpacity">@NowPlayingOpacityPercent%</output>
+                                            </div>
+                                            <input id="nowPlayingOpacity" class="ss-opacity-range" type="range"
+                                                   min="0" max="100" step="1"
+                                                   disabled="@(!UseIndependentNowPlayingOpacity)"
+                                                   @bind="NowPlayingOpacityPercent" @bind:event="oninput"/>
+                                            <div class="ss-field-hint">
+                                                @(UseIndependentNowPlayingOpacity
+                                                    ? "Uses the Played Panel color with its own opacity."
+                                                    : "Following the Played Panel opacity.")
+                                            </div>
                                         </div>
                                     </div>
                                     <div class="ss-field ss-field-row">

@@ -129,6 +129,9 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
                 Text = dto.ColorText,
                 StatusBackground = dto.ColorStatusBackground,
                 PlayedListBackground = dto.ColorPlayedListBackground,
+                NowPlayingBackground = PanelBackgroundColor.Resolve(
+                    dto.ColorPlayedListBackground,
+                    dto.NowPlayingBackgroundOpacity),
                 PlayedItemBackground = dto.ColorPlayedItemBackground,
                 ResizeHandleBackground = dto.ColorResizeHandleBackground,
                 ResizeHandleHoverBackground = dto.ColorResizeHandleHoverBackground,
