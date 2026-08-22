@@ -7,15 +7,15 @@ public static class StreamerSongListReferenceParser
     private static readonly IReadOnlyDictionary<string, string> RoutePlatforms =
         new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
-            ["t"] = "twitch",
-            ["twitch"] = "twitch",
-            ["y"] = "youtube",
-            ["youtube"] = "youtube",
-            ["k"] = "kick",
-            ["kick"] = "kick",
-            ["s"] = "none",
-            ["streamersonglist"] = "none",
-            ["none"] = "none"
+            ["t"] = StreamerSongListPlatformNames.Twitch,
+            [StreamerSongListPlatformNames.Twitch] = StreamerSongListPlatformNames.Twitch,
+            ["y"] = StreamerSongListPlatformNames.YouTube,
+            [StreamerSongListPlatformNames.YouTube] = StreamerSongListPlatformNames.YouTube,
+            ["k"] = StreamerSongListPlatformNames.Kick,
+            [StreamerSongListPlatformNames.Kick] = StreamerSongListPlatformNames.Kick,
+            ["s"] = StreamerSongListPlatformNames.None,
+            ["streamersonglist"] = StreamerSongListPlatformNames.None,
+            [StreamerSongListPlatformNames.None] = StreamerSongListPlatformNames.None
         };
 
     public static bool TryParse(
@@ -88,10 +88,10 @@ public static class StreamerSongListReferenceParser
 
     private static bool TryNormalizePlatform(string? value, out string platform)
     {
-        platform = value?.Trim().ToLowerInvariant() ?? "";
-        if (RoutePlatforms.TryGetValue(platform, out var normalized))
-            platform = normalized;
+        var candidate = value?.Trim() ?? "";
+        if (RoutePlatforms.TryGetValue(candidate, out var routedPlatform))
+            candidate = routedPlatform;
 
-        return platform is "twitch" or "youtube" or "kick" or "none";
+        return StreamerSongListPlatformNames.TryNormalize(candidate, out platform);
     }
 }

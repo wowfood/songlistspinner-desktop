@@ -71,7 +71,9 @@ public partial class Dashboard
         ? ""
         : SpinnerDataService.CreateSongTextForFields(
             _nowPlaying,
-            _config.NowPlaying?.Fields is { Length: > 0 } fields ? fields : ["artist", "title"]);
+            _config.NowPlaying?.Fields is { Length: > 0 } fields
+                ? fields
+                : SongFieldNames.CreateDefaultSelection());
     private string ApiEnvironmentLabel => GetApiEnvironment().label;
     private string ApiEnvironmentClass => GetApiEnvironment().cssClass;
     private string OverlayHealthClass => _overlayHealth.ServerState switch
@@ -119,7 +121,7 @@ public partial class Dashboard
         _wheelCts.Dispose();
         try
         {
-            await JS.InvokeVoidAsync("SpinnerInterop.disposeDashboardBindings");
+            await JS.InvokeVoidAsync(SpinnerInteropMethods.DisposeDashboardBindings);
         }
         catch (Exception ex) { _ = ex; }
 
@@ -133,7 +135,7 @@ public partial class Dashboard
 
         try
         {
-            await JS.InvokeVoidAsync("SpinnerInterop.resetBackground");
+            await JS.InvokeVoidAsync(SpinnerInteropMethods.ResetBackground);
         }
         catch (Exception ex) { _ = ex; }
 
@@ -181,18 +183,18 @@ public partial class Dashboard
         _jsInitialized = true;
 
         await JS.InvokeVoidAsync(
-            "SpinnerInterop.applyTheme", _config.Colors, _config.PlayedList, _config.WinnerDialog);
-        await JS.InvokeVoidAsync("SpinnerInterop.applyBackground", _config.Background);
-        await JS.InvokeVoidAsync("SpinnerInterop.applyPlayedListPosition",
+            SpinnerInteropMethods.ApplyTheme, _config.Colors, _config.PlayedList, _config.WinnerDialog);
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.ApplyBackground, _config.Background);
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.ApplyPlayedListPosition,
             _config.SongList.PlayedListPosition);
 
-        await JS.InvokeVoidAsync("SpinnerInterop.createWheel",
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.CreateWheel,
             new[] { new { label = "Enter streamer name above" } },
             _config.WheelColors);
 
-        await JS.InvokeVoidAsync("SpinnerInterop.setupResizeObserver");
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeObserver);
         _dotNetRef = DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync("SpinnerInterop.setupResizeHandlers", _dotNetRef);
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef);
 
         var defaultName = _config.Streamer.DefaultName.Trim();
         if (!string.IsNullOrEmpty(defaultName))
@@ -310,7 +312,7 @@ public partial class Dashboard
                 spinWinner.QueueId,
                 SpinDurationMilliseconds);
 
-            await JS.InvokeVoidAsync("SpinnerInterop.spinToItem", winnerIndex, SpinDurationMilliseconds);
+            await JS.InvokeVoidAsync(SpinnerInteropMethods.SpinToItem, winnerIndex, SpinDurationMilliseconds);
 
             await Task.Delay(SpinDurationMilliseconds + WinnerRevealDelayMilliseconds, _lifetimeCts.Token);
             var displayedQueuePosition = _config.WinnerDialog.ShowQueuePosition
@@ -367,14 +369,14 @@ public partial class Dashboard
     private async Task OnWheelToggle(ChangeEventArgs e)
     {
         _wheelVisible = (bool)(e.Value ?? true);
-        await JS.InvokeVoidAsync("SpinnerInterop.setWheelVisible", _wheelVisible);
-        _ = OverlayService.BroadcastAsync("set_wheel_visible", new { visible = _wheelVisible });
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetWheelVisible, _wheelVisible);
+        _ = OverlayService.BroadcastWheelVisibilityAsync(_wheelVisible);
     }
 
     private async Task ToggleCollapse()
     {
         _playedListCollapsed = !_playedListCollapsed;
-        await JS.InvokeVoidAsync("SpinnerInterop.setPlayedListCollapsed",
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetPlayedListCollapsed,
             _playedListCollapsed, _config.SongList.PlayedListPosition);
         await OverlayService.UpdatePlayedListCollapsedAsync(_playedListCollapsed);
     }
@@ -431,7 +433,7 @@ public partial class Dashboard
         _winnerActionError = null;
         _winnerActionPending = false;
         _winnerVisible = true;
-        _ = JS.InvokeVoidAsync("SpinnerInterop.runConfetti", (object)_config.WheelColors);
+        _ = JS.InvokeVoidAsync(SpinnerInteropMethods.RunConfetti, (object)_config.WheelColors);
     }
 
     private Task MarkWinnerPlayedAsync()
@@ -605,7 +607,7 @@ public partial class Dashboard
         var items = _availableSongs.Count > 0
             ? _availableSongs.Select(s => new { label = SpinnerDataService.BuildWheelLabel(s) }).ToArray<object>()
             : new object[] { new { label = "No songs in queue" } };
-        await JS.InvokeVoidAsync("SpinnerInterop.createWheel", ct, items, _config.WheelColors);
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.CreateWheel, ct, items, _config.WheelColors);
     }
 
     private void SetStatus(string message, bool visible = true)

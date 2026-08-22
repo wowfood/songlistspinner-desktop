@@ -228,14 +228,7 @@ public partial class Settings
     private string SectionClass(SettingsSection section) =>
         _activeSection == section ? "ss-settings-nav-item active" : "ss-settings-nav-item";
 
-    private static string FieldLabel(string field) => field switch
-    {
-        "artist" => "Artist",
-        "title" => "Song title",
-        "requester" => "Requester",
-        "donation" => "Donation",
-        _ => field
-    };
+    private static string FieldLabel(string field) => SettingsOptions.GetSongFieldLabel(field);
 
     private void BeginPlayedFieldDrag(int index)
     {
@@ -365,7 +358,7 @@ public partial class Settings
             var config = LocalSettings.ToSpinnerConfig(previewDto);
             var nowPlayingFields = config.NowPlaying.Fields is { Length: > 0 }
                 ? config.NowPlaying.Fields
-                : ["artist", "title"];
+                : SongFieldNames.CreateDefaultSelection();
 
             var payload = new
             {
@@ -380,7 +373,10 @@ public partial class Settings
                 availableCount = PreviewSongs.Length
             };
 
-            await JS.InvokeVoidAsync("SpinnerInterop.updateSettingsPreview", "settingsOverlayPreview", payload);
+            await JS.InvokeVoidAsync(
+                SpinnerInteropMethods.UpdateSettingsPreview,
+                "settingsOverlayPreview",
+                payload);
         }
         catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
         {

@@ -7,11 +7,14 @@ namespace SonglistSpinner.Services;
 public class LocalOverlayServer : IAsyncDisposable
 {
     private const string OverlayResourceName = "SonglistSpinner.WebAssets.Overlay.html";
+    private const string ContractsResourceName = "SonglistSpinner.WebAssets.SongSpinner.contracts.js";
     private const string SpinWheelResourceName = "SonglistSpinner.WebAssets.spin-wheel-iife.js";
     private static readonly Lazy<byte[]> OverlayDocument = new(() =>
         LoadEmbeddedResource(OverlayResourceName, "The embedded overlay document is missing."));
     private static readonly Lazy<byte[]> SpinWheelScript = new(() =>
         LoadEmbeddedResource(SpinWheelResourceName, "The embedded wheel script is missing."));
+    private static readonly Lazy<byte[]> ContractsScript = new(() =>
+        LoadEmbeddedResource(ContractsResourceName, "The embedded overlay contracts script is missing."));
 
     private readonly CancellationTokenSource _cts = new();
     private readonly OverlayStateService _overlay;
@@ -132,8 +135,14 @@ public class LocalOverlayServer : IAsyncDisposable
                 case "/overlay/events":
                     await ServeSSEAsync(context, ct);
                     break;
+                case "/overlay/SongSpinner.contracts.js":
+                    await ServeScriptAsync(context, ContractsScript.Value, "no-cache");
+                    break;
                 case "/overlay/spin-wheel-iife.js":
-                    await ServeSpinWheelScriptAsync(context);
+                    await ServeScriptAsync(
+                        context,
+                        SpinWheelScript.Value,
+                        "public, max-age=31536000, immutable");
                     break;
                 default:
                     context.Response.StatusCode = 404;
@@ -191,11 +200,13 @@ public class LocalOverlayServer : IAsyncDisposable
         }
     }
 
-    private static async Task ServeSpinWheelScriptAsync(HttpListenerContext context)
+    private static async Task ServeScriptAsync(
+        HttpListenerContext context,
+        byte[] bytes,
+        string cacheControl)
     {
-        var bytes = SpinWheelScript.Value;
         context.Response.ContentType = "text/javascript; charset=utf-8";
-        context.Response.AddHeader("Cache-Control", "public, max-age=31536000, immutable");
+        context.Response.AddHeader("Cache-Control", cacheControl);
         context.Response.ContentLength64 = bytes.Length;
         await context.Response.OutputStream.WriteAsync(bytes);
         context.Response.Close();

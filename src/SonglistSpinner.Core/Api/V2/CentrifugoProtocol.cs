@@ -80,9 +80,14 @@ internal static class CentrifugoProtocol
         var eventType = typeProperty.GetString();
         var kind = eventType switch
         {
-            "now_playing_update" or "queue_add" or "queue_clear" or "queue_remove" or
-                "queue_reorder" or "queue_update" => StreamerSongListEventKind.QueueChanged,
-            "play_history_add" or "play_history_remove" => StreamerSongListEventKind.PlayHistoryChanged,
+            StreamerSongListEventTypes.NowPlayingUpdate or
+                StreamerSongListEventTypes.QueueAdd or
+                StreamerSongListEventTypes.QueueClear or
+                StreamerSongListEventTypes.QueueRemove or
+                StreamerSongListEventTypes.QueueReorder or
+                StreamerSongListEventTypes.QueueUpdate => StreamerSongListEventKind.QueueChanged,
+            StreamerSongListEventTypes.PlayHistoryAdd or
+                StreamerSongListEventTypes.PlayHistoryRemove => StreamerSongListEventKind.PlayHistoryChanged,
             _ => (StreamerSongListEventKind?)null
         };
 

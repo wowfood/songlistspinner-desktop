@@ -81,7 +81,7 @@ public class OverlayStateService
 
     private Task BroadcastStateAsync(OverlaySnapshot snapshot)
     {
-        return BroadcastAsync("update_songs", new
+        return BroadcastAsync(OverlayEventNames.UpdateSongs, new
         {
             config = snapshot.Config,
             streamer = snapshot.CurrentStreamer,
@@ -98,36 +98,41 @@ public class OverlayStateService
         int winnerQueueId,
         int duration)
     {
-        return BroadcastAsync("spin_command", new { winnerIndex, winnerQueueId, duration });
+        return BroadcastAsync(OverlayEventNames.SpinCommand, new { winnerIndex, winnerQueueId, duration });
     }
 
     public Task BroadcastWinnerRevealAsync(
         IReadOnlyList<WinnerDialogField> fields,
         int? queuePosition)
     {
-        return BroadcastAsync("winner_reveal", new { fields, queuePosition });
+        return BroadcastAsync(OverlayEventNames.WinnerReveal, new { fields, queuePosition });
     }
 
     public Task BroadcastCloseWinnerAsync()
     {
-        return BroadcastAsync("close_winner", new { });
+        return BroadcastAsync(OverlayEventNames.CloseWinner, new { });
+    }
+
+    public Task BroadcastWheelVisibilityAsync(bool visible)
+    {
+        return BroadcastAsync(OverlayEventNames.SetWheelVisible, new { visible });
     }
 
     public Task UpdatePlayedListCollapsedAsync(bool collapsed)
     {
         lock (_stateGate)
             _snapshot = _snapshot with { PlayedListCollapsed = collapsed };
-        return BroadcastAsync("set_collapse", new { collapsed });
+        return BroadcastAsync(OverlayEventNames.SetCollapse, new { collapsed });
     }
 
     public Task UpdatePlayedListWidthAsync(string width, string minWidth)
     {
         lock (_stateGate)
             _snapshot = _snapshot with { PlayedListWidth = width, PlayedListMinWidth = minWidth };
-        return BroadcastAsync("set_played_list_width", new { width, minWidth });
+        return BroadcastAsync(OverlayEventNames.SetPlayedListWidth, new { width, minWidth });
     }
 
-    public Task BroadcastAsync(string eventName, object payload)
+    private Task BroadcastAsync(string eventName, object payload)
     {
         var json = JsonSerializer.Serialize(payload, JsonOpts);
         var message = $"event: {eventName}\ndata: {json}\n\n";
@@ -208,7 +213,7 @@ public class OverlayStateService
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOpts);
-        return $"event: init_state\ndata: {json}\n\n";
+        return $"event: {OverlayEventNames.InitialState}\ndata: {json}\n\n";
     }
 
     private static object[] BuildWheelItems(IReadOnlyCollection<SpinnerQueueItem> songs)
@@ -227,7 +232,7 @@ public class OverlayStateService
         if (item is null) return null;
         var fields = config.NowPlaying.Fields is { Length: > 0 }
             ? config.NowPlaying.Fields
-            : ["artist", "title"];
+            : SongFieldNames.CreateDefaultSelection();
         return SpinnerDataService.CreateSongTextForFields(item, fields);
     }
 

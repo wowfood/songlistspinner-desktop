@@ -45,7 +45,7 @@ public class SpinnerDataServiceTests
         bool exclude = true,
         string[]? winnerFields = null,
         bool showNumbers = false,
-        string numberingStart = SpinnerPlayedListConfig.NumberingStartBottom)
+        string numberingStart = SpinnerSettingValues.PlayedListNumberingStarts.Bottom)
     {
         return new SpinnerConfig
         {
@@ -453,7 +453,7 @@ public class SpinnerDataServiceTests
         var config = Cfg(
             ["title"],
             showNumbers: true,
-            numberingStart: SpinnerPlayedListConfig.NumberingStartTop);
+            numberingStart: SpinnerSettingValues.PlayedListNumberingStarts.Top);
 
         var result = SpinnerDataService.CreatePlayedSongTexts(songs, config);
 
@@ -461,7 +461,7 @@ public class SpinnerDataServiceTests
     }
 
     [Theory]
-    [InlineData(SpinnerPlayedListConfig.NumberingStartBottom)]
+    [InlineData(SpinnerSettingValues.PlayedListNumberingStarts.Bottom)]
     [InlineData("invalid")]
     public void Given_NumberingDoesNotStartAtTop_When_CreatePlayedSongTexts_Then_OldestIsOne(
         string numberingStart)

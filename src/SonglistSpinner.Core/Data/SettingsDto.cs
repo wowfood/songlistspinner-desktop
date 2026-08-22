@@ -1,4 +1,5 @@
 using System.Text.Json.Serialization;
+using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Core.Data;
 
@@ -7,24 +8,24 @@ public class SettingsDto
     public string WheelColors { get; set; } =
         """["#ff6b6b","#4ecdc4","#45b7d1","#f9ca24","#6c5ce7","#a29bfe","#fd79a8","#fdcb6e"]""";
 
-    public string BackgroundMode { get; set; } = "color";
+    public string BackgroundMode { get; set; } = SpinnerSettingValues.BackgroundModes.Default;
     public string BackgroundColor { get; set; } = "#111111";
     public string BackgroundImage { get; set; } = "";
     public string DefaultStreamerName { get; set; } = "";
-    public string StreamerPlatform { get; set; } = "twitch";
+    public string StreamerPlatform { get; set; } = StreamerSongListPlatformNames.Default;
     public bool HideChangeOptionWhenDefault { get; set; } = true;
-    public string SongListFields { get; set; } = """["artist","title"]""";
+    public string SongListFields { get; set; } = SongFieldNames.DefaultJson;
     public bool ExcludePlayedSongs { get; set; }
-    public string PlayedListPosition { get; set; } = "right";
-    public string PlayHistoryPeriod { get; set; } = "week";
+    public string PlayedListPosition { get; set; } = SpinnerSettingValues.PlayedListPositions.Default;
+    public string PlayHistoryPeriod { get; set; } = SpinnerSettingValues.PlayHistoryPeriods.Default;
     [JsonPropertyName("AutoPlay")]
     public bool UpdateQueueAfterSpin { get; set; }
     public bool DisplayNowPlaying { get; set; }
-    public string NowPlayingFields { get; set; } = """["artist","title"]""";
+    public string NowPlayingFields { get; set; } = SongFieldNames.DefaultJson;
     public string NowPlayingFontFamily { get; set; } = "sans-serif";
     public string NowPlayingFontSize { get; set; } = "1.125rem";
     public string NowPlayingWidth { get; set; } = "28rem";
-    public string NowPlayingPosition { get; set; } = "bottom-left";
+    public string NowPlayingPosition { get; set; } = SpinnerSettingValues.NowPlayingPositions.Default;
     public double? NowPlayingBackgroundOpacity { get; set; }
     public string? WinnerDialogFields { get; set; }
     public string WinnerDialogFontFamily { get; set; } = "sans-serif";
@@ -46,5 +47,5 @@ public class SettingsDto
     public string PlayedListFontSize { get; set; } = "0.875rem";
     public int PlayedListMaxLines { get; set; } = 2;
     public bool PlayedListShowNumbers { get; set; }
-    public string PlayedListNumberingStart { get; set; } = "bottom";
+    public string PlayedListNumberingStart { get; set; } = SpinnerSettingValues.PlayedListNumberingStarts.Default;
 }

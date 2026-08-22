@@ -90,10 +90,10 @@
                                 <div class="ss-field">
                                     <label for="streamerPlatform">Platform Identity</label>
                                     <InputSelect id="streamerPlatform" @bind-Value="_dto.StreamerPlatform">
-                                        <option value="twitch">Twitch</option>
-                                        <option value="youtube">YouTube</option>
-                                        <option value="kick">Kick</option>
-                                        <option value="none">StreamerSongList</option>
+                                        @foreach (var option in SettingsOptions.Platforms)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
                                     </InputSelect>
                                     <div class="ss-field-hint">Selects the public route used to resolve the StreamerSongList channel.</div>
                                 </div>
@@ -196,11 +196,10 @@
                                 <div class="ss-field">
                                     <label for="playHistoryPeriod">Play History Period</label>
                                     <InputSelect id="playHistoryPeriod" @bind-Value="_dto.PlayHistoryPeriod">
-                                        <option value="stream">Recent (API v2)</option>
-                                        <option value="day">Last 24 hours</option>
-                                        <option value="week">Last 7 days</option>
-                                        <option value="month">Last month</option>
-                                        <option value="all">All time</option>
+                                        @foreach (var option in SettingsOptions.PlayHistoryPeriods)
+                                        {
+                                            <option value="@option.Value">@option.Label</option>
+                                        }
                                     </InputSelect>
                                     <div class="ss-field-hint">This range supplies the played panel and, when enabled, the wheel exclusion filter.</div>
                                 </div>
@@ -251,16 +250,20 @@
                                         <InputSelect id="playedListNumberingStart"
                                                      @bind-Value="_dto.PlayedListNumberingStart"
                                                      disabled="@(!_dto.PlayedListShowNumbers)">
-                                            <option value="top">Top of list</option>
-                                            <option value="bottom">Bottom of list</option>
+                                            @foreach (var option in SettingsOptions.PlayedListNumberingStarts)
+                                            {
+                                                <option value="@option.Value">@option.Label</option>
+                                            }
                                         </InputSelect>
                                         <div class="ss-field-hint">The displayed history remains newest first.</div>
                                     </div>
                                     <div class="ss-field">
                                         <label for="playedListPosition">Panel Position</label>
                                         <InputSelect id="playedListPosition" @bind-Value="_dto.PlayedListPosition">
-                                            <option value="right">Right</option>
-                                            <option value="left">Left</option>
+                                            @foreach (var option in SettingsOptions.PlayedListPositions)
+                                            {
+                                                <option value="@option.Value">@option.Label</option>
+                                            }
                                         </InputSelect>
                                     </div>
                                     <div class="ss-field">
@@ -322,12 +325,10 @@
                                         <div class="ss-field">
                                             <label for="nowPlayingPosition">Screen Position</label>
                                             <InputSelect id="nowPlayingPosition" @bind-Value="_dto.NowPlayingPosition">
-                                                <option value="top-left">Top left</option>
-                                                <option value="top-center">Top center</option>
-                                                <option value="top-right">Top right</option>
-                                                <option value="bottom-left">Bottom left</option>
-                                                <option value="bottom-center">Bottom center</option>
-                                                <option value="bottom-right">Bottom right</option>
+                                                @foreach (var option in SettingsOptions.NowPlayingPositions)
+                                                {
+                                                    <option value="@option.Value">@option.Label</option>
+                                                }
                                             </InputSelect>
                                         </div>
                                         <div class="ss-field">
@@ -418,8 +419,10 @@
                                     <div class="ss-field">
                                         <label for="backgroundMode">Mode</label>
                                         <InputSelect id="backgroundMode" @bind-Value="_dto.BackgroundMode">
-                                            <option value="color">Solid color</option>
-                                            <option value="transparent">Transparent</option>
+                                            @foreach (var option in SettingsOptions.BackgroundModes)
+                                            {
+                                                <option value="@option.Value">@option.Label</option>
+                                            }
                                         </InputSelect>
                                         <div class="ss-field-hint">Transparent mode is intended for an OBS browser source.</div>
                                     </div>
