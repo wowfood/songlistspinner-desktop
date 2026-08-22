@@ -1,6 +1,6 @@
-using System.Globalization;
 using System.Text.Json;
 using SonglistSpinner.Core.Data;
+using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -22,6 +22,8 @@ public sealed class SettingsViewModel
     public int WinnerDialogDragOverIdx { get; set; } = -1;
     public string PlayedListBgHex { get; set; } = "#000000";
     public double PlayedListBgAlpha { get; set; } = 0.7;
+    public bool UseIndependentNowPlayingBgAlpha { get; set; }
+    public double NowPlayingBgAlpha { get; set; } = 0.7;
 
     public void Initialize(SettingsDto dto)
     {
@@ -38,6 +40,9 @@ public sealed class SettingsViewModel
         InitNowPlayingDisplayFields(dto.NowPlayingFields);
         InitWinnerDialogDisplayFields(dto.WinnerDialogFields, dto.SongListFields);
         InitPlayedListBg(dto.ColorPlayedListBackground);
+        UseIndependentNowPlayingBgAlpha = dto.NowPlayingBackgroundOpacity.HasValue;
+        NowPlayingBgAlpha = PanelBackgroundColor.ClampOpacity(
+            dto.NowPlayingBackgroundOpacity ?? PlayedListBgAlpha);
         dto.ColorPointer = NormalizeHexColor(dto.ColorPointer);
     }
 
@@ -134,40 +139,20 @@ public sealed class SettingsViewModel
 
     public void InitPlayedListBg(string value)
     {
-        if (value.Length > 6 &&
-            value.StartsWith("rgba(", StringComparison.OrdinalIgnoreCase) &&
-            value.EndsWith(')'))
-        {
-            var parts = value[5..^1].Split(',');
-            if (parts.Length == 4 &&
-                int.TryParse(parts[0].Trim(), out var r) &&
-                int.TryParse(parts[1].Trim(), out var g) &&
-                int.TryParse(parts[2].Trim(), out var b) &&
-                double.TryParse(parts[3].Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out var a) &&
-                r is >= 0 and <= 255 &&
-                g is >= 0 and <= 255 &&
-                b is >= 0 and <= 255 &&
-                a is >= 0 and <= 1)
-            {
-                PlayedListBgHex = $"#{r:X2}{g:X2}{b:X2}";
-                PlayedListBgAlpha = a;
-                return;
-            }
-        }
-
-        PlayedListBgHex = value.StartsWith('#') ? value[..Math.Min(7, value.Length)] : "#000000";
-        PlayedListBgAlpha = 1.0;
+        var color = PanelBackgroundColor.Parse(value);
+        PlayedListBgHex = color.Hex;
+        PlayedListBgAlpha = color.Opacity;
     }
 
     public string ComputedPlayedListBg()
     {
-        var hex = PlayedListBgHex.TrimStart('#');
-        if (hex.Length >= 6 &&
-            int.TryParse(hex[..2], NumberStyles.HexNumber, null, out var r) &&
-            int.TryParse(hex[2..4], NumberStyles.HexNumber, null, out var g) &&
-            int.TryParse(hex[4..6], NumberStyles.HexNumber, null, out var b))
-            return $"rgba({r},{g},{b},{PlayedListBgAlpha.ToString("F2", CultureInfo.InvariantCulture)})";
-        return PlayedListBgHex;
+        return new PanelBackgroundColor(PlayedListBgHex, PlayedListBgAlpha).ToCss();
+    }
+
+    public string ComputedNowPlayingBg()
+    {
+        var opacity = UseIndependentNowPlayingBgAlpha ? NowPlayingBgAlpha : PlayedListBgAlpha;
+        return new PanelBackgroundColor(PlayedListBgHex, opacity).ToCss();
     }
 
     public static string NormalizeHexColor(string color)
@@ -209,6 +194,9 @@ public sealed class SettingsViewModel
             winnerDialogFields.Length > 0 ? winnerDialogFields : new[] { "artist", "title", "requester" });
 
         dto.ColorPlayedListBackground = ComputedPlayedListBg();
+        dto.NowPlayingBackgroundOpacity = UseIndependentNowPlayingBgAlpha
+            ? PanelBackgroundColor.ClampOpacity(NowPlayingBgAlpha)
+            : null;
     }
 }
 

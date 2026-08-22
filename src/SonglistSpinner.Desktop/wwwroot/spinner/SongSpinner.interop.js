@@ -209,6 +209,7 @@ window.SpinnerInterop = (function () {
             r.style.setProperty('--app-text-color', colors.text || '')
             r.style.setProperty('--app-status-bg', colors.statusBackground || '')
             r.style.setProperty('--app-played-list-bg', colors.playedListBackground || '')
+            r.style.setProperty('--app-now-playing-bg', colors.nowPlayingBackground || colors.playedListBackground || '')
             r.style.setProperty('--app-played-item-bg', colors.playedItemBackground || '')
             r.style.setProperty('--app-resize-handle-bg', colors.resizeHandleBackground || '')
             r.style.setProperty('--app-resize-handle-hover-bg', colors.resizeHandleHoverBackground || '')

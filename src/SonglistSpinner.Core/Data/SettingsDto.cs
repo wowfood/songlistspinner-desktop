@@ -25,6 +25,7 @@ public class SettingsDto
     public string NowPlayingFontSize { get; set; } = "1.125rem";
     public string NowPlayingWidth { get; set; } = "28rem";
     public string NowPlayingPosition { get; set; } = "bottom-left";
+    public double? NowPlayingBackgroundOpacity { get; set; }
     public string? WinnerDialogFields { get; set; }
     public string WinnerDialogFontFamily { get; set; } = "sans-serif";
     public string WinnerDialogFontSize { get; set; } = "1rem";

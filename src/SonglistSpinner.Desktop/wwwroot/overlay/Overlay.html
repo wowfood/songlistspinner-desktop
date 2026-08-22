@@ -9,6 +9,7 @@
     --app-text-color: #ffffff;
     --app-status-bg: rgba(0, 0, 0, 0.7);
     --app-played-list-bg: rgba(0, 0, 0, 0.7);
+    --app-now-playing-bg: rgba(0, 0, 0, 0.7);
     --app-played-item-bg: #222222;
     --app-resize-handle-bg: #333;
     --app-resize-handle-hover-bg: #555;
@@ -224,7 +225,7 @@ button{
     max-width:calc(100vw - 2rem);
     padding:0.875rem 1rem;
     border-radius:0.5rem;
-    background:var(--app-played-list-bg);
+    background:var(--app-now-playing-bg);
     color:var(--app-text-color);
     box-shadow:0 0.25rem 1.25rem rgba(0, 0, 0, 0.35);
     text-align:left;
@@ -560,6 +561,7 @@ window.SpinnerInterop = (function () {
             r.style.setProperty('--app-text-color', colors.text || '')
             r.style.setProperty('--app-status-bg', colors.statusBackground || '')
             r.style.setProperty('--app-played-list-bg', colors.playedListBackground || '')
+            r.style.setProperty('--app-now-playing-bg', colors.nowPlayingBackground || colors.playedListBackground || '')
             r.style.setProperty('--app-played-item-bg', colors.playedItemBackground || '')
             r.style.setProperty('--app-resize-handle-bg', colors.resizeHandleBackground || '')
             r.style.setProperty('--app-resize-handle-hover-bg', colors.resizeHandleHoverBackground || '')

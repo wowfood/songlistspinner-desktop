@@ -764,6 +764,66 @@ h1:focus {
     border-color: #6441a5;
 }
 
+.ss-panel-background-swatch {
+    height: 2.4rem;
+    border: 1px solid #c9c1d2;
+    border-radius: 0.4rem;
+    overflow: hidden;
+    background-color: #fff;
+    background-image:
+        linear-gradient(45deg, #e3e3e3 25%, transparent 25%),
+        linear-gradient(-45deg, #e3e3e3 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #e3e3e3 75%),
+        linear-gradient(-45deg, transparent 75%, #e3e3e3 75%);
+    background-position: 0 0, 0 0.4rem, 0.4rem -0.4rem, -0.4rem 0;
+    background-size: 0.8rem 0.8rem;
+}
+
+.ss-panel-background-swatch span {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.ss-opacity-control {
+    display: grid;
+    gap: 0.35rem;
+    margin-top: 0.65rem;
+}
+
+.ss-opacity-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+}
+
+.ss-opacity-heading label {
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.ss-opacity-heading output {
+    min-width: 3rem;
+    color: #60418d;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    font-weight: 750;
+    text-align: right;
+}
+
+.ss-opacity-range {
+    width: 100%;
+    margin: 0;
+    accent-color: #6441a5;
+    cursor: pointer;
+}
+
+.ss-opacity-range:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
 /* Field hint text */
 .ss-field-hint {
     font-size: 0.8rem;

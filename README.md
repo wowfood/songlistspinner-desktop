@@ -292,7 +292,9 @@ When the Now Playing workflow is enabled, its panel additionally supports:
 - **Wheel Colors** accepts one CSS color per line and repeats the palette when
   the queue contains more songs than colors.
 - Color pickers configure text, wheel pointer, button background, button text,
-  played-panel background and opacity, and played-song backgrounds.
+  played-panel background, and played-song backgrounds. Played-panel opacity has
+  an explicit 0–100% control; Now Playing follows it by default or can use a
+  separate opacity.
 
 ### Advanced
 

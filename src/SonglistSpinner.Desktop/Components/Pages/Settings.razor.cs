@@ -128,11 +128,49 @@ public partial class Settings
 
     private MudColor ColorPlayedListBg
     {
-        get => _vm.PlayedListBgHex.ToMudColorWithAlpha(_vm.PlayedListBgAlpha);
+        get => _vm.PlayedListBgHex.ToMudColor();
         set
         {
             _vm.PlayedListBgHex = value.ToHexString();
-            _vm.PlayedListBgAlpha = value.A / 255.0;
+            QueuePreviewRefresh();
+        }
+    }
+
+    private int PlayedListOpacityPercent
+    {
+        get => (int)Math.Round(_vm.PlayedListBgAlpha * 100, MidpointRounding.AwayFromZero);
+        set
+        {
+            _vm.PlayedListBgAlpha = Math.Clamp(value, 0, 100) / 100.0;
+            QueuePreviewRefresh();
+        }
+    }
+
+    private bool UseIndependentNowPlayingOpacity
+    {
+        get => _vm.UseIndependentNowPlayingBgAlpha;
+        set
+        {
+            if (value && !_vm.UseIndependentNowPlayingBgAlpha)
+                _vm.NowPlayingBgAlpha = _vm.PlayedListBgAlpha;
+
+            _vm.UseIndependentNowPlayingBgAlpha = value;
+            QueuePreviewRefresh();
+        }
+    }
+
+    private int NowPlayingOpacityPercent
+    {
+        get
+        {
+            var opacity = _vm.UseIndependentNowPlayingBgAlpha
+                ? _vm.NowPlayingBgAlpha
+                : _vm.PlayedListBgAlpha;
+            return (int)Math.Round(opacity * 100, MidpointRounding.AwayFromZero);
+        }
+        set
+        {
+            _vm.NowPlayingBgAlpha = Math.Clamp(value, 0, 100) / 100.0;
             QueuePreviewRefresh();
         }
     }
@@ -580,6 +618,8 @@ public partial class Settings
             CaptureDisplayFields(_vm.WinnerDialogDisplayFields),
             _vm.PlayedListBgHex,
             _vm.PlayedListBgAlpha,
+            _vm.UseIndependentNowPlayingBgAlpha,
+            _vm.NowPlayingBgAlpha,
             _credentialKind,
             _credentialClientId,
             !string.IsNullOrWhiteSpace(_credentialToken),
@@ -602,6 +642,8 @@ public partial class Settings
         string WinnerDialogDisplayFields,
         string PlayedListBackground,
         double PlayedListBackgroundAlpha,
+        bool UseIndependentNowPlayingBackgroundAlpha,
+        double NowPlayingBackgroundAlpha,
         StreamerSongListCredentialKind CredentialKind,
         string CredentialClientId,
         bool CredentialTokenEdited,
