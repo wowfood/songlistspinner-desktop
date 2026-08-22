@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
 using Microsoft.JSInterop;
+using MudBlazor;
 using MudBlazor.Utilities;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
@@ -43,7 +44,7 @@ public partial class Settings
     private string? _credentialTestResult;
     private bool _credentialTestSucceeded;
     private string _credentialToken = "";
-    private bool _clearCredentialOnSave;
+    private bool _clearingCredential;
     private SettingsDto? _dto;
     private EditContext? _editContext;
     private StreamerSongListCredential? _existingCredential;
@@ -52,7 +53,9 @@ public partial class Settings
     private bool _allowNavigation;
     private CancellationTokenSource? _previewRefreshCts;
     private bool _previewReady;
-    private string? _savedFormState;
+    private bool _resetDialogOpen;
+    private string? _savedCredentialFormState;
+    private string? _savedSettingsFormState;
     private bool _testingCredential;
 
     private string PreviewUrl => $"{OverlayService.OverlayUrl}?preview=1";
@@ -67,9 +70,15 @@ public partial class Settings
         }
     }
 
-    private bool HasUnsavedChanges =>
-        _savedFormState is not null &&
-        !StringComparer.Ordinal.Equals(_savedFormState, CaptureFormState());
+    private bool HasUnsavedChanges => HasUnsavedSettingsChanges || HasUnsavedCredentialChanges;
+
+    private bool HasUnsavedSettingsChanges =>
+        _savedSettingsFormState is not null &&
+        !StringComparer.Ordinal.Equals(_savedSettingsFormState, CaptureSettingsFormState());
+
+    private bool HasUnsavedCredentialChanges =>
+        _savedCredentialFormState is not null &&
+        !StringComparer.Ordinal.Equals(_savedCredentialFormState, CaptureCredentialFormState());
 
     private MudColor ColorBackground
     {
@@ -188,10 +197,7 @@ public partial class Settings
 
     protected override async Task OnInitializedAsync()
     {
-        _dto = LocalSettings.LoadSettings();
-        _vm.Initialize(_dto);
-        _editContext = new EditContext(_dto);
-        _editContext.OnFieldChanged += OnSettingsFieldChanged;
+        ReplaceSettingsDraft(LocalSettings.LoadSettings());
         _existingCredential = await CredentialStore.GetCredentialAsync();
         if (_existingCredential is not null)
         {
@@ -200,7 +206,8 @@ public partial class Settings
             _hasCredential = true;
         }
 
-        _savedFormState = CaptureFormState();
+        _savedSettingsFormState = CaptureSettingsFormState();
+        _savedCredentialFormState = CaptureCredentialFormState();
     }
 
     public void Dispose()
@@ -419,34 +426,24 @@ public partial class Settings
             await OverlayService.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
 
             var submittedToken = _credentialToken.Trim();
-            if (_clearCredentialOnSave && string.IsNullOrWhiteSpace(submittedToken))
+            var token = string.IsNullOrWhiteSpace(submittedToken)
+                ? _existingCredential?.Token
+                : submittedToken;
+            if (!string.IsNullOrWhiteSpace(token))
             {
-                await CredentialStore.ClearCredentialAsync();
-                _existingCredential = null;
-                _clearCredentialOnSave = false;
-                _hasCredential = false;
-            }
-            else
-            {
-                var token = string.IsNullOrWhiteSpace(submittedToken)
-                    ? _existingCredential?.Token
-                    : submittedToken;
-                if (!string.IsNullOrWhiteSpace(token))
-                {
-                    var credential = new StreamerSongListCredential(
-                        _credentialKind,
-                        token,
-                        string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
-                    await CredentialStore.SaveCredentialAsync(credential);
-                    _existingCredential = credential;
-                    _credentialToken = "";
-                    _hasCredential = true;
-                    _clearCredentialOnSave = false;
-                }
+                var credential = new StreamerSongListCredential(
+                    _credentialKind,
+                    token,
+                    string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
+                await CredentialStore.SaveCredentialAsync(credential);
+                _existingCredential = credential;
+                _credentialToken = "";
+                _hasCredential = true;
             }
 
             _vm.SaveSuccess = true;
-            _savedFormState = CaptureFormState();
+            _savedSettingsFormState = CaptureSettingsFormState();
+            _savedCredentialFormState = CaptureCredentialFormState();
             return true;
         }
         catch (Exception ex)
@@ -456,15 +453,112 @@ public partial class Settings
         }
     }
 
-    private void ClearApiCredential()
+    private async Task ClearApiCredentialAsync()
     {
-        _credentialToken = "";
-        _credentialClientId = "";
-        _credentialKind = StreamerSongListCredentialKind.Streamer;
-        _clearCredentialOnSave = true;
-        _hasCredential = false;
-        _credentialTestResult = null;
-        _credentialTestSucceeded = false;
+        if (!_hasCredential || _clearingCredential) return;
+
+        _clearingCredential = true;
+        try
+        {
+            var confirmed = await DialogService.ShowMessageBoxAsync(
+                "Clear API credential?",
+                "This permanently removes the saved StreamerSongList API credential from secure storage. " +
+                "Your other settings and any unsaved settings draft will not be changed.",
+                yesText: "Clear credential",
+                cancelText: "Keep credential");
+
+            if (confirmed != true) return;
+
+            await CredentialStore.ClearCredentialAsync();
+            _existingCredential = null;
+            _credentialToken = "";
+            _credentialClientId = "";
+            _credentialKind = StreamerSongListCredentialKind.Streamer;
+            _hasCredential = false;
+            _credentialTestSucceeded = true;
+            _credentialTestResult = "API credential cleared. Other settings were not changed.";
+            _savedCredentialFormState = CaptureCredentialFormState();
+        }
+        catch (Exception ex)
+        {
+            _credentialTestSucceeded = false;
+            _credentialTestResult = $"The API credential could not be cleared: {ex.Message}";
+        }
+        finally
+        {
+            _clearingCredential = false;
+        }
+    }
+
+    private async Task ReviewSettingsResetAsync(SettingsResetScope scope)
+    {
+        if (_dto is null || _resetDialogOpen) return;
+
+        _vm.ApplyToDto(_dto);
+        var defaults = CreateDefaultSettingsDraft();
+        var scopeLabel = SettingsResetPlan.GetScopeLabel(scope);
+        var affectedFields = SettingsResetPlan.GetAffectedFields(_dto, defaults, scope);
+        if (affectedFields.Count == 0)
+        {
+            await DialogService.ShowMessageBoxAsync(
+                $"{scopeLabel} already uses defaults",
+                "No fields in this area differ from their shipped defaults. Nothing was changed, " +
+                "and the API credential was not inspected.",
+                yesText: "OK");
+            return;
+        }
+
+        _resetDialogOpen = true;
+        try
+        {
+            var parameters = new DialogParameters<ResetSettingsDialog>();
+            parameters.Add(dialog => dialog.Fields, affectedFields);
+            parameters.Add(dialog => dialog.ScopeLabel, scopeLabel);
+            var options = new DialogOptions
+            {
+                BackdropClick = false,
+                CloseButton = true,
+                CloseOnEscapeKey = true,
+                FullWidth = true,
+                MaxWidth = MaxWidth.Small
+            };
+            var dialog = await DialogService.ShowAsync<ResetSettingsDialog>(
+                $"Review {scopeLabel} reset",
+                parameters,
+                options);
+            var result = await dialog.Result;
+            if (result?.Canceled != false) return;
+
+            SettingsResetPlan.ApplyDefaults(_dto, defaults, scope);
+            ReplaceSettingsDraft(_dto);
+        }
+        finally
+        {
+            _resetDialogOpen = false;
+        }
+    }
+
+    private static SettingsDto CreateDefaultSettingsDraft()
+    {
+        var defaults = new SettingsDto();
+        var viewModel = new SettingsViewModel();
+        viewModel.Initialize(defaults);
+        viewModel.ApplyToDto(defaults);
+        return defaults;
+    }
+
+    private void ReplaceSettingsDraft(SettingsDto settings)
+    {
+        if (_editContext is not null)
+            _editContext.OnFieldChanged -= OnSettingsFieldChanged;
+
+        _dto = settings;
+        _vm.Initialize(_dto);
+        _editContext = new EditContext(_dto);
+        _editContext.OnFieldChanged += OnSettingsFieldChanged;
+        _vm.SaveSuccess = false;
+        _vm.SaveError = null;
+        QueuePreviewRefresh();
     }
 
     private void OpenSetupWizard()
@@ -563,8 +657,7 @@ public partial class Settings
         _credentialKind = credential?.Kind ?? StreamerSongListCredentialKind.Streamer;
         _credentialClientId = credential?.ClientId ?? "";
         _credentialToken = "";
-        _clearCredentialOnSave = false;
-        _savedFormState = CaptureFormState();
+        _savedCredentialFormState = CaptureCredentialFormState();
     }
 
     private async Task ConfirmNavigationAsync(LocationChangingContext context)
@@ -602,7 +695,7 @@ public partial class Settings
         }
     }
 
-    private string CaptureFormState()
+    private string CaptureSettingsFormState()
     {
         if (_dto is null) return "";
 
@@ -615,12 +708,15 @@ public partial class Settings
             _vm.PlayedListBgHex,
             _vm.PlayedListBgAlpha,
             _vm.UseIndependentNowPlayingBgAlpha,
-            _vm.NowPlayingBgAlpha,
+            _vm.NowPlayingBgAlpha));
+    }
+
+    private string CaptureCredentialFormState()
+    {
+        return JsonSerializer.Serialize(new CredentialFormSnapshot(
             _credentialKind,
             _credentialClientId,
-            !string.IsNullOrWhiteSpace(_credentialToken),
-            _hasCredential,
-            _clearCredentialOnSave));
+            !string.IsNullOrWhiteSpace(_credentialToken)));
     }
 
     private static string CaptureDisplayFields(IEnumerable<DisplayField> fields)
@@ -639,12 +735,12 @@ public partial class Settings
         string PlayedListBackground,
         double PlayedListBackgroundAlpha,
         bool UseIndependentNowPlayingBackgroundAlpha,
-        double NowPlayingBackgroundAlpha,
+        double NowPlayingBackgroundAlpha);
+
+    private sealed record CredentialFormSnapshot(
         StreamerSongListCredentialKind CredentialKind,
         string CredentialClientId,
-        bool CredentialTokenEdited,
-        bool HasCredential,
-        bool ClearCredentialOnSave);
+        bool CredentialTokenEdited);
 
     private enum SettingsSection
     {

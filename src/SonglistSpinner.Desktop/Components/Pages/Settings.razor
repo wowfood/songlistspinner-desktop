@@ -133,7 +133,11 @@
                                     @if (_hasCredential)
                                     {
                                         <span class="ss-auth-status ss-auth-ok">&#10003; API credential configured</span>
-                                        <button type="button" class="ss-btn-danger-subtle" @onclick="ClearApiCredential">Clear</button>
+                                        <button type="button" class="ss-btn-danger-subtle"
+                                                disabled="@_clearingCredential"
+                                                @onclick="ClearApiCredentialAsync">
+                                            @(_clearingCredential ? "Clearing..." : "Clear credential")
+                                        </button>
                                     }
                                     else
                                     {
@@ -214,7 +218,15 @@
                             </div>
 
                             <section class="ss-settings-section">
-                                <h3>Played Songs Panel</h3>
+                                <div class="ss-settings-section-title-row">
+                                    <h3>Played Songs Panel</h3>
+                                    <button type="button" class="ss-btn-reset-subset"
+                                            aria-label="Revert Played Songs Panel to default"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.PlayedSongsPanel))">
+                                        Revert to default
+                                    </button>
+                                </div>
                                 <div class="ss-field">
                                     <label>Display Fields</label>
                                     <div class="ss-field-multiselect">
@@ -289,7 +301,15 @@
                             <section class="ss-settings-section @(!_dto.DisplayNowPlaying ? "ss-settings-section-muted" : "")">
                                 <div class="ss-settings-section-title-row">
                                     <h3>Now Playing Panel</h3>
-                                    <span>@(_dto.DisplayNowPlaying ? "Enabled" : "Disabled")</span>
+                                    <div class="ss-settings-section-title-actions">
+                                        <span>@(_dto.DisplayNowPlaying ? "Enabled" : "Disabled")</span>
+                                        <button type="button" class="ss-btn-reset-subset"
+                                                aria-label="Revert Now Playing Panel to default"
+                                                disabled="@_resetDialogOpen"
+                                                @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.NowPlayingPanel))">
+                                            Revert to default
+                                        </button>
+                                    </div>
                                 </div>
                                 @if (!_dto.DisplayNowPlaying)
                                 {
@@ -354,7 +374,15 @@
                             </section>
 
                             <section class="ss-settings-section">
-                                <h3>Winner Dialog Settings</h3>
+                                <div class="ss-settings-section-title-row">
+                                    <h3>Winner Dialog Settings</h3>
+                                    <button type="button" class="ss-btn-reset-subset"
+                                            aria-label="Revert Winner Dialog Settings to default"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.WinnerDialog))">
+                                        Revert to default
+                                    </button>
+                                </div>
                                 <div class="ss-field">
                                     <label>Display Fields</label>
                                     <div class="ss-field-multiselect">
@@ -414,7 +442,15 @@
                             </div>
 
                             <section class="ss-settings-section">
-                                <h3>Background</h3>
+                                <div class="ss-settings-section-title-row">
+                                    <h3>Background</h3>
+                                    <button type="button" class="ss-btn-reset-subset"
+                                            aria-label="Revert Background to default"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.Background))">
+                                        Revert to default
+                                    </button>
+                                </div>
                                 <div class="ss-settings-field-grid">
                                     <div class="ss-field">
                                         <label for="backgroundMode">Mode</label>
@@ -437,7 +473,15 @@
                             </section>
 
                             <section class="ss-settings-section">
-                                <h3>Wheel Palette</h3>
+                                <div class="ss-settings-section-title-row">
+                                    <h3>Wheel Palette</h3>
+                                    <button type="button" class="ss-btn-reset-subset"
+                                            aria-label="Revert Wheel Palette to default"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.WheelPalette))">
+                                        Revert to default
+                                    </button>
+                                </div>
                                 <div class="ss-field">
                                     <label for="wheelColors">Wheel Colors</label>
                                     <InputTextArea id="wheelColors" @bind-Value="WheelColorsRaw" rows="6"/>
@@ -446,7 +490,15 @@
                             </section>
 
                             <section class="ss-settings-section">
-                                <h3>Overlay Colors</h3>
+                                <div class="ss-settings-section-title-row">
+                                    <h3>Overlay Colors</h3>
+                                    <button type="button" class="ss-btn-reset-subset"
+                                            aria-label="Revert Overlay Colors to default"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.OverlayColors))">
+                                        Revert to default
+                                    </button>
+                                </div>
                                 <div class="ss-color-grid">
                                     <div class="ss-field ss-field-row">
                                         <label>Text</label>
@@ -547,6 +599,24 @@
                                             Open log folder
                                         </button>
                                     </div>
+                                </div>
+                            </section>
+
+                            <section class="ss-settings-section">
+                                <h3>Settings Maintenance</h3>
+                                <p class="ss-settings-inline-notice">
+                                    Restore application settings to their original values. You will review every field
+                                    that differs before the draft is changed.
+                                </p>
+                                <div class="ss-settings-inline-actions">
+                                    <button type="button" class="ss-btn-danger-subtle ss-btn-reset-settings"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.All))">
+                                        Review reset all settings
+                                    </button>
+                                </div>
+                                <div class="ss-field-hint">
+                                    The API credential is excluded and can only be cleared from Connection.
                                 </div>
                             </section>
 
