@@ -12,6 +12,9 @@
     --app-played-list-font-family: sans-serif;
     --app-played-list-font-size: 0.875rem;
     --app-played-list-max-lines: 1;
+    --app-winner-dialog-font-family: sans-serif;
+    --app-winner-dialog-font-size: 1rem;
+    --app-winner-dialog-width: 36rem;
 }
 
 body.spinner-page {
@@ -522,33 +525,49 @@ input:checked + .slider:before {
 
 .winner-modal-content {
     position: relative;
-    width: min(90vw, 36rem);
+    width: min(90vw, var(--app-winner-dialog-width));
     margin: 10vh auto 0;
     padding: 1.5rem;
     border-radius: 0.75rem;
     background: rgba(24, 24, 24, 0.95);
     color: var(--app-text-color);
+    font-family: var(--app-winner-dialog-font-family);
+    font-size: var(--app-winner-dialog-font-size);
     box-shadow: 0 0 30px rgba(255, 225, 120, 0.35);
     text-align: center;
     overflow: hidden;
     animation: winner-pop 280ms ease-out;
 }
 
-.winner-main-line {
-    margin: 0.75rem 0 0.5rem;
-    font-size: 1.1rem;
+.winner-fields {
+    margin: 0.75rem 0 1rem;
+    font-size: 1em;
+}
+
+.winner-field-separator {
+    margin: 0 0.35em;
+    opacity: 0.7;
+}
+
+.winner-field-label {
     font-weight: 700;
 }
 
-.winner-details {
-    margin: 0 0 1rem;
-    font-size: 0.95rem;
-    opacity: 0.95;
+.winner-field-value {
+    margin-left: 0.25em;
+    font-weight: 400;
+}
+
+.winner-queue-position {
+    margin: -0.5rem 0 1rem;
+    font-size: 0.9em;
+    font-weight: 600;
+    opacity: 0.9;
 }
 
 .winner-action-prompt {
     margin: 0.75rem 0;
-    font-size: 0.9rem;
+    font-size: 0.9em;
     opacity: 0.9;
 }
 
@@ -566,7 +585,8 @@ input:checked + .slider:before {
     padding: 0.65rem 1rem;
     border: 2px solid transparent;
     border-radius: 0.4rem;
-    font-size: 0.95rem;
+    font-family: inherit;
+    font-size: 0.95em;
     font-weight: 700;
 }
 
@@ -591,7 +611,7 @@ input:checked + .slider:before {
     position: relative;
     z-index: 1;
     margin: 0.9rem 0 0;
-    font-size: 0.875rem;
+    font-size: 0.875em;
 }
 
 .winner-action-error {

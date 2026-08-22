@@ -257,6 +257,35 @@ public partial class Settings
         QueuePreviewRefresh();
     }
 
+    private void BeginWinnerDialogFieldDrag(int index)
+    {
+        _vm.WinnerDialogDragIdx = index;
+        _vm.WinnerDialogDragOverIdx = -1;
+    }
+
+    private void SetWinnerDialogFieldDragOver(int index)
+    {
+        if (_vm.WinnerDialogDragOverIdx != index) _vm.WinnerDialogDragOverIdx = index;
+    }
+
+    private void DropWinnerDialogField(int index)
+    {
+        _vm.DropWinnerDialogField(index);
+        QueuePreviewRefresh();
+    }
+
+    private void EndWinnerDialogFieldDrag()
+    {
+        _vm.WinnerDialogDragIdx = -1;
+        _vm.WinnerDialogDragOverIdx = -1;
+    }
+
+    private void ToggleWinnerDialogField(int index)
+    {
+        _vm.ToggleWinnerDialogField(index);
+        QueuePreviewRefresh();
+    }
+
     private async Task OnPreviewLoadedAsync()
     {
         _previewReady = true;
@@ -548,6 +577,7 @@ public partial class Settings
             _vm.WheelColorsRaw,
             CaptureDisplayFields(_vm.DisplayFields),
             CaptureDisplayFields(_vm.NowPlayingDisplayFields),
+            CaptureDisplayFields(_vm.WinnerDialogDisplayFields),
             _vm.PlayedListBgHex,
             _vm.PlayedListBgAlpha,
             _credentialKind,
@@ -569,6 +599,7 @@ public partial class Settings
         string WheelColors,
         string DisplayFields,
         string NowPlayingDisplayFields,
+        string WinnerDialogDisplayFields,
         string PlayedListBackground,
         double PlayedListBackgroundAlpha,
         StreamerSongListCredentialKind CredentialKind,

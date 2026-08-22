@@ -13,10 +13,13 @@ public sealed class SettingsViewModel
     public string? SaveError { get; set; }
     public List<DisplayField> DisplayFields { get; private set; } = new();
     public List<DisplayField> NowPlayingDisplayFields { get; private set; } = new();
+    public List<DisplayField> WinnerDialogDisplayFields { get; private set; } = new();
     public int DragIdx { get; set; } = -1;
     public int DragOverIdx { get; set; } = -1;
     public int NowPlayingDragIdx { get; set; } = -1;
     public int NowPlayingDragOverIdx { get; set; } = -1;
+    public int WinnerDialogDragIdx { get; set; } = -1;
+    public int WinnerDialogDragOverIdx { get; set; } = -1;
     public string PlayedListBgHex { get; set; } = "#000000";
     public double PlayedListBgAlpha { get; set; } = 0.7;
 
@@ -33,6 +36,7 @@ public sealed class SettingsViewModel
 
         InitDisplayFields(dto.SongListFields);
         InitNowPlayingDisplayFields(dto.NowPlayingFields);
+        InitWinnerDialogDisplayFields(dto.WinnerDialogFields, dto.SongListFields);
         InitPlayedListBg(dto.ColorPlayedListBackground);
         dto.ColorPointer = NormalizeHexColor(dto.ColorPointer);
     }
@@ -47,16 +51,30 @@ public sealed class SettingsViewModel
         NowPlayingDisplayFields = BuildDisplayFields(json);
     }
 
-    private static List<DisplayField> BuildDisplayFields(string json)
+    public void InitWinnerDialogDisplayFields(string? json, string legacySongListFields)
     {
+        if (!string.IsNullOrWhiteSpace(json))
+        {
+            WinnerDialogDisplayFields = BuildDisplayFields(json, ["artist", "title", "requester"]);
+            return;
+        }
+
+        WinnerDialogDisplayFields = BuildDisplayFields(legacySongListFields);
+        var requester = WinnerDialogDisplayFields.First(field => field.Name == "requester");
+        requester.Selected = true;
+    }
+
+    private static List<DisplayField> BuildDisplayFields(string json, string[]? fallback = null)
+    {
+        fallback ??= ["artist", "title"];
         string[] selected;
         try
         {
-            selected = JsonSerializer.Deserialize<string[]>(json) ?? [];
+            selected = JsonSerializer.Deserialize<string[]>(json) ?? fallback;
         }
         catch
         {
-            selected = ["artist", "title"];
+            selected = fallback;
         }
 
         return selected
@@ -74,6 +92,11 @@ public sealed class SettingsViewModel
     public void ToggleNowPlayingField(int idx)
     {
         NowPlayingDisplayFields[idx].Selected = !NowPlayingDisplayFields[idx].Selected;
+    }
+
+    public void ToggleWinnerDialogField(int idx)
+    {
+        WinnerDialogDisplayFields[idx].Selected = !WinnerDialogDisplayFields[idx].Selected;
     }
 
     public void DropField(int targetIdx)
@@ -96,6 +119,17 @@ public sealed class SettingsViewModel
         NowPlayingDisplayFields.Insert(insertIdx, item);
         NowPlayingDragIdx = -1;
         NowPlayingDragOverIdx = -1;
+    }
+
+    public void DropWinnerDialogField(int targetIdx)
+    {
+        if (WinnerDialogDragIdx < 0 || WinnerDialogDragIdx == targetIdx) return;
+        var item = WinnerDialogDisplayFields[WinnerDialogDragIdx];
+        WinnerDialogDisplayFields.RemoveAt(WinnerDialogDragIdx);
+        var insertIdx = WinnerDialogDragIdx < targetIdx ? targetIdx - 1 : targetIdx;
+        WinnerDialogDisplayFields.Insert(insertIdx, item);
+        WinnerDialogDragIdx = -1;
+        WinnerDialogDragOverIdx = -1;
     }
 
     public void InitPlayedListBg(string value)
@@ -169,6 +203,10 @@ public sealed class SettingsViewModel
         var nowPlayingFields = NowPlayingDisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
         dto.NowPlayingFields = JsonSerializer.Serialize(
             nowPlayingFields.Length > 0 ? nowPlayingFields : new[] { "artist", "title" });
+
+        var winnerDialogFields = WinnerDialogDisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
+        dto.WinnerDialogFields = JsonSerializer.Serialize(
+            winnerDialogFields.Length > 0 ? winnerDialogFields : new[] { "artist", "title", "requester" });
 
         dto.ColorPlayedListBackground = ComputedPlayedListBg();
     }

@@ -60,11 +60,32 @@ public static class SpinnerDataService
 
     public static string[] GetWinnerFields(SpinnerConfig config)
     {
-        var fields = (config.SongList.Fields is { Length: > 0 } f ? f : (string[])["artist", "title"])
-            .Select(x => x.ToLowerInvariant())
-            .ToList();
-        if (!fields.Contains("requester")) fields.Add("requester");
-        return [.. fields];
+        var fields = config.WinnerDialog.Fields
+            .Where(field => !string.IsNullOrWhiteSpace(field))
+            .Select(field => field.ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        return fields.Length > 0 ? fields : ["artist", "title", "requester"];
+    }
+
+    public static WinnerDialogField[] CreateWinnerDialogFields(
+        SpinnerQueueItem song,
+        SpinnerConfig config)
+    {
+        return GetWinnerFields(config)
+            .Select(field => (field, value: GetSongFieldValue(song, field)))
+            .Where(item => !string.IsNullOrEmpty(item.value))
+            .Select(item => new WinnerDialogField(
+                $"{char.ToUpperInvariant(item.field[0])}{item.field[1..]}",
+                item.value))
+            .ToArray();
+    }
+
+    public static int? FindQueuePosition(IEnumerable<SpinnerQueueItem> queue, int queueId)
+    {
+        if (queueId <= 0) return null;
+        var item = queue.FirstOrDefault(candidate => candidate.QueueId == queueId);
+        return item is { Position: > 0 } ? item.Position : null;
     }
 
     public static string CreatePlayedSongText(PlayHistoryItem item, SpinnerConfig config)

@@ -19,6 +19,9 @@
     --app-played-list-font-family: sans-serif;
     --app-played-list-font-size: 0.875rem;
     --app-played-list-max-lines: 2;
+    --app-winner-dialog-font-family: sans-serif;
+    --app-winner-dialog-font-size: 1rem;
+    --app-winner-dialog-width: 36rem;
 }
 html, body {
     height: 100%;
@@ -282,26 +285,39 @@ button{
 }
 .winner-modal-content{
     position:relative;
-    width:min(90vw, 36rem);
+    width:min(90vw, var(--app-winner-dialog-width));
     margin:10vh auto 0;
     padding:1.5rem;
     border-radius:0.75rem;
     background:rgba(24, 24, 24, 0.95);
     color:var(--app-text-color);
+    font-family:var(--app-winner-dialog-font-family);
+    font-size:var(--app-winner-dialog-font-size);
     box-shadow:0 0 30px rgba(255, 225, 120, 0.35);
     text-align:center;
     overflow:hidden;
     animation:winner-pop 280ms ease-out;
 }
-.winner-main-line{
-    margin:0.75rem 0 0.5rem;
-    font-size:1.1rem;
+.winner-fields{
+    margin:0.75rem 0 1rem;
+    font-size:1em;
+}
+.winner-field-separator{
+    margin:0 0.35em;
+    opacity:0.7;
+}
+.winner-field-label{
     font-weight:700;
 }
-.winner-details{
-    margin:0 0 1rem;
-    font-size:0.95rem;
-    opacity:0.95;
+.winner-field-value{
+    margin-left:0.25em;
+    font-weight:400;
+}
+.winner-queue-position{
+    margin:-0.5rem 0 1rem;
+    font-size:0.9em;
+    font-weight:600;
+    opacity:0.9;
 }
 .winner-confetti{
     position:absolute;
@@ -428,8 +444,10 @@ button{
     <div class="winner-modal-content" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
         <div id="winnerConfetti" class="winner-confetti"></div>
         <h2 id="winnerTitle">Winner</h2>
-        <p id="winnerMainLine" class="winner-main-line"></p>
-        <p id="winnerDetails" class="winner-details"></p>
+        <p id="winnerFields" class="winner-fields" hidden></p>
+        <p id="winnerQueuePosition" class="winner-queue-position" hidden>
+            Queue position: <strong id="winnerQueuePositionValue"></strong>
+        </p>
     </div>
 </div>
 
@@ -536,7 +554,7 @@ window.SpinnerInterop = (function () {
             }).observe(container)
         },
 
-        applyTheme(colors, playedList) {
+        applyTheme(colors, playedList, winnerDialog) {
             const r = document.documentElement
             if (!colors) return
             r.style.setProperty('--app-text-color', colors.text || '')
@@ -553,6 +571,11 @@ window.SpinnerInterop = (function () {
                 r.style.setProperty('--app-played-list-font-family', playedList.fontFamily || '')
                 r.style.setProperty('--app-played-list-font-size', playedList.fontSize || '')
                 r.style.setProperty('--app-played-list-max-lines', playedList.maxLines ?? '')
+            }
+            if (winnerDialog) {
+                r.style.setProperty('--app-winner-dialog-font-family', winnerDialog.fontFamily || '')
+                r.style.setProperty('--app-winner-dialog-font-size', winnerDialog.fontSize || '')
+                r.style.setProperty('--app-winner-dialog-width', winnerDialog.width || '')
             }
         },
 
@@ -679,12 +702,41 @@ function connectSSE() {
             winnerIndex = resolvedIndex
         }
         SpinnerInterop.spinToItem(winnerIndex, data.duration)
-        setTimeout(() => {
-            document.getElementById('winnerMainLine').textContent = data.mainLine
-            document.getElementById('winnerDetails').textContent = data.details
-            document.getElementById('winnerModal').style.display = 'block'
-            if (_overlayState.config) SpinnerInterop.runConfetti(_overlayState.config.wheelColors)
-        }, data.duration + 100)
+    })
+
+    es.addEventListener('winner_reveal', e => {
+        const data = JSON.parse(e.data)
+        const queuePosition = Number(data.queuePosition)
+        const hasQueuePosition = Number.isInteger(queuePosition) && queuePosition > 0
+        const queuePositionElement = document.getElementById('winnerQueuePosition')
+        const fieldsElement = document.getElementById('winnerFields')
+        const fields = Array.isArray(data.fields)
+            ? data.fields.filter(field => field && field.label && field.value)
+            : []
+        fieldsElement.replaceChildren()
+        fields.forEach((field, index) => {
+            if (index > 0) {
+                const separator = document.createElement('span')
+                separator.className = 'winner-field-separator'
+                separator.setAttribute('aria-hidden', 'true')
+                separator.textContent = '|'
+                fieldsElement.appendChild(separator)
+            }
+            const label = document.createElement('strong')
+            label.className = 'winner-field-label'
+            label.textContent = field.label
+            const value = document.createElement('span')
+            value.className = 'winner-field-value'
+            value.textContent = field.value
+            fieldsElement.append(label, value)
+        })
+        fieldsElement.hidden = fields.length === 0
+        document.getElementById('winnerQueuePositionValue').textContent = hasQueuePosition
+            ? `#${queuePosition}`
+            : ''
+        queuePositionElement.hidden = !hasQueuePosition
+        document.getElementById('winnerModal').style.display = 'block'
+        if (_overlayState.config) SpinnerInterop.runConfetti(_overlayState.config.wheelColors)
     })
 
     es.addEventListener('close_winner', () => {
@@ -716,7 +768,7 @@ function connectSSE() {
 function updateSongs(data) {
     if (data.config) {
         _overlayState.config = data.config
-        SpinnerInterop.applyTheme(data.config.colors, data.config.playedList)
+        SpinnerInterop.applyTheme(data.config.colors, data.config.playedList, data.config.winnerDialog)
         SpinnerInterop.applyBackground(data.config.background)
         SpinnerInterop.applyPlayedListPosition(
             data.config.songList && data.config.songList.playedListPosition)

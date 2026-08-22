@@ -61,6 +61,23 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
             nowPlayingFields = ["artist", "title"];
         }
 
+        var legacyWinnerFields = (fields.Length > 0 ? fields : ["artist", "title"])
+            .Select(field => field.ToLowerInvariant())
+            .Append("requester")
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        string[] winnerDialogFields;
+        try
+        {
+            winnerDialogFields = string.IsNullOrWhiteSpace(dto.WinnerDialogFields)
+                ? legacyWinnerFields
+                : JsonSerializer.Deserialize<string[]>(dto.WinnerDialogFields, JsonOpts) ?? legacyWinnerFields;
+        }
+        catch
+        {
+            winnerDialogFields = legacyWinnerFields;
+        }
+
         return new SpinnerConfig
         {
             Debug = dto.DebugMode,
@@ -98,6 +115,14 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
                 FontSize = dto.NowPlayingFontSize,
                 Width = dto.NowPlayingWidth,
                 Position = dto.NowPlayingPosition
+            },
+            WinnerDialog = new SpinnerWinnerDialogConfig
+            {
+                Fields = winnerDialogFields,
+                FontFamily = dto.WinnerDialogFontFamily,
+                FontSize = dto.WinnerDialogFontSize,
+                Width = dto.WinnerDialogWidth,
+                ShowQueuePosition = dto.WinnerDialogShowQueuePosition
             },
             Colors = new SpinnerColors
             {

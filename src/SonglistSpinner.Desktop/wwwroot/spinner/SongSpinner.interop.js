@@ -203,7 +203,7 @@ window.SpinnerInterop = (function () {
             _resizeTimeout = null
         },
 
-        applyTheme(colors, playedList) {
+        applyTheme(colors, playedList, winnerDialog) {
             const r = document.documentElement
             if (!colors) return
             r.style.setProperty('--app-text-color', colors.text || '')
@@ -220,6 +220,11 @@ window.SpinnerInterop = (function () {
                 r.style.setProperty('--app-played-list-font-family', playedList.fontFamily || '')
                 r.style.setProperty('--app-played-list-font-size', playedList.fontSize || '')
                 r.style.setProperty('--app-played-list-max-lines', playedList.maxLines ?? '')
+            }
+            if (winnerDialog) {
+                r.style.setProperty('--app-winner-dialog-font-family', winnerDialog.fontFamily || '')
+                r.style.setProperty('--app-winner-dialog-font-size', winnerDialog.fontSize || '')
+                r.style.setProperty('--app-winner-dialog-width', winnerDialog.width || '')
             }
         },
 
