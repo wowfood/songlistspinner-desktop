@@ -88,7 +88,8 @@ public partial class Dashboard
             _nowPlaying,
             _config.NowPlaying?.Fields is { Length: > 0 } fields
                 ? fields
-                : SongFieldNames.CreateDefaultSelection());
+                : SongFieldNames.CreateDefaultSelection(),
+            _config.NowPlaying?.Separator);
     private string ApiEnvironmentLabel => GetApiEnvironment().label;
     private string ApiEnvironmentClass => GetApiEnvironment().cssClass;
     private string OverlayHealthClass => _overlayHealth.ServerState switch

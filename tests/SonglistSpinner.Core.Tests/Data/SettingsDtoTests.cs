@@ -17,6 +17,8 @@ public class SettingsDtoTests
         Assert.Equal(
             SpinnerSettingValues.PlayedListNumberingStarts.Bottom,
             settings.PlayedListNumberingStart);
+        Assert.Equal(SongTextFormatting.DefaultSeparator, settings.PlayedListSeparator);
+        Assert.Equal(SongTextFormatting.DefaultSeparator, settings.NowPlayingSeparator);
     }
 
     [Fact]
@@ -32,6 +34,12 @@ public class SettingsDtoTests
         Assert.Equal("bottom-left", root.GetProperty(nameof(SettingsDto.NowPlayingPosition)).GetString());
         Assert.Equal("bottom", root.GetProperty(nameof(SettingsDto.PlayedListNumberingStart)).GetString());
         Assert.Equal(SongFieldNames.DefaultJson, root.GetProperty(nameof(SettingsDto.SongListFields)).GetString());
+        Assert.Equal(
+            SongTextFormatting.DefaultSeparator,
+            root.GetProperty(nameof(SettingsDto.PlayedListSeparator)).GetString());
+        Assert.Equal(
+            SongTextFormatting.DefaultSeparator,
+            root.GetProperty(nameof(SettingsDto.NowPlayingSeparator)).GetString());
     }
 
     [Fact]
@@ -86,5 +94,20 @@ public class SettingsDtoTests
         SettingsDtoNormalizer.Normalize(settings);
 
         Assert.Null(settings.WinnerDialogFields);
+    }
+
+    [Fact]
+    public void Given_BlankAndCustomSeparators_When_Normalized_Then_DefaultsOrPreservesExactValue()
+    {
+        var settings = new SettingsDto
+        {
+            PlayedListSeparator = "   ",
+            NowPlayingSeparator = " • "
+        };
+
+        SettingsDtoNormalizer.Normalize(settings);
+
+        Assert.Equal(SongTextFormatting.DefaultSeparator, settings.PlayedListSeparator);
+        Assert.Equal(" • ", settings.NowPlayingSeparator);
     }
 }

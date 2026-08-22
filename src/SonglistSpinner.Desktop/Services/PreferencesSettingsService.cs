@@ -83,12 +83,14 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
                 MaxLines = dto.PlayedListMaxLines,
                 ShowNumbers = dto.PlayedListShowNumbers,
                 NumberingStart = SpinnerSettingValues.PlayedListNumberingStarts.NormalizeOrDefault(
-                    dto.PlayedListNumberingStart)
+                    dto.PlayedListNumberingStart),
+                Separator = dto.PlayedListSeparator
             },
             NowPlaying = new SpinnerNowPlayingConfig
             {
                 Enabled = dto.DisplayNowPlaying,
                 Fields = nowPlayingFields,
+                Separator = dto.NowPlayingSeparator,
                 FontFamily = dto.NowPlayingFontFamily,
                 FontSize = dto.NowPlayingFontSize,
                 Width = dto.NowPlayingWidth,

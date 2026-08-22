@@ -19,6 +19,8 @@ public static class SettingsDtoNormalizer
             SpinnerSettingValues.NowPlayingPositions.NormalizeOrDefault(settings.NowPlayingPosition);
         settings.PlayedListNumberingStart =
             SpinnerSettingValues.PlayedListNumberingStarts.NormalizeOrDefault(settings.PlayedListNumberingStart);
+        settings.PlayedListSeparator = SongTextFormatting.NormalizeSeparator(settings.PlayedListSeparator);
+        settings.NowPlayingSeparator = SongTextFormatting.NormalizeSeparator(settings.NowPlayingSeparator);
 
         var songListFields = ParseFields(settings.SongListFields);
         settings.SongListFields = JsonSerializer.Serialize(songListFields);

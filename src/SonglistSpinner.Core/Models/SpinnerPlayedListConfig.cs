@@ -7,4 +7,5 @@ public class SpinnerPlayedListConfig
     public int MaxLines { get; set; } = 2;
     public bool ShowNumbers { get; set; }
     public string NumberingStart { get; set; } = SpinnerSettingValues.PlayedListNumberingStarts.Default;
+    public string Separator { get; set; } = SongTextFormatting.DefaultSeparator;
 }
