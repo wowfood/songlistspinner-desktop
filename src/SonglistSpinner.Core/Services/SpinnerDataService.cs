@@ -58,6 +58,13 @@ public static class SpinnerDataService
         return CreateSongTextForFields(song, fields);
     }
 
+    public static string[] CreatePlayedSongTexts(
+        IReadOnlyList<SpinnerQueueItem> songs,
+        SpinnerConfig config)
+    {
+        return CreatePlayedSongTexts(songs, config, song => CreatePlayedSongText(song, config));
+    }
+
     public static string[] GetWinnerFields(SpinnerConfig config)
     {
         var fields = config.WinnerDialog.Fields
@@ -97,6 +104,33 @@ public static class SpinnerDataService
             .Where(x => !string.IsNullOrEmpty(x.value))
             .Select(x => $"{char.ToUpperInvariant(x.field[0])}{x.field[1..]}: {x.value}");
         return string.Join(" | ", parts);
+    }
+
+    public static string[] CreatePlayedSongTexts(
+        IReadOnlyList<PlayHistoryItem> songs,
+        SpinnerConfig config)
+    {
+        return CreatePlayedSongTexts(songs, config, song => CreatePlayedSongText(song, config));
+    }
+
+    private static string[] CreatePlayedSongTexts<T>(
+        IReadOnlyList<T> songs,
+        SpinnerConfig config,
+        Func<T, string> createText)
+    {
+        if (!config.PlayedList.ShowNumbers) return songs.Select(createText).ToArray();
+
+        var startsAtTop = string.Equals(
+            config.PlayedList.NumberingStart,
+            SpinnerPlayedListConfig.NumberingStartTop,
+            StringComparison.OrdinalIgnoreCase);
+        return songs
+            .Select((song, index) =>
+            {
+                var number = startsAtTop ? index + 1 : songs.Count - index;
+                return $"{number}. {createText(song)}";
+            })
+            .ToArray();
     }
 
     private static string GetHistoryFieldValue(PlayHistoryItem item, string field)

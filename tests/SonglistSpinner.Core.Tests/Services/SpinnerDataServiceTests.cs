@@ -43,7 +43,9 @@ public class SpinnerDataServiceTests
     private static SpinnerConfig Cfg(
         string[]? fields = null,
         bool exclude = true,
-        string[]? winnerFields = null)
+        string[]? winnerFields = null,
+        bool showNumbers = false,
+        string numberingStart = SpinnerPlayedListConfig.NumberingStartBottom)
     {
         return new SpinnerConfig
         {
@@ -51,6 +53,11 @@ public class SpinnerDataServiceTests
             {
                 Fields = fields ?? ["artist", "title"],
                 ExcludePlayedSongs = exclude
+            },
+            PlayedList = new SpinnerPlayedListConfig
+            {
+                ShowNumbers = showNumbers,
+                NumberingStart = numberingStart
             },
             WinnerDialog = new SpinnerWinnerDialogConfig
             {
@@ -425,6 +432,79 @@ public class SpinnerDataServiceTests
         var h = new PlayHistoryItem { Song = null };
         var result = SpinnerDataService.CreatePlayedSongText(h, Cfg(["artist", "title"]));
         Assert.Equal("Artist: Unknown | Title: Unknown", result);
+    }
+
+    // ── CreatePlayedSongTexts ────────────────────────────────────────────────
+
+    [Fact]
+    public void Given_NumberingDisabled_When_CreatePlayedSongTexts_Then_ReturnsUnnumberedText()
+    {
+        PlayHistoryItem[] songs = [H(title: "Newest"), H(title: "Oldest")];
+
+        var result = SpinnerDataService.CreatePlayedSongTexts(songs, Cfg(["title"]));
+
+        Assert.Equal(["Title: Newest", "Title: Oldest"], result);
+    }
+
+    [Fact]
+    public void Given_NumberingStartsAtTop_When_CreatePlayedSongTexts_Then_NumbersInDisplayOrder()
+    {
+        PlayHistoryItem[] songs = [H(title: "Newest"), H(title: "Middle"), H(title: "Oldest")];
+        var config = Cfg(
+            ["title"],
+            showNumbers: true,
+            numberingStart: SpinnerPlayedListConfig.NumberingStartTop);
+
+        var result = SpinnerDataService.CreatePlayedSongTexts(songs, config);
+
+        Assert.Equal(["1. Title: Newest", "2. Title: Middle", "3. Title: Oldest"], result);
+    }
+
+    [Theory]
+    [InlineData(SpinnerPlayedListConfig.NumberingStartBottom)]
+    [InlineData("invalid")]
+    public void Given_NumberingDoesNotStartAtTop_When_CreatePlayedSongTexts_Then_OldestIsOne(
+        string numberingStart)
+    {
+        PlayHistoryItem[] songs = [H(title: "Newest"), H(title: "Middle"), H(title: "Oldest")];
+        var config = Cfg(["title"], showNumbers: true, numberingStart: numberingStart);
+
+        var result = SpinnerDataService.CreatePlayedSongTexts(songs, config);
+
+        Assert.Equal(["3. Title: Newest", "2. Title: Middle", "1. Title: Oldest"], result);
+    }
+
+    [Fact]
+    public void Given_EmptyHistory_When_CreatePlayedSongTexts_Then_ReturnsEmptyArray()
+    {
+        var result = SpinnerDataService.CreatePlayedSongTexts(
+            Array.Empty<PlayHistoryItem>(),
+            Cfg(showNumbers: true));
+
+        Assert.Empty(result);
+    }
+
+    [Fact]
+    public void Given_SingleItem_When_CreatePlayedSongTexts_Then_NumberIsOne()
+    {
+        var result = SpinnerDataService.CreatePlayedSongTexts(
+            new[] { H(title: "Only") },
+            Cfg(["title"], showNumbers: true));
+
+        Assert.Equal(["1. Title: Only"], result);
+    }
+
+    [Fact]
+    public void Given_EquivalentQueueAndHistoryItems_When_Numbered_Then_PreviewAndHistoryTextMatch()
+    {
+        SpinnerQueueItem[] queueSongs = [Q(title: "Newest"), Q(title: "Oldest")];
+        PlayHistoryItem[] historySongs = [H(title: "Newest"), H(title: "Oldest")];
+        var config = Cfg(["title"], showNumbers: true);
+
+        var previewResult = SpinnerDataService.CreatePlayedSongTexts(queueSongs, config);
+        var historyResult = SpinnerDataService.CreatePlayedSongTexts(historySongs, config);
+
+        Assert.Equal(historyResult, previewResult);
     }
 
     // ── GetWinnerFields ──────────────────────────────────────────────────────

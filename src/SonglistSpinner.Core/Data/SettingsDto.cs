@@ -45,4 +45,6 @@ public class SettingsDto
     public string PlayedListFontFamily { get; set; } = "sans-serif";
     public string PlayedListFontSize { get; set; } = "0.875rem";
     public int PlayedListMaxLines { get; set; } = 2;
+    public bool PlayedListShowNumbers { get; set; }
+    public string PlayedListNumberingStart { get; set; } = "bottom";
 }

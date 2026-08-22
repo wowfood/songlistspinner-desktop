@@ -240,6 +240,23 @@
                                 </div>
                                 <div class="ss-settings-field-grid">
                                     <div class="ss-field">
+                                        <label class="ss-checkbox-label">
+                                            <InputCheckbox @bind-Value="_dto.PlayedListShowNumbers"/>
+                                            Show sequence numbers
+                                        </label>
+                                        <div class="ss-field-hint">Prefixes each displayed song with a number.</div>
+                                    </div>
+                                    <div class="ss-field">
+                                        <label for="playedListNumberingStart">Numbering Starts At</label>
+                                        <InputSelect id="playedListNumberingStart"
+                                                     @bind-Value="_dto.PlayedListNumberingStart"
+                                                     disabled="@(!_dto.PlayedListShowNumbers)">
+                                            <option value="top">Top of list</option>
+                                            <option value="bottom">Bottom of list</option>
+                                        </InputSelect>
+                                        <div class="ss-field-hint">The displayed history remains newest first.</div>
+                                    </div>
+                                    <div class="ss-field">
                                         <label for="playedListPosition">Panel Position</label>
                                         <InputSelect id="playedListPosition" @bind-Value="_dto.PlayedListPosition">
                                             <option value="right">Right</option>

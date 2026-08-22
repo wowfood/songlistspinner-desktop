@@ -374,7 +374,7 @@ public partial class Settings
                     ? "your-channel"
                     : previewDto.DefaultStreamerName.Trim(),
                 wheelItems = PreviewSongs.Select(song => new { label = SpinnerDataService.BuildWheelLabel(song) }),
-                playedTexts = PreviewSongs.Take(3).Select(song => SpinnerDataService.CreatePlayedSongText(song, config)),
+                playedTexts = SpinnerDataService.CreatePlayedSongTexts(PreviewSongs.Take(3).ToArray(), config),
                 nowPlayingText = SpinnerDataService.CreateSongTextForFields(PreviewSongs[3], nowPlayingFields),
                 playedCount = 3,
                 availableCount = PreviewSongs.Length

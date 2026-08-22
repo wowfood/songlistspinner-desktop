@@ -106,11 +106,11 @@
                     <h3>Queued Songs: <span id="availableCount">@_availableSongs.Count</span></h3>
                 </div>
                 <ul id="playedSongsUl">
-                    @foreach (var song in _playedSongs)
+                    @foreach (var text in SpinnerDataService.CreatePlayedSongTexts(_playedSongs, _config))
                     {
                         <li>
                             <span class="played-song-text">
-                                @SpinnerDataService.CreatePlayedSongText(song, _config ?? new SpinnerConfig())
+                                @text
                             </span>
                         </li>
                     }

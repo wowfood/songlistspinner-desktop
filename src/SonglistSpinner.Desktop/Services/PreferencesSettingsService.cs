@@ -105,7 +105,14 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
             {
                 FontFamily = dto.PlayedListFontFamily,
                 FontSize = dto.PlayedListFontSize,
-                MaxLines = dto.PlayedListMaxLines
+                MaxLines = dto.PlayedListMaxLines,
+                ShowNumbers = dto.PlayedListShowNumbers,
+                NumberingStart = string.Equals(
+                    dto.PlayedListNumberingStart,
+                    SpinnerPlayedListConfig.NumberingStartTop,
+                    StringComparison.OrdinalIgnoreCase)
+                    ? SpinnerPlayedListConfig.NumberingStartTop
+                    : SpinnerPlayedListConfig.NumberingStartBottom
             },
             NowPlaying = new SpinnerNowPlayingConfig
             {
