@@ -133,7 +133,11 @@
                                     @if (_hasCredential)
                                     {
                                         <span class="ss-auth-status ss-auth-ok">&#10003; API credential configured</span>
-                                        <button type="button" class="ss-btn-danger-subtle" @onclick="ClearApiCredential">Clear</button>
+                                        <button type="button" class="ss-btn-danger-subtle"
+                                                disabled="@_clearingCredential"
+                                                @onclick="ClearApiCredentialAsync">
+                                            @(_clearingCredential ? "Clearing..." : "Clear credential")
+                                        </button>
                                     }
                                     else
                                     {
@@ -547,6 +551,24 @@
                                             Open log folder
                                         </button>
                                     </div>
+                                </div>
+                            </section>
+
+                            <section class="ss-settings-section">
+                                <h3>Settings Maintenance</h3>
+                                <p class="ss-settings-inline-notice">
+                                    Restore application settings to their original values. You will review every field
+                                    that differs before the draft is changed.
+                                </p>
+                                <div class="ss-settings-inline-actions">
+                                    <button type="button" class="ss-btn-danger-subtle ss-btn-reset-settings"
+                                            disabled="@_resetDialogOpen"
+                                            @onclick="ReviewSettingsResetAsync">
+                                        Review reset to defaults
+                                    </button>
+                                </div>
+                                <div class="ss-field-hint">
+                                    The API credential is excluded and can only be cleared from Connection.
                                 </div>
                             </section>
 

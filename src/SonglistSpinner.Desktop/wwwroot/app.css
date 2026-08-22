@@ -1124,6 +1124,51 @@ h1:focus {
     cursor: pointer;
 }
 
+.ss-btn-danger-subtle:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.ss-btn-reset-settings {
+    margin-top: 0.9rem;
+    padding: 0.55rem 0.8rem;
+    font-size: 0.82rem;
+}
+
+.ss-reset-dialog-intro {
+    margin: 0 0 1rem;
+    color: #3e3745;
+    line-height: 1.5;
+}
+
+.ss-reset-dialog-fields {
+    max-height: 20rem;
+    margin-bottom: 1rem;
+    overflow-y: auto;
+    padding-right: 0.4rem;
+}
+
+.ss-reset-dialog-fields section + section {
+    margin-top: 0.9rem;
+}
+
+.ss-reset-dialog-fields h4 {
+    margin: 0 0 0.3rem;
+    color: #60418d;
+    font-size: 0.85rem;
+}
+
+.ss-reset-dialog-fields ul {
+    margin: 0;
+    padding-left: 1.25rem;
+}
+
+.ss-reset-dialog-fields li {
+    margin: 0.2rem 0;
+    color: #4f4855;
+    font-size: 0.86rem;
+}
+
 .ss-settings-actions .ss-btn-primary,
 .ss-settings-actions .ss-btn-secondary {
     justify-content: center;

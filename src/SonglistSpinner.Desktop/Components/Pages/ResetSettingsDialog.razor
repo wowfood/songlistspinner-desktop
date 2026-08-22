@@ -1,0 +1,45 @@
+<MudDialog>
+    <DialogContent>
+        <p class="ss-reset-dialog-intro">
+            The following fields differ from their default values and will be reset:
+        </p>
+
+        <div class="ss-reset-dialog-fields" aria-label="Settings that will be reset">
+            @foreach (var group in Fields.GroupBy(field => field.Section))
+            {
+                <section>
+                    <h4>@group.Key</h4>
+                    <ul>
+                        @foreach (var field in group)
+                        {
+                            <li>@field.Label</li>
+                        }
+                    </ul>
+                </section>
+            }
+        </div>
+
+        <MudAlert Severity="Severity.Info" Variant="Variant.Outlined" Dense="true">
+            This updates the draft only. Choose <strong>Save Settings</strong> to apply it.
+            Your StreamerSongList API credential is not affected.
+        </MudAlert>
+    </DialogContent>
+    <DialogActions>
+        <MudButton ButtonType="ButtonType.Button" OnClick="Cancel">Keep current settings</MudButton>
+        <MudButton ButtonType="ButtonType.Button" Color="Color.Warning" Variant="Variant.Filled" OnClick="Reset">
+            Reset draft to defaults
+        </MudButton>
+    </DialogActions>
+</MudDialog>
+
+@code {
+    [CascadingParameter]
+    private IMudDialogInstance MudDialog { get; set; } = null!;
+
+    [Parameter]
+    public IReadOnlyList<SettingsResetField> Fields { get; set; } = [];
+
+    private void Cancel() => MudDialog.Cancel();
+
+    private void Reset() => MudDialog.Close(DialogResult.Ok(true));
+}
