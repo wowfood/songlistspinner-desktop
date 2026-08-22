@@ -135,8 +135,25 @@
     <div class="winner-modal-content" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
         <div id="winnerConfetti" class="winner-confetti"></div>
         <h2 id="winnerTitle">Winner</h2>
-        <p id="winnerMainLine" class="winner-main-line">@_winnerMainLine</p>
-        <p id="winnerDetails" class="winner-details">@_winnerDetails</p>
+        @if (_winnerFields.Length > 0)
+        {
+            <p id="winnerFields" class="winner-fields">
+                @for (var i = 0; i < _winnerFields.Length; i++)
+                {
+                    var field = _winnerFields[i];
+                    @if (i > 0)
+                    {
+                        <span class="winner-field-separator" aria-hidden="true">|</span>
+                    }
+                    <strong class="winner-field-label">@field.Label</strong>
+                    <span class="winner-field-value">@field.Value</span>
+                }
+            </p>
+        }
+        @if (_winnerQueuePosition is { } queuePosition)
+        {
+            <p class="winner-queue-position">Queue position: <strong>#@queuePosition</strong></p>
+        }
         <p class="winner-action-prompt">Choose what happens to this queue entry.</p>
         <div class="winner-modal-actions">
             @if (IsNowPlayingWinnerActionEnabled)

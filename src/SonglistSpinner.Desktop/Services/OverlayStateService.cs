@@ -98,11 +98,16 @@ public class OverlayStateService
     public Task BroadcastSpinCommandAsync(
         int winnerIndex,
         int winnerQueueId,
-        int duration,
-        string mainLine,
-        string details)
+        int duration)
     {
-        return BroadcastAsync("spin_command", new { winnerIndex, winnerQueueId, duration, mainLine, details });
+        return BroadcastAsync("spin_command", new { winnerIndex, winnerQueueId, duration });
+    }
+
+    public Task BroadcastWinnerRevealAsync(
+        IReadOnlyList<WinnerDialogField> fields,
+        int? queuePosition)
+    {
+        return BroadcastAsync("winner_reveal", new { fields, queuePosition });
     }
 
     public Task BroadcastCloseWinnerAsync()

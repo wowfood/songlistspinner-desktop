@@ -11,10 +11,14 @@ public class SpinnerDataServiceTests
         string artist = "Artist A",
         string title = "Song One",
         string requester = "User1",
-        decimal? donation = null)
+        decimal? donation = null,
+        int queueId = 0,
+        int position = 0)
     {
         return new SpinnerQueueItem
         {
+            QueueId = queueId,
+            Position = position,
             Song = new SpinnerSong { Id = id, Artist = artist, Title = title },
             Requests = [new SpinnerRequest { Name = requester, DonationAmount = donation }]
         };
@@ -36,7 +40,10 @@ public class SpinnerDataServiceTests
         };
     }
 
-    private static SpinnerConfig Cfg(string[]? fields = null, bool exclude = true)
+    private static SpinnerConfig Cfg(
+        string[]? fields = null,
+        bool exclude = true,
+        string[]? winnerFields = null)
     {
         return new SpinnerConfig
         {
@@ -44,6 +51,10 @@ public class SpinnerDataServiceTests
             {
                 Fields = fields ?? ["artist", "title"],
                 ExcludePlayedSongs = exclude
+            },
+            WinnerDialog = new SpinnerWinnerDialogConfig
+            {
+                Fields = winnerFields ?? ["artist", "title", "requester"]
             }
         };
     }
@@ -419,23 +430,26 @@ public class SpinnerDataServiceTests
     // ── GetWinnerFields ──────────────────────────────────────────────────────
 
     [Fact]
-    public void Given_ConfigWithoutRequesterField_When_GetWinnerFields_Then_AddsRequester()
+    public void Given_ConfiguredWinnerFieldsWithoutRequester_When_GetWinnerFields_Then_DoesNotAddRequester()
     {
-        var fields = SpinnerDataService.GetWinnerFields(Cfg(["artist", "title"]));
-        Assert.Contains("requester", fields);
+        var fields = SpinnerDataService.GetWinnerFields(Cfg(winnerFields: ["artist", "title"]));
+        Assert.DoesNotContain("requester", fields);
     }
 
     [Fact]
     public void Given_ConfigWithRequesterAlreadyPresent_When_GetWinnerFields_Then_DoesNotDuplicateRequester()
     {
-        var fields = SpinnerDataService.GetWinnerFields(Cfg(["artist", "requester"]));
+        var fields = SpinnerDataService.GetWinnerFields(
+            Cfg(winnerFields: ["artist", "requester", "REQUESTER"]));
         Assert.Single(fields, f => f == "requester");
     }
 
     [Fact]
     public void Given_ConfigWithMultipleFields_When_GetWinnerFields_Then_PreservesAllOriginalFields()
     {
-        var fields = SpinnerDataService.GetWinnerFields(Cfg(["artist", "title"]));
+        var fields = SpinnerDataService.GetWinnerFields(
+            Cfg(winnerFields: ["donation", "title", "artist"]));
+        Assert.Equal(["donation", "title", "artist"], fields);
         Assert.Contains("artist", fields);
         Assert.Contains("title", fields);
     }
@@ -443,7 +457,7 @@ public class SpinnerDataServiceTests
     [Fact]
     public void Given_ConfigWithEmptyFields_When_GetWinnerFields_Then_DefaultsToArtistTitleAndRequester()
     {
-        var cfg = new SpinnerConfig { SongList = new SpinnerSongListConfig { Fields = [] } };
+        var cfg = new SpinnerConfig { WinnerDialog = new SpinnerWinnerDialogConfig { Fields = [] } };
         var fields = SpinnerDataService.GetWinnerFields(cfg);
         Assert.Contains("artist", fields);
         Assert.Contains("title", fields);
@@ -453,9 +467,69 @@ public class SpinnerDataServiceTests
     [Fact]
     public void Given_FieldsInMixedCase_When_GetWinnerFields_Then_ReturnsLowercaseFields()
     {
-        var fields = SpinnerDataService.GetWinnerFields(Cfg(["ARTIST", "Title"]));
+        var fields = SpinnerDataService.GetWinnerFields(Cfg(winnerFields: ["ARTIST", "Title"]));
         Assert.Contains("artist", fields);
         Assert.Contains("title", fields);
+    }
+
+    // ── CreateWinnerDialogFields ─────────────────────────────────────────────
+
+    [Fact]
+    public void Given_ArtistAndTitleAreNotSelected_When_CreateWinnerDialogFields_Then_OmitsBothFields()
+    {
+        var result = SpinnerDataService.CreateWinnerDialogFields(
+            Q(requester: "Singer42"),
+            Cfg(winnerFields: ["requester"]));
+
+        var field = Assert.Single(result);
+        Assert.Equal("Requester", field.Label);
+        Assert.Equal("Singer42", field.Value);
+    }
+
+    [Fact]
+    public void Given_OrderedWinnerFields_When_CreateWinnerDialogFields_Then_PreservesLabelValueOrder()
+    {
+        var result = SpinnerDataService.CreateWinnerDialogFields(
+            Q(artist: "Band", title: "Track", requester: "Singer42"),
+            Cfg(winnerFields: ["title", "requester", "artist"]));
+
+        Assert.Equal(
+            [
+                new WinnerDialogField("Title", "Track"),
+                new WinnerDialogField("Requester", "Singer42"),
+                new WinnerDialogField("Artist", "Band")
+            ],
+            result);
+    }
+
+    // ── FindQueuePosition ────────────────────────────────────────────────────
+
+    [Fact]
+    public void Given_MatchingQueueEntryWithPositivePosition_When_FindQueuePosition_Then_ReturnsPosition()
+    {
+        var queue = new[] { Q(queueId: 91, position: 4), Q(queueId: 92, position: 5) };
+
+        var result = SpinnerDataService.FindQueuePosition(queue, 91);
+
+        Assert.Equal(4, result);
+    }
+
+    [Fact]
+    public void Given_QueueEntryIsMissing_When_FindQueuePosition_Then_ReturnsNull()
+    {
+        var result = SpinnerDataService.FindQueuePosition([Q(queueId: 91, position: 4)], 92);
+
+        Assert.Null(result);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Given_MatchingQueueEntryWithInvalidPosition_When_FindQueuePosition_Then_ReturnsNull(int position)
+    {
+        var result = SpinnerDataService.FindQueuePosition([Q(queueId: 91, position: position)], 91);
+
+        Assert.Null(result);
     }
 
     // ── FilterAvailableSongs ─────────────────────────────────────────────────

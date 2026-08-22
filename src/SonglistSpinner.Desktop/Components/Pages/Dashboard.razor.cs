@@ -14,6 +14,7 @@ namespace SonglistSpinner.Components.Pages;
 public partial class Dashboard
 {
     private const int SpinDurationMilliseconds = 5000;
+    private const int WinnerQueuePositionLookupTimeoutMilliseconds = 2000;
     private const int WinnerRevealDelayMilliseconds = 100;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
@@ -57,11 +58,11 @@ public partial class Dashboard
     private CancellationTokenSource _wheelCts = new();
 
     private bool _wheelVisible = true;
-    private string _winnerDetails = "";
-    private string _winnerMainLine = "";
+    private WinnerDialogField[] _winnerFields = [];
     private string? _winnerActionError;
     private bool _winnerActionPending;
     private int? _winnerQueueId;
+    private int? _winnerQueuePosition;
     private bool _winnerVisible;
     private bool _preferMarkWinnerPlayed;
 
@@ -179,7 +180,8 @@ public partial class Dashboard
         if (_jsInitialized) return;
         _jsInitialized = true;
 
-        await JS.InvokeVoidAsync("SpinnerInterop.applyTheme", _config.Colors, _config.PlayedList);
+        await JS.InvokeVoidAsync(
+            "SpinnerInterop.applyTheme", _config.Colors, _config.PlayedList, _config.WinnerDialog);
         await JS.InvokeVoidAsync("SpinnerInterop.applyBackground", _config.Background);
         await JS.InvokeVoidAsync("SpinnerInterop.applyPlayedListPosition",
             _config.SongList.PlayedListPosition);
@@ -266,11 +268,13 @@ public partial class Dashboard
             return;
         }
 
+        var spinStreamer = _currentStreamer;
         _lastSpinTime = DateTime.UtcNow;
         _spinDisabled = true;
         _isSpinning = true;
         _spinCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         _winnerQueueId = null;
+        _winnerQueuePosition = null;
         _wheelCts.Cancel();
         _wheelCts = new CancellationTokenSource();
         SetStatus("Fetching queue...");
@@ -278,7 +282,7 @@ public partial class Dashboard
 
         try
         {
-            var (queue, played) = await FetchQueueAndHistory(_currentStreamer, _lifetimeCts.Token);
+            var (queue, played) = await FetchQueueAndHistory(spinStreamer, _lifetimeCts.Token);
             _nowPlaying = queue.Playing;
             _playedSongs = played;
             _availableSongs = SpinnerDataService.FilterAvailableSongs(queue.Items, played, _config);
@@ -298,23 +302,26 @@ public partial class Dashboard
             await InvokeAsync(StateHasChanged);
 
             var spinWinner = _availableSongs[winnerIndex];
-            var spinMainLine = $"{spinWinner.Song.Artist} - {spinWinner.Song.Title}";
-            var spinDetails =
-                SpinnerDataService.CreateSongTextForFields(spinWinner, SpinnerDataService.GetWinnerFields(_config));
+            var winnerFields = SpinnerDataService.CreateWinnerDialogFields(spinWinner, _config);
             await OverlayService.UpdateStateAsync(
                 _config, _availableSongs, _playedSongs, _nowPlaying, _currentStreamer);
             await OverlayService.BroadcastSpinCommandAsync(
                 winnerIndex,
                 spinWinner.QueueId,
-                SpinDurationMilliseconds,
-                spinMainLine,
-                spinDetails);
+                SpinDurationMilliseconds);
 
             await JS.InvokeVoidAsync("SpinnerInterop.spinToItem", winnerIndex, SpinDurationMilliseconds);
 
             await Task.Delay(SpinDurationMilliseconds + WinnerRevealDelayMilliseconds, _lifetimeCts.Token);
+            var displayedQueuePosition = _config.WinnerDialog.ShowQueuePosition
+                ? await ResolveCurrentQueuePositionAsync(
+                    spinStreamer,
+                    spinWinner.QueueId,
+                    _lifetimeCts.Token)
+                : null;
             _winnerQueueId = spinWinner.QueueId;
-            ShowWinnerModal(spinWinner);
+            ShowWinnerModal(winnerFields, displayedQueuePosition);
+            await OverlayService.BroadcastWinnerRevealAsync(winnerFields, displayedQueuePosition);
             SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(spinWinner)}");
             StateHasChanged();
 
@@ -350,6 +357,7 @@ public partial class Dashboard
         _playedSongs = [];
         _winnerVisible = false;
         _winnerQueueId = null;
+        _winnerQueuePosition = null;
         SignalSpinCompleted();
         await RebuildWheel(_wheelCts.Token);
         await OverlayService.UpdateStateAsync(_config, _availableSongs, _playedSongs, null, "");
@@ -416,11 +424,10 @@ public partial class Dashboard
         }
     }
 
-    private void ShowWinnerModal(SpinnerQueueItem song)
+    private void ShowWinnerModal(WinnerDialogField[] fields, int? queuePosition)
     {
-        _winnerMainLine = $"{song.Song.Artist} - {song.Song.Title}";
-        _winnerDetails = SpinnerDataService.CreateSongTextForFields(
-            song, SpinnerDataService.GetWinnerFields(_config));
+        _winnerFields = fields;
+        _winnerQueuePosition = queuePosition;
         _winnerActionError = null;
         _winnerActionPending = false;
         _winnerVisible = true;
@@ -503,6 +510,7 @@ public partial class Dashboard
         SetStatus(statusMessage);
 
         _winnerQueueId = null;
+        _winnerQueuePosition = null;
         _playedRefreshCts?.Cancel();
         _playedRefreshCts = new CancellationTokenSource();
         await RefreshAfterWinnerAsync(_playedRefreshCts.Token);
@@ -512,6 +520,40 @@ public partial class Dashboard
     [JSInvokable]
     public Task OnResizeEnd(string width, string minWidth) =>
         OverlayService.UpdatePlayedListWidthAsync(width, minWidth);
+
+    private async Task<int?> ResolveCurrentQueuePositionAsync(
+        string expectedStreamer,
+        int queueId,
+        CancellationToken cancellationToken)
+    {
+        if (queueId <= 0 ||
+            !string.Equals(_currentStreamer, expectedStreamer, StringComparison.Ordinal))
+            return null;
+
+        try
+        {
+            using var lookupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            lookupCts.CancelAfter(WinnerQueuePositionLookupTimeoutMilliseconds);
+            var channel = new StreamerSongListChannel(expectedStreamer, _config.Streamer.Platform);
+            var queue = await ApiService.FetchQueueSnapshotAsync(channel, lookupCts.Token);
+            if (!string.Equals(_currentStreamer, expectedStreamer, StringComparison.Ordinal)) return null;
+            return SpinnerDataService.FindQueuePosition(queue.Items, queueId);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            Trace.WriteLine("[SonglistSpinner] Timed out while refreshing the winner queue position.");
+            return null;
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            Trace.WriteLine($"[SonglistSpinner] Could not refresh the winner queue position: {ex}");
+            return null;
+        }
+    }
 
     private async Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchQueueAndHistory(
         string streamer,

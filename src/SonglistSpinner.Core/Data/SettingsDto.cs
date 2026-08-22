@@ -25,6 +25,11 @@ public class SettingsDto
     public string NowPlayingFontSize { get; set; } = "1.125rem";
     public string NowPlayingWidth { get; set; } = "28rem";
     public string NowPlayingPosition { get; set; } = "bottom-left";
+    public string? WinnerDialogFields { get; set; }
+    public string WinnerDialogFontFamily { get; set; } = "sans-serif";
+    public string WinnerDialogFontSize { get; set; } = "1rem";
+    public string WinnerDialogWidth { get; set; } = "36rem";
+    public bool WinnerDialogShowQueuePosition { get; set; } = true;
     public bool DebugMode { get; set; }
     public string ColorText { get; set; } = "#ffffff";
     public string ColorStatusBackground { get; set; } = "rgba(0, 0, 0, 0.7)";

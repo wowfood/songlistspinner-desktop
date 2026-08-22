@@ -53,7 +53,7 @@
                             aria-pressed="@(_activeSection == SettingsSection.Overlay)"
                             @onclick="@(() => SelectSection(SettingsSection.Overlay))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9638;</span>
-                        <span><strong>Overlay Layout</strong><small>Played and Now Playing</small></span>
+                        <span><strong>Overlay Layout</strong><small>Panels and winner dialog</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Appearance)"
                             aria-pressed="@(_activeSection == SettingsSection.Appearance)"
@@ -211,7 +211,7 @@
                             <div class="ss-settings-section-heading">
                                 <span>Overlay Layout</span>
                                 <h2>Arrange the information your viewers see</h2>
-                                <p>Use the preview to check field order, panel location, typography, and Now Playing placement.</p>
+                                <p>Configure field order, panel placement, and typography across the overlay and winner dialog.</p>
                             </div>
 
                             <section class="ss-settings-section">
@@ -333,6 +333,58 @@
                                         </div>
                                     </div>
                                 }
+                            </section>
+
+                            <section class="ss-settings-section">
+                                <h3>Winner Dialog Settings</h3>
+                                <div class="ss-field">
+                                    <label>Display Fields</label>
+                                    <div class="ss-field-multiselect">
+                                        @for (var i = 0; i < _vm.WinnerDialogDisplayFields.Count; i++)
+                                        {
+                                            var idx = i;
+                                            var field = _vm.WinnerDialogDisplayFields[i];
+                                            <div class="ss-chip @(field.Selected ? "ss-chip-selected" : "ss-chip-unselected") @(_vm.WinnerDialogDragOverIdx == idx && _vm.WinnerDialogDragIdx != idx ? "ss-chip-drag-over" : "")"
+                                                 draggable="true"
+                                                 @ondragstart="@(() => BeginWinnerDialogFieldDrag(idx))"
+                                                 @ondragover="@(_ => SetWinnerDialogFieldDragOver(idx))"
+                                                 @ondragover:preventDefault
+                                                 @ondrop="@(() => DropWinnerDialogField(idx))"
+                                                 @ondragend="@(_ => EndWinnerDialogFieldDrag())"
+                                                 @onclick="@(() => ToggleWinnerDialogField(idx))">
+                                                <span class="ss-chip-handle" aria-hidden="true">&#10247;</span>
+                                                @FieldLabel(field.Name)
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="ss-field-hint">Fields appear in this order with bold labels and equally weighted values.</div>
+                                </div>
+                                <div class="ss-settings-field-grid">
+                                    <div class="ss-field">
+                                        <label for="winnerDialogWidth">Dialog Width</label>
+                                        <InputText id="winnerDialogWidth" @bind-Value="_dto.WinnerDialogWidth" placeholder="36rem"/>
+                                        <div class="ss-field-hint">CSS sizes such as 36rem, 600px, or 50vw.</div>
+                                    </div>
+                                    <div class="ss-field">
+                                        <label for="winnerDialogFont">Font Family</label>
+                                        <InputSelect id="winnerDialogFont" @bind-Value="_dto.WinnerDialogFontFamily">
+                                            @foreach (var font in FontChoices)
+                                            {
+                                                <option value="@font.Value">@font.Label</option>
+                                            }
+                                        </InputSelect>
+                                    </div>
+                                    <div class="ss-field">
+                                        <label for="winnerDialogFontSize">Font Size</label>
+                                        <InputText id="winnerDialogFontSize" @bind-Value="_dto.WinnerDialogFontSize" placeholder="1rem"/>
+                                    </div>
+                                    <div class="ss-field">
+                                        <label class="ss-checkbox-label">
+                                            <InputCheckbox @bind-Value="_dto.WinnerDialogShowQueuePosition"/>
+                                            Show queue position when available
+                                        </label>
+                                    </div>
+                                </div>
                             </section>
                             break;
 
