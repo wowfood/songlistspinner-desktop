@@ -240,6 +240,26 @@
                                 </div>
                                 <div class="ss-settings-field-grid">
                                     <div class="ss-field">
+                                        <label for="playedListSeparatorChoice">Field Separator</label>
+                                        <InputSelect id="playedListSeparatorChoice" @bind-Value="PlayedListSeparatorChoice">
+                                            @foreach (var option in SettingsOptions.FieldSeparators)
+                                            {
+                                                <option value="@option.Key">@option.Label</option>
+                                            }
+                                            <option value="@SettingsOptions.CustomSeparatorKey">Custom</option>
+                                        </InputSelect>
+                                        <div class="ss-field-hint">Choose a symbol that will render in both desktop and browser overlays.</div>
+                                        @if (PlayedListUsesCustomSeparator)
+                                        {
+                                            <div class="ss-custom-separator">
+                                                <label for="playedListSeparator">Custom Separator</label>
+                                                <InputText id="playedListSeparator" @bind-Value="_dto.PlayedListSeparator"
+                                                           placeholder="Enter a custom separator"/>
+                                                <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
+                                            </div>
+                                        }
+                                    </div>
+                                    <div class="ss-field">
                                         <label class="ss-checkbox-label">
                                             <InputCheckbox @bind-Value="_dto.PlayedListShowNumbers"/>
                                             Show sequence numbers
@@ -321,6 +341,26 @@
                                         </DisplayFieldOrderEditor>
                                     </div>
                                     <div class="ss-settings-field-grid">
+                                        <div class="ss-field">
+                                            <label for="nowPlayingSeparatorChoice">Field Separator</label>
+                                            <InputSelect id="nowPlayingSeparatorChoice" @bind-Value="NowPlayingSeparatorChoice">
+                                                @foreach (var option in SettingsOptions.FieldSeparators)
+                                                {
+                                                    <option value="@option.Key">@option.Label</option>
+                                                }
+                                                <option value="@SettingsOptions.CustomSeparatorKey">Custom</option>
+                                            </InputSelect>
+                                            <div class="ss-field-hint">Choose a symbol that will render in both desktop and browser overlays.</div>
+                                            @if (NowPlayingUsesCustomSeparator)
+                                            {
+                                                <div class="ss-custom-separator">
+                                                    <label for="nowPlayingSeparator">Custom Separator</label>
+                                                    <InputText id="nowPlayingSeparator" @bind-Value="_dto.NowPlayingSeparator"
+                                                               placeholder="Enter a custom separator"/>
+                                                    <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
+                                                </div>
+                                            }
+                                        </div>
                                         <div class="ss-field">
                                             <label for="nowPlayingPosition">Screen Position</label>
                                             <InputSelect id="nowPlayingPosition" @bind-Value="_dto.NowPlayingPosition">

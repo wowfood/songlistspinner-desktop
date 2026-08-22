@@ -45,7 +45,8 @@ public class SpinnerDataServiceTests
         bool exclude = true,
         string[]? winnerFields = null,
         bool showNumbers = false,
-        string numberingStart = SpinnerSettingValues.PlayedListNumberingStarts.Bottom)
+        string numberingStart = SpinnerSettingValues.PlayedListNumberingStarts.Bottom,
+        string separator = SongTextFormatting.DefaultSeparator)
     {
         return new SpinnerConfig
         {
@@ -57,7 +58,8 @@ public class SpinnerDataServiceTests
             PlayedList = new SpinnerPlayedListConfig
             {
                 ShowNumbers = showNumbers,
-                NumberingStart = numberingStart
+                NumberingStart = numberingStart,
+                Separator = separator
             },
             WinnerDialog = new SpinnerWinnerDialogConfig
             {
@@ -329,6 +331,22 @@ public class SpinnerDataServiceTests
     }
 
     [Fact]
+    public void Given_CustomSeparator_When_CreateSongTextForFields_Then_PreservesItExactly()
+    {
+        var result = SpinnerDataService.CreateSongTextForFields(Q(), ["artist", "title"], " • ");
+        Assert.Equal("Artist: Artist A • Title: Song One", result);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Given_BlankSeparator_When_CreateSongTextForFields_Then_UsesDefault(string separator)
+    {
+        var result = SpinnerDataService.CreateSongTextForFields(Q(), ["artist", "title"], separator);
+        Assert.Equal("Artist: Artist A | Title: Song One", result);
+    }
+
+    [Fact]
     public void Given_FieldWithNoValue_When_CreateSongTextForFields_Then_SkipsField()
     {
         var result = SpinnerDataService.CreateSongTextForFields(Q(), ["artist", "foobar"]);
@@ -385,6 +403,15 @@ public class SpinnerDataServiceTests
         Assert.Equal("Artist: Band | Donation: 5", result);
     }
 
+    [Fact]
+    public void Given_CustomSeparator_When_CreatePlayedSongText_QueueItem_Then_UsesIt()
+    {
+        var result = SpinnerDataService.CreatePlayedSongText(
+            Q(),
+            Cfg(["artist", "title"], separator: " / "));
+        Assert.Equal("Artist: Artist A / Title: Song One", result);
+    }
+
     // ── CreatePlayedSongText (PlayHistoryItem overload) ──────────────────────
 
     [Fact]
@@ -424,6 +451,15 @@ public class SpinnerDataServiceTests
     {
         var result = SpinnerDataService.CreatePlayedSongText(H(), Cfg(["artist", "donation"]));
         Assert.Equal("Artist: Artist A", result);
+    }
+
+    [Fact]
+    public void Given_CustomSeparator_When_CreatePlayedSongText_HistoryItem_Then_UsesIt()
+    {
+        var result = SpinnerDataService.CreatePlayedSongText(
+            H(),
+            Cfg(["artist", "title"], separator: " — "));
+        Assert.Equal("Artist: Artist A — Title: Song One", result);
     }
 
     [Fact]

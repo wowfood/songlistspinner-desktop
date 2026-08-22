@@ -54,6 +54,8 @@ public partial class Settings
     private CancellationTokenSource? _previewRefreshCts;
     private bool _previewReady;
     private bool _resetDialogOpen;
+    private string _playedListSeparatorChoice = SettingsOptions.CustomSeparatorKey;
+    private string _nowPlayingSeparatorChoice = SettingsOptions.CustomSeparatorKey;
     private string? _savedCredentialFormState;
     private string? _savedSettingsFormState;
     private bool _testingCredential;
@@ -243,6 +245,42 @@ public partial class Settings
         }
     }
 
+    private string PlayedListSeparatorChoice
+    {
+        get => _playedListSeparatorChoice;
+        set
+        {
+            _playedListSeparatorChoice = value;
+            if (_dto is null || !SettingsOptions.TryGetSeparator(value, out var separator)) return;
+            _dto.PlayedListSeparator = separator;
+            QueuePreviewRefresh();
+        }
+    }
+
+    private string NowPlayingSeparatorChoice
+    {
+        get => _nowPlayingSeparatorChoice;
+        set
+        {
+            _nowPlayingSeparatorChoice = value;
+            if (_dto is null || !SettingsOptions.TryGetSeparator(value, out var separator)) return;
+            _dto.NowPlayingSeparator = separator;
+            QueuePreviewRefresh();
+        }
+    }
+
+    private bool PlayedListUsesCustomSeparator =>
+        string.Equals(
+            _playedListSeparatorChoice,
+            SettingsOptions.CustomSeparatorKey,
+            StringComparison.Ordinal);
+
+    private bool NowPlayingUsesCustomSeparator =>
+        string.Equals(
+            _nowPlayingSeparatorChoice,
+            SettingsOptions.CustomSeparatorKey,
+            StringComparison.Ordinal);
+
     private void TogglePlayedField(string fieldName)
     {
         if (_vm.ToggleField(fieldName))
@@ -334,7 +372,10 @@ public partial class Settings
                     : previewDto.DefaultStreamerName.Trim(),
                 wheelItems = PreviewSongs.Select(song => new { label = SpinnerDataService.BuildWheelLabel(song) }),
                 playedTexts = SpinnerDataService.CreatePlayedSongTexts(PreviewSongs.Take(3).ToArray(), config),
-                nowPlayingText = SpinnerDataService.CreateSongTextForFields(PreviewSongs[3], nowPlayingFields),
+                nowPlayingText = SpinnerDataService.CreateSongTextForFields(
+                    PreviewSongs[3],
+                    nowPlayingFields,
+                    config.NowPlaying.Separator),
                 playedCount = 3,
                 availableCount = PreviewSongs.Length
             };
@@ -381,6 +422,7 @@ public partial class Settings
         {
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
+            RefreshSeparatorChoices();
             DiagnosticLog.Configure(_dto.DebugMode);
             await OverlayService.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
 
@@ -513,11 +555,19 @@ public partial class Settings
 
         _dto = settings;
         _vm.Initialize(_dto);
+        RefreshSeparatorChoices();
         _editContext = new EditContext(_dto);
         _editContext.OnFieldChanged += OnSettingsFieldChanged;
         _vm.SaveSuccess = false;
         _vm.SaveError = null;
         QueuePreviewRefresh();
+    }
+
+    private void RefreshSeparatorChoices()
+    {
+        if (_dto is null) return;
+        _playedListSeparatorChoice = SettingsOptions.GetSeparatorKey(_dto.PlayedListSeparator);
+        _nowPlayingSeparatorChoice = SettingsOptions.GetSeparatorKey(_dto.NowPlayingSeparator);
     }
 
     private void OpenSetupWizard()

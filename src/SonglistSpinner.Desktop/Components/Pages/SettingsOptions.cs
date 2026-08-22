@@ -3,9 +3,12 @@ using SonglistSpinner.Core.Models;
 namespace SonglistSpinner.Components.Pages;
 
 internal readonly record struct SettingOption(string Value, string Label);
+internal readonly record struct SeparatorSettingOption(string Key, string Separator, string Label);
 
 internal static class SettingsOptions
 {
+    public const string CustomSeparatorKey = "custom";
+
     public static IReadOnlyList<SettingOption> Platforms { get; } = Array.AsReadOnly<SettingOption>(
     [
         new(StreamerSongListPlatformNames.Twitch, "Twitch"),
@@ -51,6 +54,42 @@ internal static class SettingsOptions
         new(SpinnerSettingValues.BackgroundModes.Color, "Solid color"),
         new(SpinnerSettingValues.BackgroundModes.Transparent, "Transparent")
     ]);
+
+    public static IReadOnlyList<SeparatorSettingOption> FieldSeparators { get; } =
+        Array.AsReadOnly<SeparatorSettingOption>(
+        [
+            new("pipe", SongTextFormatting.Pipe, "Pipe  |"),
+            new("bullet", SongTextFormatting.Bullet, "Bullet  •"),
+            new("middle-dot", SongTextFormatting.MiddleDot, "Middle dot  ·"),
+            new("diamond", SongTextFormatting.Diamond, "Diamond  ◆"),
+            new("star", SongTextFormatting.Star, "Star  ★"),
+            new("slash", SongTextFormatting.Slash, "Slash  /"),
+            new("dash", SongTextFormatting.Dash, "Dash  —"),
+            new("arrow", SongTextFormatting.Arrow, "Arrow  →")
+        ]);
+
+    public static string GetSeparatorKey(string? separator)
+    {
+        var normalized = SongTextFormatting.NormalizeSeparator(separator);
+        return FieldSeparators.FirstOrDefault(option =>
+                string.Equals(option.Separator, normalized, StringComparison.Ordinal))
+            is { Key.Length: > 0 } match
+            ? match.Key
+            : CustomSeparatorKey;
+    }
+
+    public static bool TryGetSeparator(string key, out string separator)
+    {
+        foreach (var option in FieldSeparators)
+        {
+            if (!string.Equals(option.Key, key, StringComparison.Ordinal)) continue;
+            separator = option.Separator;
+            return true;
+        }
+
+        separator = "";
+        return false;
+    }
 
     public static string GetSongFieldLabel(string field)
     {
