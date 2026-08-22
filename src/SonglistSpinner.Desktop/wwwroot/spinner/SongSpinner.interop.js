@@ -246,10 +246,10 @@ window.SpinnerInterop = (function () {
             if (!container || !icon) return
             if ((position || 'right').toLowerCase() === 'left') {
                 container.classList.add('played-list-left')
-                icon.innerText = '▶'
+                icon.innerText = '◀'
             } else {
                 container.classList.remove('played-list-left')
-                icon.innerText = '◀'
+                icon.innerText = '▶'
             }
         },
 
@@ -285,10 +285,10 @@ window.SpinnerInterop = (function () {
                 el.classList.add('collapsed')
                 el.style.width = '3rem'
                 el.style.minWidth = '3rem'
-                icon.innerText = pos === 'left' ? '◀' : '▶'
+                icon.innerText = pos === 'left' ? '▶' : '◀'
             } else {
                 el.classList.remove('collapsed')
-                icon.innerText = pos === 'left' ? '▶' : '◀'
+                icon.innerText = pos === 'left' ? '◀' : '▶'
                 el.style.width = _savedWidth || ''
                 el.style.minWidth = _savedMinWidth || ''
             }
