@@ -51,7 +51,7 @@
                 <div id="pointer"></div>
                 <div id="wheelContainer"></div>
                 <div id="buttonContainer">
-                    <button id="spinButton" @onclick="Spin" disabled="@_spinDisabled">@_spinButtonText</button>
+                    <button id="spinButton" @onclick="Spin" disabled="@(_spinDisabled || _markNowPlayingPending)">@_spinButtonText</button>
                 </div>
                 <div id="status" style="@(_statusVisible ? "display:block" : "display:none")">@_status</div>
             </div>
@@ -86,6 +86,21 @@
                 </div>
             </div>
             <div id="playedListContent">
+                @if (_nowPlaying is not null)
+                {
+                    <section id="nowPlayingControl" aria-label="Now Playing controls">
+                        <div class="now-playing-summary">
+                            <span class="now-playing-label">Now Playing</span>
+                            <strong id="nowPlayingSong">@NowPlayingDisplayText</strong>
+                        </div>
+                        <button id="markNowPlayingPlayedBtn"
+                                disabled="@(_markNowPlayingPending || _isSpinning)"
+                                aria-describedby="nowPlayingSong"
+                                @onclick="MarkNowPlayingPlayedAsync">
+                            @(_markNowPlayingPending ? "Marking..." : "Mark Played")
+                        </button>
+                    </section>
+                }
                 <div id="songCounterSection">
                     <h3>Played Songs: <span id="playedCount">@_playedSongs.Length</span></h3>
                     <h3>Queued Songs: <span id="availableCount">@_availableSongs.Count</span></h3>

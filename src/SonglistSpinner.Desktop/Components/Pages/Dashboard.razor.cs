@@ -35,6 +35,7 @@ public partial class Dashboard
     private bool _jsInitialized;
     private DateTime _lastSpinTime = DateTime.MinValue;
     private bool _loading = true;
+    private bool _markNowPlayingPending;
     private SpinnerQueueItem? _nowPlaying;
     private LocalOverlayHealth _overlayHealth = new(LocalOverlayServerState.Stopped, 0, null);
     private bool _overlayHealthSubscribed;
@@ -65,6 +66,11 @@ public partial class Dashboard
     private bool _preferMarkWinnerPlayed;
 
     private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
+    private string NowPlayingDisplayText => _nowPlaying is null
+        ? ""
+        : SpinnerDataService.CreateSongTextForFields(
+            _nowPlaying,
+            _config.NowPlaying?.Fields is { Length: > 0 } fields ? fields : ["artist", "title"]);
     private string ApiEnvironmentLabel => GetApiEnvironment().label;
     private string ApiEnvironmentClass => GetApiEnvironment().cssClass;
     private string OverlayHealthClass => _overlayHealth.ServerState switch
@@ -242,6 +248,12 @@ public partial class Dashboard
 
     private async Task Spin()
     {
+        if (_markNowPlayingPending)
+        {
+            SetStatus("Wait for the Now Playing update to finish.");
+            return;
+        }
+
         if (string.IsNullOrEmpty(_currentStreamer))
         {
             SetStatus("Please enter a streamer name first");
@@ -357,6 +369,51 @@ public partial class Dashboard
         await JS.InvokeVoidAsync("SpinnerInterop.setPlayedListCollapsed",
             _playedListCollapsed, _config.SongList.PlayedListPosition);
         await OverlayService.UpdatePlayedListCollapsedAsync(_playedListCollapsed);
+    }
+
+    private async Task MarkNowPlayingPlayedAsync()
+    {
+        if (_markNowPlayingPending || _isSpinning || _nowPlaying is null) return;
+        if (_streamerId <= 0 || string.IsNullOrWhiteSpace(_currentStreamer))
+        {
+            SetStatus("The current streamer is unavailable. Reload the streamer and try again.");
+            return;
+        }
+
+        var streamerId = _streamerId;
+        var streamer = _currentStreamer;
+        var markedPlayed = false;
+        _markNowPlayingPending = true;
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            await ApiService.MarkNowPlayingAsPlayedAsync(streamerId, _lifetimeCts.Token);
+            markedPlayed = true;
+            SetStatus("Now Playing marked as played.");
+            await RefreshSnapshotAsync(streamer, _lifetimeCts.Token);
+        }
+        catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (markedPlayed)
+            {
+                SetStatus($"Now Playing was marked as played, but the dashboard refresh failed: {ex.Message}");
+                Trace.WriteLine($"[SonglistSpinner] Refresh after marking Now Playing failed: {ex}");
+            }
+            else
+            {
+                SetApiHealth(DashboardServiceHealth.Failed, ex.Message);
+                SetStatus($"StreamerSongList failed while marking Now Playing as played: {ex.Message}");
+            }
+        }
+        finally
+        {
+            _markNowPlayingPending = false;
+            await InvokeAsync(StateHasChanged);
+        }
     }
 
     private void ShowWinnerModal(SpinnerQueueItem song)
