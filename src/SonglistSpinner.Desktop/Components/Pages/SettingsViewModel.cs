@@ -12,12 +12,6 @@ public sealed class SettingsViewModel
     public List<DisplayField> DisplayFields { get; private set; } = new();
     public List<DisplayField> NowPlayingDisplayFields { get; private set; } = new();
     public List<DisplayField> WinnerDialogDisplayFields { get; private set; } = new();
-    public int DragIdx { get; set; } = -1;
-    public int DragOverIdx { get; set; } = -1;
-    public int NowPlayingDragIdx { get; set; } = -1;
-    public int NowPlayingDragOverIdx { get; set; } = -1;
-    public int WinnerDialogDragIdx { get; set; } = -1;
-    public int WinnerDialogDragOverIdx { get; set; } = -1;
     public string PlayedListBgHex { get; set; } = "#000000";
     public double PlayedListBgAlpha { get; set; } = 0.7;
     public bool UseIndependentNowPlayingBgAlpha { get; set; }
@@ -83,52 +77,56 @@ public sealed class SettingsViewModel
             .ToList();
     }
 
-    public void ToggleField(int idx)
+    public bool ToggleField(string fieldName) =>
+        ToggleField(DisplayFields, fieldName);
+
+    public bool ToggleNowPlayingField(string fieldName) =>
+        ToggleField(NowPlayingDisplayFields, fieldName);
+
+    public bool ToggleWinnerDialogField(string fieldName) =>
+        ToggleField(WinnerDialogDisplayFields, fieldName);
+
+    public bool MoveField(string fieldName, int targetIndex) =>
+        MoveField(DisplayFields, fieldName, targetIndex);
+
+    public bool MoveNowPlayingField(string fieldName, int targetIndex) =>
+        MoveField(NowPlayingDisplayFields, fieldName, targetIndex);
+
+    public bool MoveWinnerDialogField(string fieldName, int targetIndex) =>
+        MoveField(WinnerDialogDisplayFields, fieldName, targetIndex);
+
+    private static bool ToggleField(List<DisplayField> fields, string fieldName)
     {
-        DisplayFields[idx].Selected = !DisplayFields[idx].Selected;
+        var field = fields.FirstOrDefault(
+            candidate => string.Equals(candidate.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+        if (field is null)
+        {
+            return false;
+        }
+
+        field.Selected = !field.Selected;
+        return true;
     }
 
-    public void ToggleNowPlayingField(int idx)
+    private static bool MoveField(List<DisplayField> fields, string fieldName, int targetIndex)
     {
-        NowPlayingDisplayFields[idx].Selected = !NowPlayingDisplayFields[idx].Selected;
-    }
+        var sourceIndex = fields.FindIndex(
+            candidate => string.Equals(candidate.Name, fieldName, StringComparison.OrdinalIgnoreCase));
+        if (sourceIndex < 0 || fields.Count < 2)
+        {
+            return false;
+        }
 
-    public void ToggleWinnerDialogField(int idx)
-    {
-        WinnerDialogDisplayFields[idx].Selected = !WinnerDialogDisplayFields[idx].Selected;
-    }
+        targetIndex = Math.Clamp(targetIndex, 0, fields.Count - 1);
+        if (sourceIndex == targetIndex)
+        {
+            return false;
+        }
 
-    public void DropField(int targetIdx)
-    {
-        if (DragIdx < 0 || DragIdx == targetIdx) return;
-        var item = DisplayFields[DragIdx];
-        DisplayFields.RemoveAt(DragIdx);
-        var insertIdx = DragIdx < targetIdx ? targetIdx - 1 : targetIdx;
-        DisplayFields.Insert(insertIdx, item);
-        DragIdx = -1;
-        DragOverIdx = -1;
-    }
-
-    public void DropNowPlayingField(int targetIdx)
-    {
-        if (NowPlayingDragIdx < 0 || NowPlayingDragIdx == targetIdx) return;
-        var item = NowPlayingDisplayFields[NowPlayingDragIdx];
-        NowPlayingDisplayFields.RemoveAt(NowPlayingDragIdx);
-        var insertIdx = NowPlayingDragIdx < targetIdx ? targetIdx - 1 : targetIdx;
-        NowPlayingDisplayFields.Insert(insertIdx, item);
-        NowPlayingDragIdx = -1;
-        NowPlayingDragOverIdx = -1;
-    }
-
-    public void DropWinnerDialogField(int targetIdx)
-    {
-        if (WinnerDialogDragIdx < 0 || WinnerDialogDragIdx == targetIdx) return;
-        var item = WinnerDialogDisplayFields[WinnerDialogDragIdx];
-        WinnerDialogDisplayFields.RemoveAt(WinnerDialogDragIdx);
-        var insertIdx = WinnerDialogDragIdx < targetIdx ? targetIdx - 1 : targetIdx;
-        WinnerDialogDisplayFields.Insert(insertIdx, item);
-        WinnerDialogDragIdx = -1;
-        WinnerDialogDragOverIdx = -1;
+        var field = fields[sourceIndex];
+        fields.RemoveAt(sourceIndex);
+        fields.Insert(targetIndex, field);
+        return true;
     }
 
     public void InitPlayedListBg(string value)

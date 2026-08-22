@@ -229,25 +229,14 @@
                                 </div>
                                 <div class="ss-field">
                                     <label>Display Fields</label>
-                                    <div class="ss-field-multiselect">
-                                        @for (var i = 0; i < _vm.DisplayFields.Count; i++)
-                                        {
-                                            var idx = i;
-                                            var field = _vm.DisplayFields[i];
-                                            <div class="ss-chip @(field.Selected ? "ss-chip-selected" : "ss-chip-unselected") @(_vm.DragOverIdx == idx && _vm.DragIdx != idx ? "ss-chip-drag-over" : "")"
-                                                 draggable="true"
-                                                 @ondragstart="@(() => BeginPlayedFieldDrag(idx))"
-                                                 @ondragover="@(_ => SetPlayedFieldDragOver(idx))"
-                                                 @ondragover:preventDefault
-                                                 @ondrop="@(() => DropPlayedField(idx))"
-                                                 @ondragend="@(_ => EndPlayedFieldDrag())"
-                                                 @onclick="@(() => TogglePlayedField(idx))">
-                                                <span class="ss-chip-handle" aria-hidden="true">&#10247;</span>
-                                                @FieldLabel(field.Name)
-                                            </div>
-                                        }
-                                    </div>
-                                    <div class="ss-field-hint">Click to include or exclude a field. Drag selected fields into display order.</div>
+                                    <DisplayFieldOrderEditor Items="_vm.DisplayFields"
+                                                             HelpId="playedFieldsHelp"
+                                                             OrderChanged="MovePlayedField"
+                                                             SelectionChanged="TogglePlayedField">
+                                        <HelpContent>
+                                            Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
+                                        </HelpContent>
+                                    </DisplayFieldOrderEditor>
                                 </div>
                                 <div class="ss-settings-field-grid">
                                     <div class="ss-field">
@@ -322,24 +311,14 @@
                                 {
                                     <div class="ss-field">
                                         <label>Display Fields</label>
-                                        <div class="ss-field-multiselect">
-                                            @for (var i = 0; i < _vm.NowPlayingDisplayFields.Count; i++)
-                                            {
-                                                var idx = i;
-                                                var field = _vm.NowPlayingDisplayFields[i];
-                                                <div class="ss-chip @(field.Selected ? "ss-chip-selected" : "ss-chip-unselected") @(_vm.NowPlayingDragOverIdx == idx && _vm.NowPlayingDragIdx != idx ? "ss-chip-drag-over" : "")"
-                                                     draggable="true"
-                                                     @ondragstart="@(() => BeginNowPlayingFieldDrag(idx))"
-                                                     @ondragover="@(_ => SetNowPlayingFieldDragOver(idx))"
-                                                     @ondragover:preventDefault
-                                                     @ondrop="@(() => DropNowPlayingField(idx))"
-                                                     @ondragend="@(_ => EndNowPlayingFieldDrag())"
-                                                     @onclick="@(() => ToggleNowPlayingField(idx))">
-                                                    <span class="ss-chip-handle" aria-hidden="true">&#10247;</span>
-                                                    @FieldLabel(field.Name)
-                                                </div>
-                                            }
-                                        </div>
+                                        <DisplayFieldOrderEditor Items="_vm.NowPlayingDisplayFields"
+                                                                 HelpId="nowPlayingFieldsHelp"
+                                                                 OrderChanged="MoveNowPlayingField"
+                                                                 SelectionChanged="ToggleNowPlayingField">
+                                            <HelpContent>
+                                                Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
+                                            </HelpContent>
+                                        </DisplayFieldOrderEditor>
                                     </div>
                                     <div class="ss-settings-field-grid">
                                         <div class="ss-field">
@@ -385,25 +364,15 @@
                                 </div>
                                 <div class="ss-field">
                                     <label>Display Fields</label>
-                                    <div class="ss-field-multiselect">
-                                        @for (var i = 0; i < _vm.WinnerDialogDisplayFields.Count; i++)
-                                        {
-                                            var idx = i;
-                                            var field = _vm.WinnerDialogDisplayFields[i];
-                                            <div class="ss-chip @(field.Selected ? "ss-chip-selected" : "ss-chip-unselected") @(_vm.WinnerDialogDragOverIdx == idx && _vm.WinnerDialogDragIdx != idx ? "ss-chip-drag-over" : "")"
-                                                 draggable="true"
-                                                 @ondragstart="@(() => BeginWinnerDialogFieldDrag(idx))"
-                                                 @ondragover="@(_ => SetWinnerDialogFieldDragOver(idx))"
-                                                 @ondragover:preventDefault
-                                                 @ondrop="@(() => DropWinnerDialogField(idx))"
-                                                 @ondragend="@(_ => EndWinnerDialogFieldDrag())"
-                                                 @onclick="@(() => ToggleWinnerDialogField(idx))">
-                                                <span class="ss-chip-handle" aria-hidden="true">&#10247;</span>
-                                                @FieldLabel(field.Name)
-                                            </div>
-                                        }
-                                    </div>
-                                    <div class="ss-field-hint">Fields appear in this order with bold labels and equally weighted values.</div>
+                                    <DisplayFieldOrderEditor Items="_vm.WinnerDialogDisplayFields"
+                                                             HelpId="winnerFieldsHelp"
+                                                             OrderChanged="MoveWinnerDialogField"
+                                                             SelectionChanged="ToggleWinnerDialogField">
+                                        <HelpContent>
+                                            Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
+                                            Labels are bold while values have equal weighting.
+                                        </HelpContent>
+                                    </DisplayFieldOrderEditor>
                                 </div>
                                 <div class="ss-settings-field-grid">
                                     <div class="ss-field">

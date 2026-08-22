@@ -81,12 +81,23 @@ h1:focus {
     text-decoration: none;
     font-size: 0.95rem;
     font-family: inherit;
-    transition: color 0.15s;
+    border-radius: 0.2rem;
+    transition: color 0.15s, outline-color 0.15s;
 }
 
 .ss-nav__links a:hover,
 .ss-nav__btn:hover {
     color: #a78bfa;
+    text-decoration: underline;
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.2em;
+}
+
+.ss-nav__links a:focus-visible,
+.ss-nav__btn:focus-visible {
+    color: #c4b5fd;
+    outline: 3px solid #a78bfa;
+    outline-offset: 3px;
 }
 
 .ss-nav__btn {
@@ -156,6 +167,7 @@ h1:focus {
     font-size: 0.78rem;
     font-weight: 700;
     text-decoration: none;
+    transition: background-color 0.15s, box-shadow 0.15s;
 }
 
 .ss-update-banner__action:hover {
@@ -176,6 +188,7 @@ h1:focus {
     color: #665b70;
     font: inherit;
     cursor: pointer;
+    transition: background-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
 
 .ss-update-banner__dismiss:hover {
@@ -220,10 +233,10 @@ h1:focus {
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    transition: background 0.15s;
+    transition: background-color 0.15s, box-shadow 0.15s;
 }
 
-.ss-btn-primary:hover {
+.ss-btn-primary:not(:disabled):hover {
     background: #7c5cbf;
 }
 
@@ -239,11 +252,17 @@ h1:focus {
     font-weight: 600;
     cursor: pointer;
     text-decoration: none;
-    transition: background 0.15s;
+    transition: background-color 0.15s, box-shadow 0.15s;
 }
 
-.ss-btn-secondary:hover {
+.ss-btn-secondary:not(:disabled):hover {
     background: #e8e0f7;
+}
+
+.ss-btn-primary:disabled,
+.ss-btn-secondary:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 /* ── Feature cards ── */
@@ -384,12 +403,28 @@ h1:focus {
     background: #fff;
     color: #222;
     font: inherit;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.ss-setup-field input:not(:disabled):hover,
+.ss-setup-field select:not(:disabled):hover {
+    border-color: #9b83bd;
+    background: #fdfbff;
 }
 
 .ss-setup-field input:focus-visible,
 .ss-setup-field select:focus-visible {
     border-color: #6441a5;
-    outline: 3px solid rgba(100, 65, 165, 0.18);
+    outline: 3px solid rgba(100, 65, 165, 0.35);
+    outline-offset: 1px;
+}
+
+.ss-setup-field input:disabled,
+.ss-setup-field select:disabled {
+    cursor: not-allowed;
+    background: #f1eef4;
+    color: #756d7d;
+    opacity: 0.7;
 }
 
 .ss-setup-advanced {
@@ -404,6 +439,14 @@ h1:focus {
     cursor: pointer;
     color: #6441a5;
     font-weight: 700;
+    transition: color 0.15s, outline-color 0.15s;
+}
+
+.ss-setup-advanced summary:hover {
+    color: #7c5cbf;
+    text-decoration: underline;
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.2em;
 }
 
 .ss-setup-advanced[open] summary {
@@ -688,10 +731,16 @@ h1:focus {
     font-size: 1rem;
     font-weight: 700;
     cursor: pointer;
+    transition: background-color 0.15s, box-shadow 0.15s;
 }
 
-.ss-save-bar button:hover {
+.ss-save-bar button:not(:disabled):hover {
     background: #7c5cbf;
+}
+
+.ss-save-bar button:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .ss-save-success {
@@ -757,11 +806,16 @@ h1:focus {
     border-radius: 6px;
     border: 2px solid rgba(0, 0, 0, 0.1);
     overflow: hidden;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .ss-color-preview:hover {
     border-color: #6441a5;
+}
+
+.ss-color-preview:focus-within {
+    border-color: #7652ae;
+    box-shadow: 0 0 0 3px rgba(100, 65, 165, 0.18);
 }
 
 .ss-panel-background-swatch {
@@ -817,6 +871,18 @@ h1:focus {
     margin: 0;
     accent-color: #6441a5;
     cursor: pointer;
+    transition: filter 0.15s, opacity 0.15s;
+}
+
+.ss-opacity-range:not(:disabled):hover {
+    filter: saturate(1.3);
+    outline: 2px solid rgba(100, 65, 165, 0.22);
+    outline-offset: 3px;
+}
+
+.ss-opacity-range:focus-visible {
+    outline: 3px solid rgba(100, 65, 165, 0.35);
+    outline-offset: 3px;
 }
 
 .ss-opacity-range:disabled {
@@ -845,15 +911,11 @@ h1:focus {
     gap: 0.35rem;
     padding: 0.35rem 0.75rem;
     border-radius: 2rem;
+    font: inherit;
     font-size: 0.85rem;
-    cursor: grab;
     user-select: none;
     border: 1.5px solid transparent;
-    transition: opacity 0.15s, border-color 0.15s;
-}
-
-.ss-chip:active {
-    cursor: grabbing;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s, opacity 0.15s;
 }
 
 .ss-chip-selected {
@@ -868,14 +930,119 @@ h1:focus {
     border-color: #d0c0ef;
 }
 
-.ss-chip-drag-over {
-    border-color: #ff6b6b;
-    opacity: 0.7;
+.ss-chip-selected:hover {
+    background: #7c5cbf;
+    border-color: #4d2e79;
+}
+
+.ss-chip-unselected:hover {
+    background: #e5daf8;
+    border-color: #9d82c8;
+}
+
+.ss-chip:focus-within {
+    outline: 3px solid #4d2e79;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px #fff;
 }
 
 .ss-chip-handle {
     opacity: 0.5;
     font-size: 0.9rem;
+    line-height: 1;
+    margin-left: -0.25rem;
+    padding: 0.15rem 0.25rem;
+    cursor: grab;
+    touch-action: none;
+}
+
+.ss-chip-handle:active {
+    cursor: grabbing;
+}
+
+.ss-chip-sortable-chosen {
+    border-color: #ff6b6b;
+    box-shadow: 0 0 0 2px rgb(255 107 107 / 25%);
+}
+
+.ss-chip-sortable-ghost {
+    opacity: 0.35;
+}
+
+.ss-chip-sortable-drag,
+.ss-chip-sortable-fallback {
+    cursor: grabbing;
+    opacity: 0.92;
+}
+
+.ss-chip-toggle {
+    appearance: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    cursor: pointer;
+}
+
+.ss-chip-toggle:focus-visible {
+    outline: none;
+}
+
+.ss-chip-order-controls {
+    display: inline-flex;
+    gap: 0.15rem;
+    margin-right: -0.25rem;
+}
+
+.ss-chip-order-button {
+    display: inline-grid;
+    width: 1.45rem;
+    height: 1.45rem;
+    margin: 0;
+    padding: 0;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: 50%;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+    opacity: 0.75;
+}
+
+.ss-chip-order-button:hover:not(:disabled) {
+    background: rgb(255 255 255 / 20%);
+    opacity: 1;
+}
+
+.ss-chip-unselected .ss-chip-order-button:hover:not(:disabled) {
+    background: rgb(100 65 165 / 12%);
+}
+
+.ss-chip-order-button:focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    opacity: 1;
+}
+
+.ss-chip-order-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.3;
+}
+
+.ss-visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    padding: 0 !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    clip: rect(0, 0, 0, 0) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
 }
 
 /* ── Task-based settings workspace and live overlay preview ── */
@@ -980,6 +1147,7 @@ h1:focus {
     font: inherit;
     text-align: left;
     cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
 
 .ss-settings-nav-item:hover {
@@ -1076,13 +1244,39 @@ h1:focus {
     color: #26212b;
     font: inherit;
     font-size: 0.88rem;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.ss-settings-shell .ss-field input[type="text"]:not(:disabled):hover,
+.ss-settings-shell .ss-field input[type="password"]:not(:disabled):hover,
+.ss-settings-shell .ss-field input[type="number"]:not(:disabled):hover,
+.ss-settings-shell .ss-field select:not(:disabled):hover,
+.ss-settings-shell .ss-field textarea:not(:disabled):hover {
+    border-color: #9b83bd;
+    background: #fdfbff;
+}
+
+.ss-settings-shell .ss-field select:not(:disabled) {
+    cursor: pointer;
+}
+
+.ss-settings-shell .ss-field input[type="text"]:disabled,
+.ss-settings-shell .ss-field input[type="password"]:disabled,
+.ss-settings-shell .ss-field input[type="number"]:disabled,
+.ss-settings-shell .ss-field select:disabled,
+.ss-settings-shell .ss-field textarea:disabled {
+    cursor: not-allowed;
+    background: #f1eef4;
+    color: #756d7d;
+    opacity: 0.7;
 }
 
 .ss-settings-shell .ss-field input:focus-visible,
 .ss-settings-shell .ss-field select:focus-visible,
 .ss-settings-shell .ss-field textarea:focus-visible {
     border-color: #7652ae;
-    outline: 3px solid rgba(100, 65, 165, 0.16);
+    outline: 3px solid rgba(100, 65, 165, 0.35);
+    outline-offset: 1px;
 }
 
 .ss-checkbox-label {
@@ -1095,6 +1289,21 @@ h1:focus {
 .ss-checkbox-label input {
     flex: 0 0 auto;
     margin: 0.05rem 0 0 !important;
+}
+
+.ss-checkbox-label input:not(:disabled):hover {
+    outline: 2px solid rgba(100, 65, 165, 0.24);
+    outline-offset: 2px;
+}
+
+.ss-settings-shell .ss-checkbox-label input:focus-visible {
+    outline: 3px solid rgba(100, 65, 165, 0.4);
+    outline-offset: 2px;
+}
+
+.ss-checkbox-label input:disabled {
+    cursor: not-allowed;
+    opacity: 0.55;
 }
 
 .ss-credential-row,
@@ -1122,6 +1331,12 @@ h1:focus {
     font: inherit;
     font-size: 0.78rem;
     cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
+}
+
+.ss-btn-danger-subtle:not(:disabled):hover {
+    border-color: #b84b4b;
+    background: #ffe8e8;
 }
 
 .ss-btn-danger-subtle:disabled {
@@ -1146,9 +1361,10 @@ h1:focus {
     font-size: 0.72rem;
     font-weight: 650;
     cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
-.ss-btn-reset-subset:hover {
+.ss-btn-reset-subset:not(:disabled):hover {
     background: #eee7f7;
 }
 
@@ -1256,6 +1472,14 @@ h1:focus {
     font: inherit;
     font-weight: 700;
     cursor: pointer;
+    transition: color 0.15s, outline-color 0.15s;
+}
+
+.ss-settings-inline-notice button:hover {
+    color: #7c5cbf;
+    text-decoration: underline;
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.2em;
 }
 
 .ss-settings-inline-actions {
@@ -1379,11 +1603,33 @@ h1:focus {
     font: inherit;
     font-size: 0.7rem;
     cursor: pointer;
+    transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .ss-overlay-preview-shortcuts button:hover {
     border-color: #b698df;
     background: rgba(166, 126, 220, 0.18);
+}
+
+.ss-btn-primary:focus-visible,
+.ss-btn-secondary:focus-visible,
+.ss-btn-danger-subtle:focus-visible,
+.ss-btn-reset-subset:focus-visible,
+.ss-settings-nav-item:focus-visible,
+.ss-update-banner__action:focus-visible,
+.ss-update-banner__dismiss:focus-visible,
+.ss-save-bar button:focus-visible,
+.ss-setup-advanced summary:focus-visible,
+.ss-settings-inline-notice button:focus-visible {
+    outline: 3px solid #4d2e79;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px #fff;
+}
+
+.ss-overlay-preview-shortcuts button:focus-visible {
+    outline: 3px solid #d7c2f3;
+    outline-offset: 2px;
+    box-shadow: 0 0 0 2px #2c203d;
 }
 
 .ss-settings-shell .ss-save-bar {

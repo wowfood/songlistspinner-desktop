@@ -235,93 +235,52 @@ public partial class Settings
     private string SectionClass(SettingsSection section) =>
         _activeSection == section ? "ss-settings-nav-item active" : "ss-settings-nav-item";
 
-    private static string FieldLabel(string field) => SettingsOptions.GetSongFieldLabel(field);
-
-    private void BeginPlayedFieldDrag(int index)
+    private void MovePlayedField(DisplayFieldOrderChange change)
     {
-        _vm.DragIdx = index;
-        _vm.DragOverIdx = -1;
+        if (_vm.MoveField(change.FieldName, change.NewIndex))
+        {
+            QueuePreviewRefresh();
+        }
     }
 
-    private void SetPlayedFieldDragOver(int index)
+    private void TogglePlayedField(string fieldName)
     {
-        if (_vm.DragOverIdx != index) _vm.DragOverIdx = index;
+        if (_vm.ToggleField(fieldName))
+        {
+            QueuePreviewRefresh();
+        }
     }
 
-    private void DropPlayedField(int index)
+    private void MoveNowPlayingField(DisplayFieldOrderChange change)
     {
-        _vm.DropField(index);
-        QueuePreviewRefresh();
+        if (_vm.MoveNowPlayingField(change.FieldName, change.NewIndex))
+        {
+            QueuePreviewRefresh();
+        }
     }
 
-    private void EndPlayedFieldDrag()
+    private void ToggleNowPlayingField(string fieldName)
     {
-        _vm.DragIdx = -1;
-        _vm.DragOverIdx = -1;
+        if (_vm.ToggleNowPlayingField(fieldName))
+        {
+            QueuePreviewRefresh();
+        }
     }
 
-    private void TogglePlayedField(int index)
+    private void MoveWinnerDialogField(DisplayFieldOrderChange change)
     {
-        _vm.ToggleField(index);
-        QueuePreviewRefresh();
+        if (_vm.MoveWinnerDialogField(change.FieldName, change.NewIndex))
+        {
+            QueuePreviewRefresh();
+        }
     }
 
-    private void BeginNowPlayingFieldDrag(int index)
+    private void ToggleWinnerDialogField(string fieldName)
     {
-        _vm.NowPlayingDragIdx = index;
-        _vm.NowPlayingDragOverIdx = -1;
-    }
-
-    private void SetNowPlayingFieldDragOver(int index)
-    {
-        if (_vm.NowPlayingDragOverIdx != index) _vm.NowPlayingDragOverIdx = index;
-    }
-
-    private void DropNowPlayingField(int index)
-    {
-        _vm.DropNowPlayingField(index);
-        QueuePreviewRefresh();
-    }
-
-    private void EndNowPlayingFieldDrag()
-    {
-        _vm.NowPlayingDragIdx = -1;
-        _vm.NowPlayingDragOverIdx = -1;
-    }
-
-    private void ToggleNowPlayingField(int index)
-    {
-        _vm.ToggleNowPlayingField(index);
-        QueuePreviewRefresh();
-    }
-
-    private void BeginWinnerDialogFieldDrag(int index)
-    {
-        _vm.WinnerDialogDragIdx = index;
-        _vm.WinnerDialogDragOverIdx = -1;
-    }
-
-    private void SetWinnerDialogFieldDragOver(int index)
-    {
-        if (_vm.WinnerDialogDragOverIdx != index) _vm.WinnerDialogDragOverIdx = index;
-    }
-
-    private void DropWinnerDialogField(int index)
-    {
-        _vm.DropWinnerDialogField(index);
-        QueuePreviewRefresh();
-    }
-
-    private void EndWinnerDialogFieldDrag()
-    {
-        _vm.WinnerDialogDragIdx = -1;
-        _vm.WinnerDialogDragOverIdx = -1;
-    }
-
-    private void ToggleWinnerDialogField(int index)
-    {
-        _vm.ToggleWinnerDialogField(index);
-        QueuePreviewRefresh();
+        if (_vm.ToggleWinnerDialogField(fieldName))
+        {
+            QueuePreviewRefresh();
+        }
     }
 
     private async Task OnPreviewLoadedAsync()

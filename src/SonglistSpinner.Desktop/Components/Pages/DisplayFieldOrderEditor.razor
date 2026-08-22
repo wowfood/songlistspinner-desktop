@@ -1,0 +1,53 @@
+<div @ref="_container"
+     class="ss-field-multiselect"
+     role="list"
+     aria-describedby="@HelpId">
+    @for (var index = 0; index < Items.Count; index++)
+    {
+        var field = Items[index];
+        var itemIndex = index;
+        var label = SettingsOptions.GetSongFieldLabel(field.Name);
+        var position = itemIndex + 1;
+
+        <div @key="field.Name"
+             class="ss-chip @(field.Selected ? "ss-chip-selected" : "ss-chip-unselected")"
+             data-field-name="@field.Name"
+             role="listitem"
+             aria-posinset="@position"
+             aria-setsize="@Items.Count">
+            <span class="ss-chip-handle"
+                  aria-hidden="true"
+                  title="@($"Drag {label} to reorder")">&#10247;</span>
+            <button type="button"
+                    class="ss-chip-toggle"
+                    aria-pressed="@field.Selected"
+                    aria-describedby="@HelpId"
+                    title="@($"Toggle {label}")"
+                    @onclick="@(() => ToggleFieldAsync(field.Name))">
+                @label
+            </button>
+            <span class="ss-chip-order-controls">
+                <button type="button"
+                        class="ss-chip-order-button"
+                        aria-label="@($"Move {label} earlier")"
+                        title="@($"Move {label} earlier")"
+                        disabled="@(itemIndex == 0)"
+                        @onclick="@(() => MoveFieldAsync(field.Name, itemIndex - 1))">&#8592;</button>
+                <button type="button"
+                        class="ss-chip-order-button"
+                        aria-label="@($"Move {label} later")"
+                        title="@($"Move {label} later")"
+                        disabled="@(itemIndex == Items.Count - 1)"
+                        @onclick="@(() => MoveFieldAsync(field.Name, itemIndex + 1))">&#8594;</button>
+            </span>
+        </div>
+    }
+</div>
+<div id="@HelpId" class="ss-field-hint">
+    @HelpContent
+    @if (_dragUnavailable)
+    {
+        <span> Dragging is unavailable; use the move buttons instead.</span>
+    }
+</div>
+<div class="ss-visually-hidden" role="status" aria-live="polite">@_reorderAnnouncement</div>
