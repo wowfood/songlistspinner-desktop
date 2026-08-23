@@ -62,14 +62,12 @@ public static class SpinnerDataService
 
     public static string CreatePlayedSongText(SpinnerQueueItem song, SpinnerConfig config)
     {
-        var fields = config.SongList.Fields is { Length: > 0 } f
-            ? f
-            : SongFieldNames.CreateDefaultSelection();
+        var fields = GetPlayedFields(config);
         return CreateSongTextForFields(
             song,
             fields,
             config.PlayedList.Separator,
-            config.PlayedList.ShowLabels);
+            config.PlayedList.ShowLabels && !config.PlayedList.ShowFieldHeaders);
     }
 
     public static string[] CreatePlayedSongTexts(
@@ -77,6 +75,13 @@ public static class SpinnerDataService
         SpinnerConfig config)
     {
         return CreatePlayedSongTexts(songs, config, song => CreatePlayedSongText(song, config));
+    }
+
+    public static PlayedSongFieldTable CreatePlayedSongFieldTable(
+        IReadOnlyList<SpinnerQueueItem> songs,
+        SpinnerConfig config)
+    {
+        return CreatePlayedSongFieldTable(songs, config, GetSongFieldValue);
     }
 
     public static string[] GetWinnerFields(SpinnerConfig config)
@@ -108,15 +113,14 @@ public static class SpinnerDataService
 
     public static string CreatePlayedSongText(PlayHistoryItem item, SpinnerConfig config)
     {
-        var fields = config.SongList.Fields is { Length: > 0 } f
-            ? f
-            : SongFieldNames.CreateDefaultSelection();
+        var fields = GetPlayedFields(config);
         var parts = fields
-            .Select(field => SongFieldNames.TryNormalize(field, out var normalized) ? normalized : "")
-            .Where(field => field.Length > 0)
             .Select(field => (field, value: GetHistoryFieldValue(item, field)))
             .Where(x => !string.IsNullOrEmpty(x.value))
-            .Select(x => FormatSongField(x.field, x.value, config.PlayedList.ShowLabels));
+            .Select(x => FormatSongField(
+                x.field,
+                x.value,
+                config.PlayedList.ShowLabels && !config.PlayedList.ShowFieldHeaders));
         return string.Join(SongTextFormatting.NormalizeSeparator(config.PlayedList.Separator), parts);
     }
 
@@ -127,24 +131,60 @@ public static class SpinnerDataService
         return CreatePlayedSongTexts(songs, config, song => CreatePlayedSongText(song, config));
     }
 
+    public static PlayedSongFieldTable CreatePlayedSongFieldTable(
+        IReadOnlyList<PlayHistoryItem> songs,
+        SpinnerConfig config)
+    {
+        return CreatePlayedSongFieldTable(songs, config, GetHistoryFieldValue);
+    }
+
     private static string[] CreatePlayedSongTexts<T>(
         IReadOnlyList<T> songs,
         SpinnerConfig config,
         Func<T, string> createText)
     {
-        if (!config.PlayedList.ShowNumbers) return songs.Select(createText).ToArray();
+        return songs
+            .Select((song, index) =>
+            {
+                var text = createText(song);
+                var number = GetPlayedSongNumber(index, songs.Count, config);
+                return number.HasValue ? $"{number}. {text}" : text;
+            })
+            .ToArray();
+    }
+
+    private static PlayedSongFieldTable CreatePlayedSongFieldTable<T>(
+        IReadOnlyList<T> songs,
+        SpinnerConfig config,
+        Func<T, string, string> getFieldValue)
+    {
+        var fields = GetPlayedFields(config);
+        var rows = songs
+            .Select((song, index) => new PlayedSongFieldRow(
+                GetPlayedSongNumber(index, songs.Count, config),
+                fields.Select(field => getFieldValue(song, field)).ToArray()))
+            .ToArray();
+
+        return new PlayedSongFieldTable(
+            fields.Select(FormatSongFieldLabel).ToArray(),
+            SongTextFormatting.NormalizeSeparator(config.PlayedList.Separator),
+            rows);
+    }
+
+    private static string[] GetPlayedFields(SpinnerConfig config)
+    {
+        return SongFieldNames.NormalizeSelection(config.SongList.Fields);
+    }
+
+    private static int? GetPlayedSongNumber(int index, int songCount, SpinnerConfig config)
+    {
+        if (!config.PlayedList.ShowNumbers) return null;
 
         var startsAtTop = string.Equals(
             config.PlayedList.NumberingStart,
             SpinnerSettingValues.PlayedListNumberingStarts.Top,
             StringComparison.OrdinalIgnoreCase);
-        return songs
-            .Select((song, index) =>
-            {
-                var number = startsAtTop ? index + 1 : songs.Count - index;
-                return $"{number}. {createText(song)}";
-            })
-            .ToArray();
+        return startsAtTop ? index + 1 : songCount - index;
     }
 
     private static string GetHistoryFieldValue(PlayHistoryItem item, string field)
@@ -165,8 +205,13 @@ public static class SpinnerDataService
     private static string FormatSongField(string field, string value, bool showLabels)
     {
         return showLabels
-            ? $"{char.ToUpperInvariant(field[0])}{field[1..]}: {value}"
+            ? $"{FormatSongFieldLabel(field)}: {value}"
             : value;
+    }
+
+    private static string FormatSongFieldLabel(string field)
+    {
+        return $"{char.ToUpperInvariant(field[0])}{field[1..]}";
     }
 
     // Single source of truth for donation formatting. fallback differs by context:

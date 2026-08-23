@@ -47,7 +47,8 @@ public class SpinnerDataServiceTests
         bool showNumbers = false,
         string numberingStart = SpinnerSettingValues.PlayedListNumberingStarts.Bottom,
         string separator = SongTextFormatting.DefaultSeparator,
-        bool showLabels = true)
+        bool showLabels = true,
+        bool showFieldHeaders = false)
     {
         return new SpinnerConfig
         {
@@ -61,7 +62,8 @@ public class SpinnerDataServiceTests
                 ShowNumbers = showNumbers,
                 NumberingStart = numberingStart,
                 Separator = separator,
-                ShowLabels = showLabels
+                ShowLabels = showLabels,
+                ShowFieldHeaders = showFieldHeaders
             },
             WinnerDialog = new SpinnerWinnerDialogConfig
             {
@@ -433,6 +435,15 @@ public class SpinnerDataServiceTests
         Assert.Equal("Artist A | Song One", result);
     }
 
+    [Fact]
+    public void Given_FieldHeaders_When_CreatePlayedSongText_QueueItem_Then_OmitsInlineLabels()
+    {
+        var result = SpinnerDataService.CreatePlayedSongText(
+            Q(),
+            Cfg(["artist", "title"], showLabels: true, showFieldHeaders: true));
+        Assert.Equal("Artist A | Song One", result);
+    }
+
     // ── CreatePlayedSongText (PlayHistoryItem overload) ──────────────────────
 
     [Fact]
@@ -571,6 +582,51 @@ public class SpinnerDataServiceTests
         var historyResult = SpinnerDataService.CreatePlayedSongTexts(historySongs, config);
 
         Assert.Equal(historyResult, previewResult);
+    }
+
+    // ── CreatePlayedSongFieldTable ──────────────────────────────────────────
+
+    [Fact]
+    public void Given_ConfiguredFields_When_CreatePlayedSongFieldTable_Then_HeadersAndValuesFollowOrder()
+    {
+        var config = Cfg(
+            ["requester", "title", "artist"],
+            showNumbers: true,
+            numberingStart: SpinnerSettingValues.PlayedListNumberingStarts.Top,
+            separator: " → ",
+            showFieldHeaders: true);
+
+        var result = SpinnerDataService.CreatePlayedSongFieldTable(
+            new[] { Q(artist: "Band", title: "Track", requester: "Fan") },
+            config);
+
+        Assert.Equal(["Requester", "Title", "Artist"], result.Headers);
+        Assert.Equal(" → ", result.Separator);
+        var row = Assert.Single(result.Rows);
+        Assert.Equal(1, row.Number);
+        Assert.Equal(["Fan", "Track", "Band"], row.Values);
+    }
+
+    [Fact]
+    public void Given_HistoryFieldWithoutValue_When_CreatePlayedSongFieldTable_Then_KeepsAlignedEmptyCell()
+    {
+        var result = SpinnerDataService.CreatePlayedSongFieldTable(
+            new[] { H() },
+            Cfg(["artist", "donation"], showFieldHeaders: true));
+
+        Assert.Equal(["Artist", "Donation"], result.Headers);
+        Assert.Equal(["Artist A", ""], Assert.Single(result.Rows).Values);
+    }
+
+    [Fact]
+    public void Given_BottomNumbering_When_CreatePlayedSongFieldTable_Then_NumbersMatchTextListOrder()
+    {
+        PlayHistoryItem[] songs = [H(title: "Newest"), H(title: "Oldest")];
+        var result = SpinnerDataService.CreatePlayedSongFieldTable(
+            songs,
+            Cfg(["title"], showNumbers: true, showFieldHeaders: true));
+
+        Assert.Equal([2, 1], result.Rows.Select(row => row.Number));
     }
 
     // ── GetWinnerFields ──────────────────────────────────────────────────────

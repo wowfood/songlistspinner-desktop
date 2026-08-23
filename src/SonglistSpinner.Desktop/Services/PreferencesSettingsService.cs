@@ -85,7 +85,8 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
                 NumberingStart = SpinnerSettingValues.PlayedListNumberingStarts.NormalizeOrDefault(
                     dto.PlayedListNumberingStart),
                 Separator = dto.PlayedListSeparator,
-                ShowLabels = dto.PlayedListShowLabels
+                ShowLabels = dto.PlayedListShowLabels,
+                ShowFieldHeaders = dto.PlayedListShowFieldHeaders
             },
             NowPlaying = new SpinnerNowPlayingConfig
             {

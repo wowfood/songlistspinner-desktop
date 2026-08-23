@@ -261,10 +261,18 @@
                                     </div>
                                     <div class="ss-field">
                                         <label class="ss-checkbox-label">
-                                            <InputCheckbox @bind-Value="_dto.PlayedListShowLabels"/>
+                                            <InputCheckbox @bind-Value="_dto.PlayedListShowLabels"
+                                                           disabled="@_dto.PlayedListShowFieldHeaders"/>
                                             Show field labels
                                         </label>
-                                        <div class="ss-field-hint">Prefixes values with labels such as Artist and Title.</div>
+                                        <div class="ss-field-hint">Prefixes each song value with labels such as Artist and Title. A header row replaces these labels while enabled.</div>
+                                    </div>
+                                    <div class="ss-field">
+                                        <label class="ss-checkbox-label">
+                                            <InputCheckbox @bind-Value="_dto.PlayedListShowFieldHeaders"/>
+                                            Show field header row
+                                        </label>
+                                        <div class="ss-field-hint">Displays the selected field labels once above aligned song values.</div>
                                     </div>
                                     <div class="ss-field">
                                         <label class="ss-checkbox-label">

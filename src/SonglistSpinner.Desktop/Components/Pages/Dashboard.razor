@@ -117,14 +117,61 @@
                     <h3>Played Songs: <span id="playedCount">@_playedSongs.Length</span></h3>
                     <h3>Queued Songs: <span id="availableCount">@_availableSongs.Count</span></h3>
                 </div>
+                @{
+                    var playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(_playedSongs, _config);
+                    var showPlayedFieldHeaders = _config.PlayedList.ShowFieldHeaders &&
+                                                 playedFieldTable.Headers.Length > 0;
+                }
                 <ul id="playedSongsUl">
-                    @foreach (var text in SpinnerDataService.CreatePlayedSongTexts(_playedSongs, _config))
+                    @if (showPlayedFieldHeaders)
                     {
-                        <li>
-                            <span class="played-song-text">
-                                @text
-                            </span>
+                        <li class="played-field-grid played-field-header-row"
+                            aria-label="Played Songs field headers">
+                            @if (_config.PlayedList.ShowNumbers)
+                            {
+                                <span class="played-song-number">#</span>
+                            }
+                            @for (var index = 0; index < playedFieldTable.Headers.Length; index++)
+                            {
+                                @if (index > 0)
+                                {
+                                    <span class="played-field-separator" aria-hidden="true"
+                                          title="@playedFieldTable.Separator">@playedFieldTable.Separator</span>
+                                }
+                                <span class="played-field-header" title="@playedFieldTable.Headers[index]">
+                                    @playedFieldTable.Headers[index]
+                                </span>
+                            }
                         </li>
+                        @foreach (var row in playedFieldTable.Rows)
+                        {
+                            <li class="played-field-grid">
+                                @if (row.Number is int number)
+                                {
+                                    <span class="played-song-number">@($"{number}.")</span>
+                                }
+                                @for (var index = 0; index < row.Values.Length; index++)
+                                {
+                                    @if (index > 0)
+                                    {
+                                        <span class="played-field-separator" aria-hidden="true"
+                                              title="@playedFieldTable.Separator">@playedFieldTable.Separator</span>
+                                    }
+                                    <span class="played-song-cell" title="@row.Values[index]">@row.Values[index]</span>
+                                }
+                            </li>
+                        }
+                    }
+                    else
+                    {
+                        @foreach (var text in SpinnerDataService.CreatePlayedSongTexts(_playedSongs, _config))
+                        {
+                            <li>
+                                <span class="played-song-text">
+                                    @text
+                                </span>
+                            </li>
+                        }
                     }
                 </ul>
             </div>

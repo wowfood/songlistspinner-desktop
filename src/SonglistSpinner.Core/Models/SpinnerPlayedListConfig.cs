@@ -9,4 +9,5 @@ public class SpinnerPlayedListConfig
     public string NumberingStart { get; set; } = SpinnerSettingValues.PlayedListNumberingStarts.Default;
     public string Separator { get; set; } = SongTextFormatting.DefaultSeparator;
     public bool ShowLabels { get; set; } = true;
+    public bool ShowFieldHeaders { get; set; }
 }
