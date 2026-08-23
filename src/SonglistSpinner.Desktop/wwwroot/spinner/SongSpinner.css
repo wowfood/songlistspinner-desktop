@@ -490,7 +490,67 @@ body.spinner-page #streamerInput.streamer-input-invalid:focus-visible {
     font-family: var(--app-played-list-font-family);
 }
 
-#playedList li > .played-song-text {
+#playedList li.played-field-grid {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    padding-inline: 0.35rem;
+}
+
+#playedList li.played-field-header-row {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    border-bottom: 1px solid currentColor;
+    border-radius: 0;
+    background: var(--app-played-list-bg);
+    font-weight: 700;
+}
+
+.played-field-header,
+.played-song-cell {
+    flex: 1 1 0;
+    min-width: 0;
+}
+
+.played-field-header {
+    font-size: 0.9em;
+    line-height: 1.2em;
+    max-height: 2.4em;
+    overflow: hidden;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+}
+
+.played-song-number {
+    flex: 0 0 3.5ch;
+    min-width: 0;
+    line-height: 1.4em;
+}
+
+.played-field-header-row .played-song-number {
+    line-height: 1.2em;
+}
+
+.played-field-separator {
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: 3rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+    line-height: 1.4em;
+    opacity: 0.7;
+}
+
+.played-field-header-row .played-field-separator {
+    line-height: 1.2em;
+}
+
+#playedList li > .played-song-text,
+#playedList li > .played-song-cell {
     line-height: 1.4em;
     max-height: calc(var(--app-played-list-max-lines) * 1.4em);
     overflow: hidden;

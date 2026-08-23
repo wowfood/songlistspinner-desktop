@@ -87,6 +87,9 @@ public class OverlayStateService
             streamer = snapshot.CurrentStreamer,
             wheelItems = BuildWheelItems(snapshot.AvailableSongs),
             playedTexts = SpinnerDataService.CreatePlayedSongTexts(snapshot.PlayedSongs, snapshot.Config),
+            playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(
+                snapshot.PlayedSongs,
+                snapshot.Config),
             nowPlayingText = BuildNowPlayingText(snapshot.NowPlaying, snapshot.Config),
             playedCount = snapshot.PlayedSongs.Length,
             availableCount = snapshot.AvailableSongs.Length
@@ -196,6 +199,9 @@ public class OverlayStateService
 
         var wheelItems = BuildWheelItems(snapshot.AvailableSongs);
         var playedTexts = SpinnerDataService.CreatePlayedSongTexts(snapshot.PlayedSongs, snapshot.Config);
+        var playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(
+            snapshot.PlayedSongs,
+            snapshot.Config);
         var nowPlayingText = BuildNowPlayingText(snapshot.NowPlaying, snapshot.Config);
 
         var payload = new
@@ -204,6 +210,7 @@ public class OverlayStateService
             streamer = snapshot.CurrentStreamer,
             wheelItems,
             playedTexts,
+            playedFieldTable,
             nowPlayingText,
             playedCount = snapshot.PlayedSongs.Length,
             availableCount = snapshot.AvailableSongs.Length,

@@ -209,7 +209,59 @@ button{
     font-size:var(--app-played-list-font-size);
     font-family:var(--app-played-list-font-family);
 }
-#playedList li > .played-song-text{
+#playedList li.played-field-grid{
+    display:flex;
+    align-items:flex-start;
+    gap:0;
+    padding-inline:0.35rem;
+}
+#playedList li.played-field-header-row{
+    position:sticky;
+    top:0;
+    z-index:1;
+    border-bottom:1px solid currentColor;
+    border-radius:0;
+    background:var(--app-played-list-bg);
+    font-weight:700;
+}
+.played-field-header,
+.played-song-cell{
+    flex:1 1 0;
+    min-width:0;
+}
+.played-field-header{
+    font-size:0.9em;
+    line-height:1.2em;
+    max-height:2.4em;
+    overflow:hidden;
+    overflow-wrap:anywhere;
+    display:-webkit-box;
+    -webkit-box-orient:vertical;
+    -webkit-line-clamp:2;
+}
+.played-song-number{
+    flex:0 0 3.5ch;
+    min-width:0;
+    line-height:1.4em;
+}
+.played-field-header-row .played-song-number{
+    line-height:1.2em;
+}
+.played-field-separator{
+    flex:0 1 auto;
+    min-width:0;
+    max-width:3rem;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:pre;
+    line-height:1.4em;
+    opacity:0.7;
+}
+.played-field-header-row .played-field-separator{
+    line-height:1.2em;
+}
+#playedList li > .played-song-text,
+#playedList li > .played-song-cell{
     line-height:1.4em;
     max-height:calc(var(--app-played-list-max-lines) * 1.4em);
     overflow: hidden;
@@ -771,6 +823,53 @@ function connectSSE() {
     }
 }
 
+function appendPlayedFieldCells(container, values, separator, className) {
+    ;(values || []).forEach((value, index) => {
+        if (index > 0) {
+            const separatorElement = document.createElement('span')
+            separatorElement.className = 'played-field-separator'
+            separatorElement.setAttribute('aria-hidden', 'true')
+            separatorElement.textContent = separator
+            separatorElement.title = separator
+            container.appendChild(separatorElement)
+        }
+
+        const cell = document.createElement('span')
+        cell.className = className
+        cell.textContent = value == null ? '' : value
+        cell.title = cell.textContent
+        container.appendChild(cell)
+    })
+}
+
+function renderPlayedFieldTable(ul, table, showNumbers) {
+    const separator = table.separator || ' | '
+    const headerRow = document.createElement('li')
+    headerRow.className = 'played-field-grid played-field-header-row'
+    headerRow.setAttribute('aria-label', 'Played Songs field headers')
+    if (showNumbers) {
+        const numberHeader = document.createElement('span')
+        numberHeader.className = 'played-song-number'
+        numberHeader.textContent = '#'
+        headerRow.appendChild(numberHeader)
+    }
+    appendPlayedFieldCells(headerRow, table.headers, separator, 'played-field-header')
+    ul.appendChild(headerRow)
+
+    ;(table.rows || []).forEach(row => {
+        const li = document.createElement('li')
+        li.className = 'played-field-grid'
+        if (row.number != null) {
+            const numberElement = document.createElement('span')
+            numberElement.className = 'played-song-number'
+            numberElement.textContent = `${row.number}.`
+            li.appendChild(numberElement)
+        }
+        appendPlayedFieldCells(li, row.values, separator, 'played-song-cell')
+        ul.appendChild(li)
+    })
+}
+
 function updateSongs(data) {
     if (data.config) {
         _overlayState.config = data.config
@@ -794,14 +893,22 @@ function updateSongs(data) {
     nowPlayingText.textContent = showNowPlaying ? data.nowPlayingText : ''
     const ul = document.getElementById('playedSongsUl')
     ul.innerHTML = ''
-    ;(data.playedTexts || []).forEach(text => {
-        const li = document.createElement('li')
-        const textElement = document.createElement('span')
-        textElement.className = 'played-song-text'
-        textElement.textContent = text
-        li.appendChild(textElement)
-        ul.appendChild(li)
-    })
+    const table = data.playedFieldTable
+    const showFieldHeaders = Boolean(
+        cfg && cfg.playedList && cfg.playedList.showFieldHeaders &&
+        table && Array.isArray(table.headers) && table.headers.length)
+    if (showFieldHeaders) {
+        renderPlayedFieldTable(ul, table, Boolean(cfg.playedList.showNumbers))
+    } else {
+        ;(data.playedTexts || []).forEach(text => {
+            const li = document.createElement('li')
+            const textElement = document.createElement('span')
+            textElement.className = 'played-song-text'
+            textElement.textContent = text
+            li.appendChild(textElement)
+            ul.appendChild(li)
+        })
+    }
 }
 
 window.addEventListener('message', event => {

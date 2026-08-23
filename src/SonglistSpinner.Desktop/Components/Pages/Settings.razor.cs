@@ -363,6 +363,7 @@ public partial class Settings
             var nowPlayingFields = config.NowPlaying.Fields is { Length: > 0 }
                 ? config.NowPlaying.Fields
                 : SongFieldNames.CreateDefaultSelection();
+            var previewPlayedSongs = PreviewSongs.Take(3).ToArray();
 
             var payload = new
             {
@@ -371,7 +372,8 @@ public partial class Settings
                     ? "your-channel"
                     : previewDto.DefaultStreamerName.Trim(),
                 wheelItems = PreviewSongs.Select(song => new { label = SpinnerDataService.BuildWheelLabel(song) }),
-                playedTexts = SpinnerDataService.CreatePlayedSongTexts(PreviewSongs.Take(3).ToArray(), config),
+                playedTexts = SpinnerDataService.CreatePlayedSongTexts(previewPlayedSongs, config),
+                playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(previewPlayedSongs, config),
                 nowPlayingText = SpinnerDataService.CreateSongTextForFields(
                     PreviewSongs[3],
                     nowPlayingFields,

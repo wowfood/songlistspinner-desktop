@@ -277,6 +277,7 @@ Played-panel options include:
 
 - A choice of pipe, bullet, dot, diamond, star, slash, dash, or arrow separators, plus a custom option; blank or whitespace-only custom values use the existing ` | ` separator
 - Optional field labels such as `Artist:` and `Title:`; labels remain visible by default
+- An optional aligned header row that shows the selected field labels once instead of repeating them for every song
 - Left or right screen position
 - Font family and CSS font size
 - One to five lines per song

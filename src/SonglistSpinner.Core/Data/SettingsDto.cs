@@ -17,6 +17,7 @@ public class SettingsDto
     public string SongListFields { get; set; } = SongFieldNames.DefaultJson;
     public string PlayedListSeparator { get; set; } = SongTextFormatting.DefaultSeparator;
     public bool PlayedListShowLabels { get; set; } = true;
+    public bool PlayedListShowFieldHeaders { get; set; }
     public bool ExcludePlayedSongs { get; set; }
     public string PlayedListPosition { get; set; } = SpinnerSettingValues.PlayedListPositions.Default;
     public string PlayHistoryPeriod { get; set; } = SpinnerSettingValues.PlayHistoryPeriods.Default;
