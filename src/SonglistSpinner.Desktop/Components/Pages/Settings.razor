@@ -261,6 +261,13 @@
                                     </div>
                                     <div class="ss-field">
                                         <label class="ss-checkbox-label">
+                                            <InputCheckbox @bind-Value="_dto.PlayedListShowLabels"/>
+                                            Show field labels
+                                        </label>
+                                        <div class="ss-field-hint">Prefixes values with labels such as Artist and Title.</div>
+                                    </div>
+                                    <div class="ss-field">
+                                        <label class="ss-checkbox-label">
                                             <InputCheckbox @bind-Value="_dto.PlayedListShowNumbers"/>
                                             Show sequence numbers
                                         </label>
@@ -360,6 +367,13 @@
                                                     <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
                                                 </div>
                                             }
+                                        </div>
+                                        <div class="ss-field">
+                                            <label class="ss-checkbox-label">
+                                                <InputCheckbox @bind-Value="_dto.NowPlayingShowLabels"/>
+                                                Show field labels
+                                            </label>
+                                            <div class="ss-field-hint">Prefixes values with labels such as Artist and Title.</div>
                                         </div>
                                         <div class="ss-field">
                                             <label for="nowPlayingPosition">Screen Position</label>

@@ -19,6 +19,8 @@ public class SettingsDtoTests
             settings.PlayedListNumberingStart);
         Assert.Equal(SongTextFormatting.DefaultSeparator, settings.PlayedListSeparator);
         Assert.Equal(SongTextFormatting.DefaultSeparator, settings.NowPlayingSeparator);
+        Assert.True(settings.PlayedListShowLabels);
+        Assert.True(settings.NowPlayingShowLabels);
     }
 
     [Fact]
@@ -40,6 +42,8 @@ public class SettingsDtoTests
         Assert.Equal(
             SongTextFormatting.DefaultSeparator,
             root.GetProperty(nameof(SettingsDto.NowPlayingSeparator)).GetString());
+        Assert.True(root.GetProperty(nameof(SettingsDto.PlayedListShowLabels)).GetBoolean());
+        Assert.True(root.GetProperty(nameof(SettingsDto.NowPlayingShowLabels)).GetBoolean());
     }
 
     [Fact]

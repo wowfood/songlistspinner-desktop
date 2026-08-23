@@ -48,14 +48,15 @@ public static class SpinnerDataService
     public static string CreateSongTextForFields(
         SpinnerQueueItem song,
         IEnumerable<string> fields,
-        string? separator = null)
+        string? separator = null,
+        bool showLabels = true)
     {
         var parts = fields
             .Select(field => SongFieldNames.TryNormalize(field, out var normalized) ? normalized : "")
             .Where(field => field.Length > 0)
             .Select(field => (field, value: GetSongFieldValue(song, field)))
             .Where(x => !string.IsNullOrEmpty(x.value))
-            .Select(x => $"{char.ToUpperInvariant(x.field[0])}{x.field[1..]}: {x.value}");
+            .Select(x => FormatSongField(x.field, x.value, showLabels));
         return string.Join(SongTextFormatting.NormalizeSeparator(separator), parts);
     }
 
@@ -64,7 +65,11 @@ public static class SpinnerDataService
         var fields = config.SongList.Fields is { Length: > 0 } f
             ? f
             : SongFieldNames.CreateDefaultSelection();
-        return CreateSongTextForFields(song, fields, config.PlayedList.Separator);
+        return CreateSongTextForFields(
+            song,
+            fields,
+            config.PlayedList.Separator,
+            config.PlayedList.ShowLabels);
     }
 
     public static string[] CreatePlayedSongTexts(
@@ -111,7 +116,7 @@ public static class SpinnerDataService
             .Where(field => field.Length > 0)
             .Select(field => (field, value: GetHistoryFieldValue(item, field)))
             .Where(x => !string.IsNullOrEmpty(x.value))
-            .Select(x => $"{char.ToUpperInvariant(x.field[0])}{x.field[1..]}: {x.value}");
+            .Select(x => FormatSongField(x.field, x.value, config.PlayedList.ShowLabels));
         return string.Join(SongTextFormatting.NormalizeSeparator(config.PlayedList.Separator), parts);
     }
 
@@ -155,6 +160,13 @@ public static class SpinnerDataService
             SongFieldNames.Donation => FormatDonationFromRequest(item.Requests.FirstOrDefault(), ""),
             _ => ""
         };
+    }
+
+    private static string FormatSongField(string field, string value, bool showLabels)
+    {
+        return showLabels
+            ? $"{char.ToUpperInvariant(field[0])}{field[1..]}: {value}"
+            : value;
     }
 
     // Single source of truth for donation formatting. fallback differs by context:

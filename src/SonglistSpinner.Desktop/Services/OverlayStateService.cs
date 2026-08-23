@@ -233,7 +233,11 @@ public class OverlayStateService
         var fields = config.NowPlaying.Fields is { Length: > 0 }
             ? config.NowPlaying.Fields
             : SongFieldNames.CreateDefaultSelection();
-        return SpinnerDataService.CreateSongTextForFields(item, fields, config.NowPlaying.Separator);
+        return SpinnerDataService.CreateSongTextForFields(
+            item,
+            fields,
+            config.NowPlaying.Separator,
+            config.NowPlaying.ShowLabels);
     }
 
     private void OnHealthChanged()

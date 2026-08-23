@@ -5,6 +5,7 @@ public sealed class SpinnerNowPlayingConfig
     public bool Enabled { get; init; }
     public string[] Fields { get; init; } = SongFieldNames.CreateDefaultSelection();
     public string Separator { get; init; } = SongTextFormatting.DefaultSeparator;
+    public bool ShowLabels { get; init; } = true;
     public string FontFamily { get; init; } = "sans-serif";
     public string FontSize { get; init; } = "1.125rem";
     public string Width { get; init; } = "28rem";
