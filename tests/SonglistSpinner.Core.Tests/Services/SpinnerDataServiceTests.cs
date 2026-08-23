@@ -46,7 +46,8 @@ public class SpinnerDataServiceTests
         string[]? winnerFields = null,
         bool showNumbers = false,
         string numberingStart = SpinnerSettingValues.PlayedListNumberingStarts.Bottom,
-        string separator = SongTextFormatting.DefaultSeparator)
+        string separator = SongTextFormatting.DefaultSeparator,
+        bool showLabels = true)
     {
         return new SpinnerConfig
         {
@@ -59,7 +60,8 @@ public class SpinnerDataServiceTests
             {
                 ShowNumbers = showNumbers,
                 NumberingStart = numberingStart,
-                Separator = separator
+                Separator = separator,
+                ShowLabels = showLabels
             },
             WinnerDialog = new SpinnerWinnerDialogConfig
             {
@@ -337,6 +339,16 @@ public class SpinnerDataServiceTests
         Assert.Equal("Artist: Artist A • Title: Song One", result);
     }
 
+    [Fact]
+    public void Given_HiddenLabels_When_CreateSongTextForFields_Then_ReturnsValuesOnly()
+    {
+        var result = SpinnerDataService.CreateSongTextForFields(
+            Q(),
+            ["artist", "title"],
+            showLabels: false);
+        Assert.Equal("Artist A | Song One", result);
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
@@ -412,6 +424,15 @@ public class SpinnerDataServiceTests
         Assert.Equal("Artist: Artist A / Title: Song One", result);
     }
 
+    [Fact]
+    public void Given_HiddenLabels_When_CreatePlayedSongText_QueueItem_Then_ReturnsValuesOnly()
+    {
+        var result = SpinnerDataService.CreatePlayedSongText(
+            Q(),
+            Cfg(["artist", "title"], showLabels: false));
+        Assert.Equal("Artist A | Song One", result);
+    }
+
     // ── CreatePlayedSongText (PlayHistoryItem overload) ──────────────────────
 
     [Fact]
@@ -460,6 +481,15 @@ public class SpinnerDataServiceTests
             H(),
             Cfg(["artist", "title"], separator: " — "));
         Assert.Equal("Artist: Artist A — Title: Song One", result);
+    }
+
+    [Fact]
+    public void Given_HiddenLabels_When_CreatePlayedSongText_HistoryItem_Then_ReturnsValuesOnly()
+    {
+        var result = SpinnerDataService.CreatePlayedSongText(
+            H(),
+            Cfg(["artist", "title"], showLabels: false));
+        Assert.Equal("Artist A | Song One", result);
     }
 
     [Fact]

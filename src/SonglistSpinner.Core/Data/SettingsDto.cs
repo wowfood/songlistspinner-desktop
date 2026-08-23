@@ -16,6 +16,7 @@ public class SettingsDto
     public bool HideChangeOptionWhenDefault { get; set; } = true;
     public string SongListFields { get; set; } = SongFieldNames.DefaultJson;
     public string PlayedListSeparator { get; set; } = SongTextFormatting.DefaultSeparator;
+    public bool PlayedListShowLabels { get; set; } = true;
     public bool ExcludePlayedSongs { get; set; }
     public string PlayedListPosition { get; set; } = SpinnerSettingValues.PlayedListPositions.Default;
     public string PlayHistoryPeriod { get; set; } = SpinnerSettingValues.PlayHistoryPeriods.Default;
@@ -24,6 +25,7 @@ public class SettingsDto
     public bool DisplayNowPlaying { get; set; }
     public string NowPlayingFields { get; set; } = SongFieldNames.DefaultJson;
     public string NowPlayingSeparator { get; set; } = SongTextFormatting.DefaultSeparator;
+    public bool NowPlayingShowLabels { get; set; } = true;
     public string NowPlayingFontFamily { get; set; } = "sans-serif";
     public string NowPlayingFontSize { get; set; } = "1.125rem";
     public string NowPlayingWidth { get; set; } = "28rem";

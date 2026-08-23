@@ -276,6 +276,7 @@ they should appear.
 Played-panel options include:
 
 - A choice of pipe, bullet, dot, diamond, star, slash, dash, or arrow separators, plus a custom option; blank or whitespace-only custom values use the existing ` | ` separator
+- Optional field labels such as `Artist:` and `Title:`; labels remain visible by default
 - Left or right screen position
 - Font family and CSS font size
 - One to five lines per song
@@ -285,6 +286,7 @@ Played-panel options include:
 When the Now Playing workflow is enabled, its panel additionally supports:
 
 - Its own separator preset or custom value, with the same blank-value fallback
+- Its own field-label visibility setting, also enabled by default
 - Six screen positions: top or bottom, aligned left, center, or right
 - CSS width values such as `28rem`, `480px`, or `40vw`
 - Independent font family and CSS font size

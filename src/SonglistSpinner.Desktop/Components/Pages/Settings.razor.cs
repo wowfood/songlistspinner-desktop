@@ -375,7 +375,8 @@ public partial class Settings
                 nowPlayingText = SpinnerDataService.CreateSongTextForFields(
                     PreviewSongs[3],
                     nowPlayingFields,
-                    config.NowPlaying.Separator),
+                    config.NowPlaying.Separator,
+                    config.NowPlaying.ShowLabels),
                 playedCount = 3,
                 availableCount = PreviewSongs.Length
             };
