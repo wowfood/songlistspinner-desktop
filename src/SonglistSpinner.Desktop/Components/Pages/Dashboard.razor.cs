@@ -68,6 +68,7 @@ public partial class Dashboard
     private bool _preferMarkWinnerPlayed;
 
     private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
+    private bool IsSpinDisabled => _spinDisabled || _markNowPlayingPending;
     private string StreamerInput
     {
         get => _streamerInput;

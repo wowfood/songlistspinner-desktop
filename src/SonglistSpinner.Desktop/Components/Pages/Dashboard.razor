@@ -51,7 +51,7 @@
                 <div id="pointer"></div>
                 <div id="wheelContainer"></div>
                 <div id="buttonContainer">
-                    <button id="spinButton" @onclick="Spin" disabled="@(_spinDisabled || _markNowPlayingPending)">@_spinButtonText</button>
+                    <button id="spinButton" @onclick="Spin" disabled="@IsSpinDisabled">@_spinButtonText</button>
                 </div>
                 <div id="status" style="@(_statusVisible ? "display:block" : "display:none")">@_status</div>
             </div>
@@ -176,6 +176,15 @@
                 </ul>
             </div>
             <div class="toggle-container">
+                @if (!_wheelVisible)
+                {
+                    <button id="playedListSpinButton"
+                            class="small-button played-list-spin-button"
+                            disabled="@IsSpinDisabled"
+                            @onclick="Spin">
+                        @_spinButtonText
+                    </button>
+                }
                 <div class="toggle-right">
                     <span id="toggleWheelLabel" class="toggle-label">Toggle Wheel</span>
                     <label class="switch">
