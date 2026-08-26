@@ -45,6 +45,7 @@ public partial class Settings
     private bool _credentialTestSucceeded;
     private string _credentialToken = "";
     private bool _clearingCredential;
+    private Dictionary<string, string> _cssValidationErrors = new(StringComparer.Ordinal);
     private SettingsDto? _dto;
     private EditContext? _editContext;
     private StreamerSongListCredential? _existingCredential;
@@ -68,11 +69,30 @@ public partial class Settings
         set
         {
             _vm.WheelColorsRaw = value;
+            ClearCssValidation(nameof(SettingsDto.WheelColors));
             QueuePreviewRefresh();
         }
     }
 
     private bool HasUnsavedChanges => HasUnsavedSettingsChanges || HasUnsavedCredentialChanges;
+
+    private string? ContrastWarning
+    {
+        get
+        {
+            if (_dto is null) return null;
+
+            var lowContrastPairs = new List<string>();
+            if (ContrastRatio(_dto.ColorText, _dto.ColorPlayedItemBackground) < 4.5)
+                lowContrastPairs.Add("overlay text on played-song cards");
+            if (ContrastRatio(_dto.ColorButtonText, _dto.ColorButtonBackground) < 4.5)
+                lowContrastPairs.Add("button text on button backgrounds");
+
+            return lowContrastPairs.Count == 0
+                ? null
+                : $"Increase the contrast for {string.Join(" and ", lowContrastPairs)}. Aim for at least 4.5:1 for normal text.";
+        }
+    }
 
     private bool HasUnsavedSettingsChanges =>
         _savedSettingsFormState is not null &&
@@ -421,13 +441,22 @@ public partial class Settings
         _vm.SaveError = null;
         if (_dto == null) return false;
 
+        if (!await ValidateCssSettingsAsync())
+        {
+            _vm.SaveError = "Correct the highlighted appearance values before saving.";
+            SelectSection(_cssValidationErrors.ContainsKey(nameof(SettingsDto.WheelColors))
+                ? SettingsSection.Appearance
+                : SettingsSection.Overlay);
+            return false;
+        }
+
         try
         {
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
             RefreshSeparatorChoices();
             DiagnosticLog.Configure(_dto.DebugMode);
-            await OverlayService.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
+            await StreamerSession.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
 
             var submittedToken = _credentialToken.Trim();
             var token = string.IsNullOrWhiteSpace(submittedToken)
@@ -455,6 +484,96 @@ public partial class Settings
             _vm.SaveError = ex.Message;
             return false;
         }
+    }
+
+    private async Task<bool> ValidateCssSettingsAsync()
+    {
+        if (_dto is null) return false;
+
+        var wheelColors = WheelColorsRaw
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var request = new
+        {
+            sizes = new[]
+            {
+                new { key = nameof(SettingsDto.PlayedListFontSize), property = "font-size", value = _dto.PlayedListFontSize, label = "Played-list font size" },
+                new { key = nameof(SettingsDto.NowPlayingWidth), property = "width", value = _dto.NowPlayingWidth, label = "Now Playing width" },
+                new { key = nameof(SettingsDto.NowPlayingFontSize), property = "font-size", value = _dto.NowPlayingFontSize, label = "Now Playing font size" },
+                new { key = nameof(SettingsDto.WinnerDialogWidth), property = "width", value = _dto.WinnerDialogWidth, label = "Winner dialog width" },
+                new { key = nameof(SettingsDto.WinnerDialogFontSize), property = "font-size", value = _dto.WinnerDialogFontSize, label = "Winner dialog font size" }
+            },
+            colorLists = new[]
+            {
+                new { key = nameof(SettingsDto.WheelColors), label = "Wheel color", values = wheelColors }
+            }
+        };
+
+        _cssValidationErrors = await JS.InvokeAsync<Dictionary<string, string>>(
+                                   SpinnerInteropMethods.ValidateCssSettings,
+                                   request)
+                               ?? new Dictionary<string, string>(StringComparer.Ordinal);
+        return _cssValidationErrors.Count == 0;
+    }
+
+    private bool HasCssValidation(string key) => _cssValidationErrors.ContainsKey(key);
+
+    private string? CssValidationError(string key) =>
+        _cssValidationErrors.TryGetValue(key, out var error) ? error : null;
+
+    private string? CssValidationClass(string key) => HasCssValidation(key) ? "invalid" : null;
+
+    private void ClearCssValidation(string key)
+    {
+        if (_cssValidationErrors.Remove(key))
+            _vm.SaveError = null;
+    }
+
+    private static double ContrastRatio(string foreground, string background)
+    {
+        if (!TryParseHexColor(foreground, out var foregroundRgb) ||
+            !TryParseHexColor(background, out var backgroundRgb))
+            return double.MaxValue;
+
+        var foregroundLuminance = RelativeLuminance(foregroundRgb);
+        var backgroundLuminance = RelativeLuminance(backgroundRgb);
+        return (Math.Max(foregroundLuminance, backgroundLuminance) + 0.05) /
+               (Math.Min(foregroundLuminance, backgroundLuminance) + 0.05);
+    }
+
+    private static bool TryParseHexColor(string? value, out (byte Red, byte Green, byte Blue) color)
+    {
+        color = default;
+        if (string.IsNullOrWhiteSpace(value)) return false;
+
+        var hex = value.Trim();
+        if (hex.Length != 7 || hex[0] != '#') return false;
+        try
+        {
+            color = (
+                Convert.ToByte(hex[1..3], 16),
+                Convert.ToByte(hex[3..5], 16),
+                Convert.ToByte(hex[5..7], 16));
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    private static double RelativeLuminance((byte Red, byte Green, byte Blue) color)
+    {
+        static double Linearize(byte component)
+        {
+            var channel = component / 255d;
+            return channel <= 0.04045
+                ? channel / 12.92
+                : Math.Pow((channel + 0.055) / 1.055, 2.4);
+        }
+
+        return 0.2126 * Linearize(color.Red) +
+               0.7152 * Linearize(color.Green) +
+               0.0722 * Linearize(color.Blue);
     }
 
     private async Task ClearApiCredentialAsync()

@@ -24,6 +24,9 @@
     --app-winner-dialog-font-size: 1rem;
     --app-winner-dialog-width: 36rem;
 }
+*, *::before, *::after{
+    box-sizing:border-box;
+}
 html, body {
     height: 100%;
 }
@@ -409,6 +412,9 @@ button{
     #container{
         flex-direction: column;
     }
+    #container.played-list-left{
+        flex-direction: column;
+    }
     #wheelSection{
         padding-top:0.5rem;
     }
@@ -439,6 +445,9 @@ button{
         margin:0.5rem 0;
         flex-shrink: 0;
     }
+    #nowPlaying[data-position^="bottom"]{
+        bottom:calc(40vh + 1rem);
+    }
 }
 @media (max-width: 600px) {
     #wheelContainer{
@@ -457,6 +466,17 @@ button{
     #playedList{
         padding-left:0.75rem;
         padding-right:0.75rem;
+    }
+}
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after{
+        scroll-behavior:auto !important;
+        transition-duration:0.01ms !important;
+        animation-duration:0.01ms !important;
+        animation-iteration-count:1 !important;
+    }
+    .winner-confetti{
+        display:none;
     }
 }
 </style>
@@ -683,6 +703,7 @@ window.SpinnerInterop = (function () {
             const el = document.getElementById('winnerConfetti')
             if (!el) return
             el.innerHTML = ''
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
             const palette = colors || ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24']
             for (let i = 0; i < 36; i++) {
                 const piece = document.createElement('span')

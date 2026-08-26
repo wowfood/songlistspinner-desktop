@@ -2,6 +2,7 @@ using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
+using Microsoft.AspNetCore.Components;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -21,6 +22,8 @@ public partial class Setup
     private string _eventsMessage = "Not checked yet";
     private string _fallbackPlatform = StreamerSongListPlatformNames.Default;
     private bool _hasExistingCredential;
+    private ElementReference _stepHeading;
+    private bool _focusStepHeading;
     private int _historyCount;
     private StreamerSongListChannel? _matchedChannel;
     private VerificationState _overlayState;
@@ -63,14 +66,14 @@ public partial class Setup
             return;
         }
 
-        _step = 2;
+        MoveToStep(2);
     }
 
     private void BackToAccess()
     {
         if (_busy) return;
         _error = null;
-        _step = 1;
+        MoveToStep(1);
     }
 
     private async Task VerifyConnectionAsync()
@@ -172,7 +175,7 @@ public partial class Setup
         _busy = false;
         if (_eventsState == VerificationState.Passed && _overlayState == VerificationState.Passed)
         {
-            _step = 3;
+            MoveToStep(3);
         }
         else
         {
@@ -253,7 +256,7 @@ public partial class Setup
 
     private void ContinueWithWarnings()
     {
-        if (_apiState == VerificationState.Passed) _step = 3;
+        if (_apiState == VerificationState.Passed) MoveToStep(3);
     }
 
     private async Task CopyOverlayUrlAsync()
@@ -281,6 +284,22 @@ public partial class Setup
     }
 
     private string StepClass(int step) => step == _step ? "active" : step < _step ? "complete" : "";
+
+    private string? StepAriaCurrent(int step) => step == _step ? "step" : null;
+
+    private void MoveToStep(int step)
+    {
+        _step = step;
+        _focusStepHeading = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusStepHeading) return;
+
+        _focusStepHeading = false;
+        await _stepHeading.FocusAsync(preventScroll: true);
+    }
 
     private static string CheckClass(VerificationState state) => $"ss-setup-check {state.ToString().ToLowerInvariant()}";
 

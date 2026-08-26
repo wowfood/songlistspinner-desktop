@@ -33,6 +33,7 @@ public static class MauiProgram
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
         builder.Services.AddScoped<NowPlayingTransitionService>();
+        builder.Services.AddScoped<StreamerSessionService>();
         builder.Services.AddSingleton<IStreamerSongListEventSource, CentrifugoStreamerSongListEventSource>();
         builder.Services.AddSingleton<OverlayStateService>();
         builder.Services.AddSingleton<LocalOverlayServer>();
