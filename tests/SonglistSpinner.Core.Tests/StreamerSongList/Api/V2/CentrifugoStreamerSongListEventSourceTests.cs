@@ -273,10 +273,132 @@ public class CentrifugoStreamerSongListEventSourceTests
         Assert.True(socket.IsDisposed);
     }
 
+    [Theory]
+    [InlineData("""{"id":2,"error":{"code":103,"message":"permission denied"}}""", "permission denied")]
+    [InlineData(
+        """{"push":{"disconnect":{"code":3501,"reason":"bad request"}}}""",
+        "The StreamerSongList event server rejected the connection.")]
+    [InlineData(null, "The StreamerSongList event server closed during setup.")]
+    public async Task Given_ServerFailsTheSubscriptionDuringSetup_When_Subscribing_Then_ReportsReconnectingWithTheReason(
+        string? replyToSubscribe,
+        string expectedError)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var socket = new ScriptedWebSocket();
+        socket.Push("""{"id":1,"connect":{}}""");
+        if (replyToSubscribe is null)
+            socket.CloseFromServer();
+        else
+            socket.Push(replyToSubscribe);
+        var source = CreateSource(new ScriptedConnector().Accept(socket), new FakeTimeProvider());
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        var first = await NextAsync(events, cancellationToken);
+
+        Assert.Equal(new StreamerSongListEvent(StreamerSongListEventKind.Reconnecting, Error: expectedError), first);
+        Assert.True(socket.IsDisposed);
+    }
+
+    [Fact]
+    public async Task Given_ServerPingsDuringSetup_When_Subscribing_Then_RepliesAndCompletesTheSubscription()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var socket = ScriptedWebSocket.AcceptingSubscriptions("{}");
+        var source = CreateSource(new ScriptedConnector().Accept(socket), new FakeTimeProvider());
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        var first = await NextAsync(events, cancellationToken);
+
+        Assert.Equal(StreamerSongListEventKind.Connected, first.Kind);
+        Assert.Equal(
+            [
+                """{"id":1,"connect":{}}""",
+                """{"id":2,"subscribe":{"channel":"streamer:314-queue"}}""",
+                "{}",
+                """{"id":3,"subscribe":{"channel":"streamer:314-play_history"}}"""
+            ],
+            socket.Sent);
+    }
+
+    [Fact]
+    public async Task Given_ConnectedSubscription_When_ServerSendsABinaryFrame_Then_ReportsReconnecting()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var socket = ScriptedWebSocket.AcceptingSubscriptions();
+        var source = CreateSource(new ScriptedConnector().Accept(socket), new FakeTimeProvider());
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        await NextAsync(events, cancellationToken);
+
+        socket.PushBinary([0x01, 0x02, 0x03]);
+        var notification = await NextAsync(events, cancellationToken);
+
+        Assert.Equal(
+            new StreamerSongListEvent(
+                StreamerSongListEventKind.Reconnecting,
+                Error: "StreamerSongList sent an unsupported binary event message."),
+            notification);
+    }
+
+    [Fact]
+    public async Task Given_PublicationLongerThanOneReceiveBuffer_When_Subscribed_Then_ReassemblesItIntoOneEvent()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var socket = ScriptedWebSocket.AcceptingSubscriptions();
+        var source = CreateSource(new ScriptedConnector().Accept(socket), new FakeTimeProvider());
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        await NextAsync(events, cancellationToken);
+
+        socket.Push(PublicationOfLength(40 * 1024));
+        var notification = await NextAsync(events, cancellationToken);
+
+        Assert.Equal(new StreamerSongListEvent(StreamerSongListEventKind.QueueChanged, "queue_add"), notification);
+    }
+
+    [Fact]
+    public async Task Given_PublicationLargerThanTheMessageLimit_When_Subscribed_Then_ReportsReconnecting()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var socket = ScriptedWebSocket.AcceptingSubscriptions();
+        var options = new StreamerSongListEventsOptions
+        {
+            Endpoint = Options.Endpoint,
+            InitialReconnectDelay = Options.InitialReconnectDelay,
+            MaximumReconnectDelay = Options.MaximumReconnectDelay,
+            ReceiveIdleTimeout = Options.ReceiveIdleTimeout,
+            MaximumMessageBytes = 16 * 1024
+        };
+        var source = new CentrifugoStreamerSongListEventSource(
+            options,
+            new FakeTimeProvider(),
+            new ScriptedConnector().Accept(socket).ConnectAsync);
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        await NextAsync(events, cancellationToken);
+
+        socket.Push(PublicationOfLength(20 * 1024));
+        var notification = await NextAsync(events, cancellationToken);
+
+        Assert.Equal(
+            new StreamerSongListEvent(
+                StreamerSongListEventKind.Reconnecting,
+                Error: "StreamerSongList sent an event message that was too large."),
+            notification);
+    }
+
     private static CentrifugoStreamerSongListEventSource CreateSource(
         ScriptedConnector connector,
         TimeProvider timeProvider) =>
         new(Options, timeProvider, connector.ConnectAsync);
+
+    /// <summary>A queue_add publication padded to roughly <paramref name="length"/> bytes.</summary>
+    private static string PublicationOfLength(int length) =>
+        "{\"push\":{\"channel\":\"streamer:314-queue\",\"pub\":{\"data\":{\"type\":\"queue_add\",\"data\":{\"note\":\""
+        + new string('x', length)
+        + "\"}}}}}";
 
     private static async Task<StreamerSongListEvent> NextAsync(
         IAsyncEnumerator<StreamerSongListEvent> events,

@@ -10,9 +10,11 @@ namespace SonglistSpinner.Core.Tests.StreamerSongList.Api.V2;
 /// </summary>
 internal sealed class ScriptedWebSocket : WebSocket
 {
-    private readonly Channel<string> _incoming = Channel.CreateUnbounded<string>();
+    private readonly Channel<(byte[] Bytes, WebSocketMessageType Type)> _incoming =
+        Channel.CreateUnbounded<(byte[] Bytes, WebSocketMessageType Type)>();
     private readonly List<string> _sent = [];
     private byte[]? _receiving;
+    private WebSocketMessageType _receivingType;
     private int _receivedBytes;
     private WebSocketState _state = WebSocketState.Open;
 
@@ -47,7 +49,10 @@ internal sealed class ScriptedWebSocket : WebSocket
 
     public override string? SubProtocol => null;
 
-    public void Push(string message) => _incoming.Writer.TryWrite(message);
+    public void Push(string message) =>
+        _incoming.Writer.TryWrite((Encoding.UTF8.GetBytes(message), WebSocketMessageType.Text));
+
+    public void PushBinary(byte[] message) => _incoming.Writer.TryWrite((message, WebSocketMessageType.Binary));
 
     public void CloseFromServer() => _incoming.Writer.TryComplete();
 
@@ -65,17 +70,18 @@ internal sealed class ScriptedWebSocket : WebSocket
                     WebSocketCloseStatus.NormalClosure, null);
             }
 
-            _receiving = Encoding.UTF8.GetBytes(message);
+            (_receiving, _receivingType) = message;
             _receivedBytes = 0;
         }
 
+        // A message longer than the buffer arrives over several receives, as a fragmented frame would.
         var count = Math.Min(buffer.Count, _receiving.Length - _receivedBytes);
         _receiving.AsSpan(_receivedBytes, count).CopyTo(buffer.AsSpan());
         _receivedBytes += count;
         var endOfMessage = _receivedBytes == _receiving.Length;
         if (endOfMessage) _receiving = null;
 
-        return new WebSocketReceiveResult(count, WebSocketMessageType.Text, endOfMessage);
+        return new WebSocketReceiveResult(count, _receivingType, endOfMessage);
     }
 
     public override Task SendAsync(

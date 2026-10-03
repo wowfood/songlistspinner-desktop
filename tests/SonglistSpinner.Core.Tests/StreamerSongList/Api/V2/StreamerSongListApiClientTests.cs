@@ -341,6 +341,172 @@ public class StreamerSongListApiClientTests
         Assert.Contains("played_after=2026-08-05T12:00:00.0000000+00:00", query);
     }
 
+    [Theory]
+    [InlineData("day", "2026-03-30T12:00:00.0000000+00:00")]
+    // A calendar month, not 30 days: from 31 March that is 28 February, where 30 days would be 1 March.
+    [InlineData("month", "2026-02-28T12:00:00.0000000+00:00")]
+    [InlineData("all", null)]
+    [InlineData("stream", null)]
+    public async Task Given_PlayHistoryPeriod_When_FetchPlayHistoryAsync_Then_SendsTheMatchingPlayedAfterFilter(
+        string period,
+        string? expectedPlayedAfter)
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("""{"items":[],"token":null,"total":0}"""));
+        var now = new DateTimeOffset(2026, 3, 31, 12, 0, 0, TimeSpan.Zero);
+        var client = CreateClient(handler, timeProvider: new FakeTimeProvider(now));
+
+        await client.FetchPlayHistoryAsync(
+            new StreamerSongListChannel("wowfood"),
+            period,
+            TestContext.Current.CancellationToken);
+
+        var query = Uri.UnescapeDataString(handler.RequestUri?.Query ?? "");
+        if (expectedPlayedAfter is null)
+            Assert.DoesNotContain("played_after", query);
+        else
+            Assert.Contains($"played_after={expectedPlayedAfter}", query);
+    }
+
+    [Fact]
+    public async Task Given_UnknownPeriod_When_FetchPlayHistoryAsync_Then_RejectsItBeforeSendingRequest()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("{}"));
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+            client.FetchPlayHistoryAsync(
+                new StreamerSongListChannel("wowfood"),
+                "fortnight",
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("period", exception.ParamName);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
+    public async Task Given_QueueEntryOffTheSongList_When_FetchQueueSnapshotAsync_Then_UsesTheNonlistTitleAndTheRequestersUsername()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(
+            """
+            {
+              "items": [{
+                "id": 93,
+                "position": 1,
+                "nonlistSong": "Custom Request",
+                "requests": [{ "amount": null, "name": "", "user": { "username": "viewer" } }],
+                "song": null,
+                "songId": null
+              }],
+              "playing": null,
+              "total": 1
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var result = await client.FetchQueueSnapshotAsync(
+            new StreamerSongListChannel("wowfood"),
+            TestContext.Current.CancellationToken);
+
+        var item = Assert.Single(result.Items);
+        Assert.Equal("", item.Song.Artist);
+        Assert.Equal("Custom Request", item.Song.Title);
+        Assert.Equal("viewer", Assert.Single(item.Requests).Name);
+    }
+
+    [Fact]
+    public async Task Given_HistoryDonations_When_FetchPlayHistoryAsync_Then_ADonationAttachesOnlyWhereNoRequestHasAnAmount()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse(
+            """
+            {
+              "items": [
+                {
+                  "donationAmount": 5.00,
+                  "requests": [],
+                  "song": { "artist": "Artist", "title": "Unrequested" },
+                  "songId": 8
+                },
+                {
+                  "donationAmount": 3.00,
+                  "requests": [{ "amount": 2.00, "name": "tipper", "user": null }],
+                  "song": { "artist": "Artist", "title": "Tipped Request" },
+                  "songId": 9
+                }
+              ],
+              "token": null,
+              "total": 2
+            }
+            """));
+        var client = CreateClient(handler);
+
+        var result = await client.FetchPlayHistoryAsync(
+            new StreamerSongListChannel("wowfood"),
+            cancellationToken: TestContext.Current.CancellationToken);
+
+        var unrequested = Assert.Single(result[0].Requests);
+        Assert.Equal(5.00m, unrequested.DonationAmount);
+        Assert.Equal("", unrequested.Name);
+        var tipped = Assert.Single(result[1].Requests);
+        Assert.Equal(2.00m, tipped.Amount);
+        Assert.Null(tipped.DonationAmount);
+    }
+
+    [Fact]
+    public async Task Given_ForbiddenResponse_When_FetchQueueSnapshotAsync_Then_ReportsTheChannelIsNotAccessible()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.Forbidden)
+        {
+            Content = new StringContent("""{"detail":"channel is private"}""", Encoding.UTF8, "application/problem+json")
+        });
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.FetchQueueSnapshotAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.Forbidden, exception.StatusCode);
+        Assert.Equal(
+            "The configured StreamerSongList token cannot access this channel. channel is private",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task Given_ErrorResponseWithAnHtmlBody_When_FetchQueueSnapshotAsync_Then_ReportsTheStatusWithoutTheBody()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway)
+        {
+            Content = new StringContent("<html><body>Bad Gateway</body></html>", Encoding.UTF8, "text/html")
+        });
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.FetchQueueSnapshotAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.BadGateway, exception.StatusCode);
+        Assert.Equal("StreamerSongList returned HTTP 502 (Bad Gateway).", exception.Message);
+    }
+
+    [Fact]
+    public async Task Given_SuccessResponseThatIsNotApiJson_When_FetchQueueSnapshotAsync_Then_ReportsAnApiMismatch()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StringContent("<html><body>Captive portal</body></html>", Encoding.UTF8, "application/json")
+        });
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.FetchQueueSnapshotAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("StreamerSongList returned a response that does not match API v2.", exception.Message);
+        Assert.IsAssignableFrom<System.Text.Json.JsonException>(exception.InnerException);
+    }
+
     [Fact]
     public async Task Given_NoCredential_When_FetchQueueSnapshotAsync_Then_FailsBeforeSendingRequest()
     {
