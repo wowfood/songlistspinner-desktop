@@ -1,4 +1,4 @@
-﻿namespace SonglistSpinner.WinUI;
+namespace SonglistSpinner.WinUI;
 
 public partial class App
 {
