@@ -10,9 +10,10 @@ namespace SonglistSpinner.Core.StreamerSongList;
 /// Every call throws <see cref="Api.V2.StreamerSongListApiException"/> when no usable API token is configured,
 /// when the API rejects the request, or when it returns a response that does not match API v2. HttpClient's own
 /// failures pass through unchanged: <see cref="HttpRequestException"/> when the API cannot be reached and
-/// <see cref="TaskCanceledException"/> when the client's timeout expires. Invalid arguments (a blank streamer name, an unsupported platform, an
-/// unknown history period or a <c>default</c> id) throw <see cref="ArgumentException"/> before any request is
-/// sent. Cancellation throws <see cref="OperationCanceledException"/>.
+/// <see cref="TaskCanceledException"/> when the client's timeout expires. Invalid arguments (an unsupported
+/// platform, an unknown history period or a <c>default</c> id) throw <see cref="ArgumentException"/> before any
+/// request is sent; a blank streamer name cannot reach the client, because <see cref="StreamerSongListChannel"/>
+/// rejects it. Cancellation throws <see cref="OperationCanceledException"/>.
 /// </remarks>
 public interface IStreamerSongListClient
 {
