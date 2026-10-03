@@ -54,13 +54,10 @@ internal static class TestSongs
     {
         return new SpinnerConfig
         {
-            SongList = new SpinnerSongListConfig
-            {
-                Fields = fields ?? ["artist", "title"],
-                ExcludePlayedSongs = exclude
-            },
+            PlayHistory = new SpinnerPlayHistoryConfig { ExcludePlayedSongs = exclude },
             PlayedList = new SpinnerPlayedListConfig
             {
+                Fields = fields ?? ["artist", "title"],
                 ShowNumbers = showNumbers,
                 NumberingStart = numberingStart,
                 Separator = separator,

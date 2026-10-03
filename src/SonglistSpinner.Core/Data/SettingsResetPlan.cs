@@ -38,10 +38,10 @@ public static class SettingsResetPlan
             settings => settings.PlayHistoryPeriod,
             (settings, value) => settings.PlayHistoryPeriod = value),
 
-        Define(nameof(SettingsDto.SongListFields), PlayedSongsSection, "Display fields",
+        Define(nameof(SettingsDto.PlayedListFields), PlayedSongsSection, "Display fields",
             SettingsResetScope.PlayedSongsPanel,
-            settings => settings.SongListFields,
-            (settings, value) => settings.SongListFields = value),
+            settings => settings.PlayedListFields,
+            (settings, value) => settings.PlayedListFields = value),
         Define(nameof(SettingsDto.PlayedListSeparator), PlayedSongsSection, "Field separator",
             SettingsResetScope.PlayedSongsPanel,
             settings => settings.PlayedListSeparator,

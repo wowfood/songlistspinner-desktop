@@ -34,9 +34,9 @@ public sealed class SettingsViewModel
             WheelColorsRaw = string.Join("\n", SpinnerDefaults.CreateWheelColors());
         }
 
-        InitDisplayFields(dto.SongListFields);
+        InitDisplayFields(dto.PlayedListFields);
         InitNowPlayingDisplayFields(dto.NowPlayingFields);
-        InitWinnerDialogDisplayFields(dto.WinnerDialogFields, dto.SongListFields);
+        InitWinnerDialogDisplayFields(dto.WinnerDialogFields, dto.PlayedListFields);
         InitPlayedListBg(dto.ColorPlayedListBackground);
         UseIndependentNowPlayingBgAlpha = dto.NowPlayingBackgroundOpacity.HasValue;
         NowPlayingBgAlpha = PanelBackgroundColor.ClampOpacity(
@@ -54,7 +54,7 @@ public sealed class SettingsViewModel
         NowPlayingDisplayFields = BuildDisplayFields(json);
     }
 
-    public void InitWinnerDialogDisplayFields(string? json, string legacySongListFields)
+    public void InitWinnerDialogDisplayFields(string? json, string legacyPlayedListFields)
     {
         if (!string.IsNullOrWhiteSpace(json))
         {
@@ -62,7 +62,7 @@ public sealed class SettingsViewModel
             return;
         }
 
-        WinnerDialogDisplayFields = BuildDisplayFields(legacySongListFields);
+        WinnerDialogDisplayFields = BuildDisplayFields(legacyPlayedListFields);
         var requester = WinnerDialogDisplayFields.First(field => field.Name == SongFieldNames.Requester);
         requester.Selected = true;
     }
@@ -160,7 +160,7 @@ public sealed class SettingsViewModel
         dto.WheelColors = JsonSerializer.Serialize(colors);
 
         var fields = DisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();
-        dto.SongListFields = JsonSerializer.Serialize(
+        dto.PlayedListFields = JsonSerializer.Serialize(
             SongFieldNames.NormalizeSelection(fields, SongFieldNames.CreateDefaultSelection()));
 
         var nowPlayingFields = NowPlayingDisplayFields.Where(f => f.Selected).Select(f => f.Name).ToArray();

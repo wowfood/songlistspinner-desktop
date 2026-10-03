@@ -10,11 +10,11 @@ public static class SettingsDtoConverter
     {
         SettingsDtoNormalizer.NormalizeInPlace(settings);
 
-        var fields = SettingsDtoNormalizer.ParseFields(settings.SongListFields);
+        var playedListFields = SettingsDtoNormalizer.ParseFields(settings.PlayedListFields);
         var nowPlayingFields = SettingsDtoNormalizer.ParseFields(settings.NowPlayingFields);
 
         var legacyWinnerFields = SongFieldNames.NormalizeSelection(
-            fields.Append(SongFieldNames.Requester),
+            playedListFields.Append(SongFieldNames.Requester),
             SongFieldNames.CreateWinnerDefaultSelection());
         var winnerDialogFields = string.IsNullOrWhiteSpace(settings.WinnerDialogFields)
             ? legacyWinnerFields
@@ -36,15 +36,15 @@ public static class SettingsDtoConverter
                 Platform = settings.StreamerPlatform,
                 HideChangeOptionWhenDefault = settings.HideChangeOptionWhenDefault
             },
-            SongList = new SpinnerSongListConfig
+            PlayHistory = new SpinnerPlayHistoryConfig
             {
-                Fields = fields,
                 ExcludePlayedSongs = settings.ExcludePlayedSongs,
-                PlayedListPosition = settings.PlayedListPosition,
-                PlayHistoryPeriod = settings.PlayHistoryPeriod
+                Period = settings.PlayHistoryPeriod
             },
             PlayedList = new SpinnerPlayedListConfig
             {
+                Fields = playedListFields,
+                Position = settings.PlayedListPosition,
                 FontFamily = settings.PlayedListFontFamily,
                 FontSize = settings.PlayedListFontSize,
                 MaxLines = settings.PlayedListMaxLines,

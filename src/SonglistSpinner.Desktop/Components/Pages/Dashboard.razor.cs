@@ -210,7 +210,7 @@ public partial class Dashboard
             SpinnerInteropMethods.ApplyTheme, _config.Colors, _config.PlayedList, _config.WinnerDialog);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.ApplyBackground, _config.Background);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.ApplyPlayedListPosition,
-            _config.SongList.PlayedListPosition);
+            _config.PlayedList.Position);
 
         await JS.InvokeVoidAsync(SpinnerInteropMethods.CreateWheel,
             new[] { new { label = "Enter streamer name above" } },
@@ -417,7 +417,7 @@ public partial class Dashboard
     {
         _playedListCollapsed = !_playedListCollapsed;
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetPlayedListCollapsed,
-            _playedListCollapsed, _config.SongList.PlayedListPosition);
+            _playedListCollapsed, _config.PlayedList.Position);
         OverlayService.UpdatePlayedListCollapsed(_playedListCollapsed);
     }
 
@@ -596,7 +596,7 @@ public partial class Dashboard
 
         async Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchAsync()
         {
-            var period = _config.SongList.PlayHistoryPeriod;
+            var period = _config.PlayHistory.Period;
             var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
             var queueTask = SongListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
             var historyTask = SongListClient.FetchPlayHistoryAsync(channel, period, cancellationToken);

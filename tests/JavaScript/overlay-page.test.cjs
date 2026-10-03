@@ -87,10 +87,9 @@ function initialState(overrides = {}) {
         config: {
             wheelColors: ['#ff6b6b'],
             colors: { text: '#ffffff' },
-            playedList: { showFieldHeaders: false },
+            playedList: { showFieldHeaders: false, position: 'right' },
             winnerDialog: {},
             background: { mode: 'color', color: '#111111' },
-            songList: { playedListPosition: 'right' },
             nowPlaying: { enabled: false, position: 'bottom-left', width: '28rem', fontFamily: 'sans-serif', fontSize: '1.125rem' }
         },
         streamer: 'streamer',
@@ -149,7 +148,7 @@ test('Overlay: expanding after a width change keeps the replayed width', () => {
 test('Overlay: a left played-list position moves the list without a collapse icon', () => {
     const { elements, send } = loadOverlayPage();
     const state = initialState();
-    state.config.songList.playedListPosition = 'LEFT';
+    state.config.playedList.position = 'LEFT';
 
     send('init_state', state);
 

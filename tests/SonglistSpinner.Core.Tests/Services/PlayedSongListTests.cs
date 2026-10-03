@@ -19,7 +19,7 @@ public class PlayedSongListTests
     [Fact]
     public void Given_ConfigWithEmptyFields_When_CreateTextForQueueItem_Then_DefaultsToArtistTitle()
     {
-        var cfg = new SpinnerConfig { SongList = new SpinnerSongListConfig { Fields = [] } };
+        var cfg = new SpinnerConfig { PlayedList = new SpinnerPlayedListConfig { Fields = [] } };
         var result = PlayedSongList.CreateText(Q(), cfg);
         Assert.Equal("Artist: Artist A | Title: Song One", result);
     }
@@ -76,7 +76,7 @@ public class PlayedSongListTests
     public void
         Given_HistoryItemWithEmptyConfigFields_When_CreateTextForHistoryItem_Then_DefaultsToArtistTitle()
     {
-        var cfg = new SpinnerConfig { SongList = new SpinnerSongListConfig { Fields = [] } };
+        var cfg = new SpinnerConfig { PlayedList = new SpinnerPlayedListConfig { Fields = [] } };
         var result = PlayedSongList.CreateText(H(), cfg);
         Assert.Equal("Artist: Artist A | Title: Song One", result);
     }

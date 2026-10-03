@@ -64,7 +64,7 @@ public sealed class WheelSpinService
 
         var channel = new StreamerSongListChannel(streamer, config.Streamer.Platform);
         var queueTask = _songListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
-        var historyTask = _songListClient.FetchPlayHistoryAsync(channel, config.SongList.PlayHistoryPeriod, cancellationToken);
+        var historyTask = _songListClient.FetchPlayHistoryAsync(channel, config.PlayHistory.Period, cancellationToken);
         await Task.WhenAll(queueTask, historyTask);
         var queue = await queueTask;
         var played = await historyTask;

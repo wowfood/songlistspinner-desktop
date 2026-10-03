@@ -36,7 +36,7 @@ public class SettingsDtoNormalizerTests
         {
             BackgroundMode = "TRANSPARANT",
             StreamerPlatform = " YouTube ",
-            SongListFields = """["DONATION","artist","donation","unknown"]""",
+            PlayedListFields = """["DONATION","artist","donation","unknown"]""",
             NowPlayingFields = "[]",
             WinnerDialogFields = """["REQUESTER","unknown","Title","requester"]"""
         };
@@ -45,7 +45,7 @@ public class SettingsDtoNormalizerTests
 
         Assert.Equal("transparent", settings.BackgroundMode);
         Assert.Equal("youtube", settings.StreamerPlatform);
-        Assert.Equal("""["donation","artist"]""", settings.SongListFields);
+        Assert.Equal("""["donation","artist"]""", settings.PlayedListFields);
         Assert.Equal(SongFieldNames.DefaultJson, settings.NowPlayingFields);
         Assert.Equal("""["requester","title"]""", settings.WinnerDialogFields);
     }

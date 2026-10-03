@@ -32,14 +32,14 @@ public static class SettingsDtoNormalizer
         settings.PlayedListSeparator = SongTextFormatting.NormalizeSeparator(settings.PlayedListSeparator);
         settings.NowPlayingSeparator = SongTextFormatting.NormalizeSeparator(settings.NowPlayingSeparator);
 
-        var songListFields = ParseFields(settings.SongListFields);
-        settings.SongListFields = JsonSerializer.Serialize(songListFields);
+        var playedListFields = ParseFields(settings.PlayedListFields);
+        settings.PlayedListFields = JsonSerializer.Serialize(playedListFields);
         settings.NowPlayingFields = JsonSerializer.Serialize(ParseFields(settings.NowPlayingFields));
 
         if (!string.IsNullOrWhiteSpace(settings.WinnerDialogFields))
         {
             var legacyWinnerFields = SongFieldNames.NormalizeSelection(
-                songListFields.Append(SongFieldNames.Requester),
+                playedListFields.Append(SongFieldNames.Requester),
                 SongFieldNames.CreateWinnerDefaultSelection());
             settings.WinnerDialogFields = JsonSerializer.Serialize(
                 ParseFields(settings.WinnerDialogFields, legacyWinnerFields));

@@ -133,7 +133,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 var queueTask = _songListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
                 var historyTask = _songListClient.FetchPlayHistoryAsync(
                     channel,
-                    before.Config.SongList.PlayHistoryPeriod,
+                    before.Config.PlayHistory.Period,
                     cancellationToken);
                 await Task.WhenAll(queueTask, historyTask);
                 cancellationToken.ThrowIfCancellationRequested();

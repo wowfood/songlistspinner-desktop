@@ -718,7 +718,7 @@ function updateSongs(data) {
         SpinnerInterop.applyTheme(data.config.colors, data.config.playedList, data.config.winnerDialog)
         SpinnerInterop.applyBackground(data.config.background)
         SpinnerInterop.applyPlayedListPosition(
-            data.config.songList && data.config.songList.playedListPosition)
+            data.config.playedList && data.config.playedList.position)
         applyNowPlayingConfig(data.config.nowPlaying)
     }
     const cfg = _overlayState.config

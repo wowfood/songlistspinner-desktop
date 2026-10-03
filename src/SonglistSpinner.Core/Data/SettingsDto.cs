@@ -16,7 +16,9 @@ public class SettingsDto
     public string DefaultStreamerName { get; set; } = "";
     public string StreamerPlatform { get; set; } = StreamerSongListPlatformNames.Default;
     public bool HideChangeOptionWhenDefault { get; set; } = SpinnerDefaults.Streamer.HideChangeOptionWhenDefault;
-    public string SongListFields { get; set; } = SongFieldNames.DefaultJson;
+    // Configures the played-song list; the wire name predates that vocabulary.
+    [JsonPropertyName("SongListFields")]
+    public string PlayedListFields { get; set; } = SongFieldNames.DefaultJson;
     public string PlayedListSeparator { get; set; } = SongTextFormatting.DefaultSeparator;
     public bool PlayedListShowLabels { get; set; } = SpinnerDefaults.PlayedList.ShowLabels;
     public bool PlayedListShowFieldHeaders { get; set; }

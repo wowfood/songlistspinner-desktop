@@ -1,7 +1,14 @@
 namespace SonglistSpinner.Core.Models;
 
+/// <summary>How the played-song list (in the app and the overlay) shows the songs played so far.</summary>
 public class SpinnerPlayedListConfig
 {
+    /// <summary>The <see cref="SongFieldNames"/> fields each played song shows, in order.</summary>
+    public string[] Fields { get; init; } = SongFieldNames.CreateDefaultSelection();
+
+    /// <summary>A <see cref="SpinnerSettingValues.PlayedListPositions"/> value.</summary>
+    public string Position { get; init; } = SpinnerSettingValues.PlayedListPositions.Default;
+
     public string FontFamily { get; init; } = SpinnerDefaults.FontFamily;
     public string FontSize { get; init; } = SpinnerDefaults.PlayedList.FontSize;
     public int MaxLines { get; init; } = SpinnerDefaults.PlayedList.MaxLines;

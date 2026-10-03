@@ -25,7 +25,7 @@ public static class SongAvailability
         IEnumerable<PlayHistoryItem> played,
         SpinnerConfig config)
     {
-        if (!config.SongList.ExcludePlayedSongs) return all.ToList();
+        if (!config.PlayHistory.ExcludePlayedSongs) return all.ToList();
         var playedList = played.ToList();
         return all.Where(song => !playedList.Any(p => MatchesPlayed(song, p))).ToList();
     }

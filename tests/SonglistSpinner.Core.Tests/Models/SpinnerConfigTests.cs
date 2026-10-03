@@ -33,13 +33,13 @@ public class SpinnerConfigTests
               "wheelColors": ["#ff6b6b", "#4ecdc4", "#45b7d1", "#f9ca24", "#6c5ce7", "#a29bfe", "#fd79a8", "#fdcb6e"],
               "background": { "mode": "color", "color": "#111111", "image": "" },
               "streamer": { "defaultName": "", "platform": "twitch", "hideChangeOptionWhenDefault": true },
-              "songList": {
-                "fields": ["artist", "title"],
+              "playHistory": {
                 "excludePlayedSongs": false,
-                "playedListPosition": "right",
-                "playHistoryPeriod": "week"
+                "period": "week"
               },
               "playedList": {
+                "fields": ["artist", "title"],
+                "position": "right",
                 "fontFamily": "sans-serif",
                 "fontSize": "0.875rem",
                 "maxLines": 2,

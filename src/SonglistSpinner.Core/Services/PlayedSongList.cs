@@ -86,7 +86,7 @@ public static class PlayedSongList
 
     private static string[] GetPlayedFields(SpinnerConfig config)
     {
-        return SongFieldNames.NormalizeSelection(config.SongList.Fields);
+        return SongFieldNames.NormalizeSelection(config.PlayedList.Fields);
     }
 
     private static int? GetPlayedSongNumber(int index, int songCount, SpinnerConfig config)

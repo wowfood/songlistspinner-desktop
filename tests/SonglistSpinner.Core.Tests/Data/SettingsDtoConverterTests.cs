@@ -39,10 +39,10 @@ public class SettingsDtoConverterTests
         Assert.Equal("examplestreamer", config.Streamer.DefaultName);
         Assert.Equal("youtube", config.Streamer.Platform);
         Assert.False(config.Streamer.HideChangeOptionWhenDefault);
-        Assert.Equal(["title", "requester", "donation"], config.SongList.Fields);
-        Assert.True(config.SongList.ExcludePlayedSongs);
-        Assert.Equal("left", config.SongList.PlayedListPosition);
-        Assert.Equal("month", config.SongList.PlayHistoryPeriod);
+        Assert.True(config.PlayHistory.ExcludePlayedSongs);
+        Assert.Equal("month", config.PlayHistory.Period);
+        Assert.Equal(["title", "requester", "donation"], config.PlayedList.Fields);
+        Assert.Equal("left", config.PlayedList.Position);
         Assert.Equal("Arial", config.PlayedList.FontFamily);
         Assert.Equal("1rem", config.PlayedList.FontSize);
         Assert.Equal(4, config.PlayedList.MaxLines);
@@ -102,7 +102,7 @@ public class SettingsDtoConverterTests
     {
         var settings = new SettingsDto
         {
-            SongListFields = """["title"]""",
+            PlayedListFields = """["title"]""",
             WinnerDialogFields = null
         };
 
@@ -151,7 +151,7 @@ public class SettingsDtoConverterTests
         var config = SettingsDtoConverter.ToSpinnerConfig(settings);
 
         Assert.Equal(SpinnerSettingValues.PlayedListPositions.Left, settings.PlayedListPosition);
-        Assert.Equal(SpinnerSettingValues.PlayedListPositions.Left, config.SongList.PlayedListPosition);
+        Assert.Equal(SpinnerSettingValues.PlayedListPositions.Left, config.PlayedList.Position);
     }
 
     private static string ToComparableJson(string json) =>

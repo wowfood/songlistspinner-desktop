@@ -39,7 +39,7 @@ public class SettingsDtoTests
         Assert.Equal("right", root.GetProperty(nameof(SettingsDto.PlayedListPosition)).GetString());
         Assert.Equal("bottom-left", root.GetProperty(nameof(SettingsDto.NowPlayingPosition)).GetString());
         Assert.Equal("bottom", root.GetProperty(nameof(SettingsDto.PlayedListNumberingStart)).GetString());
-        Assert.Equal(SongFieldNames.DefaultJson, root.GetProperty(nameof(SettingsDto.SongListFields)).GetString());
+        Assert.Equal(SongFieldNames.DefaultJson, root.GetProperty("SongListFields").GetString());
         Assert.Equal(
             SongTextFormatting.DefaultSeparator,
             root.GetProperty(nameof(SettingsDto.PlayedListSeparator)).GetString());
@@ -134,7 +134,7 @@ public class SettingsDtoTests
         Assert.Equal("examplestreamer", settings.DefaultStreamerName);
         Assert.Equal("youtube", settings.StreamerPlatform);
         Assert.False(settings.HideChangeOptionWhenDefault);
-        Assert.Equal("""["title","requester","donation"]""", settings.SongListFields);
+        Assert.Equal("""["title","requester","donation"]""", settings.PlayedListFields);
         Assert.Equal(" • ", settings.PlayedListSeparator);
         Assert.False(settings.PlayedListShowLabels);
         Assert.True(settings.PlayedListShowFieldHeaders);
