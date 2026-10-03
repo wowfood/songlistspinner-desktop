@@ -705,9 +705,8 @@ public partial class Settings
                 async cancellationToken =>
                 {
                     var channel = new StreamerSongListChannel(streamerName, platform);
-                    var queue = await SongListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
-                    var history = await SongListClient.FetchPlayHistoryAsync(channel, period, cancellationToken);
-                    return (queue.Items.Length, history.Length);
+                    var fetched = await SongListClient.FetchQueueAndHistoryAsync(channel, period, cancellationToken);
+                    return (fetched.Queue.Items.Length, fetched.PlayedSongs.Length);
                 });
             _credentialTestSucceeded = true;
             _credentialTestResult =

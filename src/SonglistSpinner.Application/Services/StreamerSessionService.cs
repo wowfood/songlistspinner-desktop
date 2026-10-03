@@ -1,7 +1,6 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using SonglistSpinner.Core.PlayedSongs;
 using SonglistSpinner.Core.Settings;
 using SonglistSpinner.Core.StreamerSongList;
 
@@ -130,16 +129,12 @@ public sealed class StreamerSessionService : IAsyncDisposable
             try
             {
                 var channel = new StreamerSongListChannel(expectedStreamer, before.Config.Streamer.Platform);
-                var queueTask = _songListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
-                var historyTask = _songListClient.FetchPlayHistoryAsync(
+                var fetched = await _songListClient.FetchQueueAndHistoryAsync(
                     channel,
                     before.Config.PlayHistory.Period,
                     cancellationToken);
-                await Task.WhenAll(queueTask, historyTask);
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var queue = await queueTask;
-                var played = await historyTask;
                 StreamerSessionSnapshot updated;
                 lock (_stateGate)
                 {
@@ -147,14 +142,14 @@ public sealed class StreamerSessionService : IAsyncDisposable
                         !StringComparer.Ordinal.Equals(_snapshot.Streamer, expectedStreamer))
                         return null;
 
+                    // Filter with the config as it is now: the settings may have changed during the fetch.
                     var latestConfig = _snapshot.Config;
                     updated = _snapshot with
                     {
                         Config = latestConfig,
-                        AvailableSongs = SongAvailability.FilterAvailableSongs(queue.Items, played, latestConfig)
-                            .ToArray(),
-                        PlayedSongs = played,
-                        NowPlaying = queue.Playing,
+                        AvailableSongs = fetched.AvailableSongs(latestConfig).ToArray(),
+                        PlayedSongs = fetched.PlayedSongs,
+                        NowPlaying = fetched.Queue.Playing,
                         ApiHealth = StreamerSessionHealth.Healthy,
                         ApiHealthDetail = DescribeSynchronizedNow()
                     };
@@ -485,6 +480,8 @@ public sealed record StreamerSessionSnapshot(
     string RealtimeHealthDetail)
 {
     public bool HasChannel => StreamerId > 0 && !string.IsNullOrWhiteSpace(Streamer);
+
+    public LoadedChannel? Channel => HasChannel ? new LoadedChannel(new StreamerId(StreamerId), Streamer) : null;
 
     public static StreamerSessionSnapshot Empty { get; } = new(
         0,

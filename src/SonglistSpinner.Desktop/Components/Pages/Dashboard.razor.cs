@@ -2,7 +2,6 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using SonglistSpinner.Core.PlayedSongs;
 using SonglistSpinner.Core.Settings;
 using SonglistSpinner.Core.Songs;
 using SonglistSpinner.Core.StreamerSongList;
@@ -21,7 +20,7 @@ public partial class Dashboard
     private StreamerSessionHealth _apiHealth = StreamerSessionHealth.Unknown;
     private string _apiHealthDetail = "Waiting for a channel to be loaded.";
     private SpinnerConfig _config = new();
-    private string _currentStreamer = "";
+    private LoadedChannel? _channel;
 
     private DotNetObjectReference<Dashboard>? _dotNetRef;
     private DashboardActivity _activity = DashboardActivity.Idle;
@@ -43,7 +42,6 @@ public partial class Dashboard
 
     private string _streamerInput = "";
     private string? _streamerInputError;
-    private int _streamerId;
     private CancellationTokenSource _wheelCts = new();
 
     private bool _wheelVisible = true;
@@ -60,6 +58,11 @@ public partial class Dashboard
     private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
     private bool IsBusy => _activity != DashboardActivity.Idle;
     private bool IsSpinInProgress => _activity is DashboardActivity.Spinning or DashboardActivity.ShowingWinner;
+
+    // While a channel loads, the input is hidden and holds the name being loaded.
+    private string DisplayedStreamer => _activity == DashboardActivity.LoadingChannel
+        ? _streamerInput.Trim()
+        : _channel?.Name ?? "";
     private string PreferredWinnerActionId => IsNowPlayingWinnerActionEnabled
         ? "setWinnerNowPlayingBtn"
         : _preferMarkWinnerPlayed
@@ -252,9 +255,8 @@ public partial class Dashboard
             return;
         }
 
-        var previousSession = StreamerSession.GetSnapshot();
         _activity = DashboardActivity.LoadingChannel;
-        _currentStreamer = name;
+        StreamerInput = name;
         _showStreamerInput = false;
         SetApiHealth(StreamerSessionHealth.Checking, $"Resolving {name} and loading its queue.");
         SetRealtimeHealth(StreamerSessionHealth.Unknown, "Waiting for the API connection.");
@@ -263,37 +265,19 @@ public partial class Dashboard
 
         try
         {
-            var channel = new StreamerSongListChannel(name, _config.Streamer.Platform);
-            var streamerId = (await SongListClient.ResolveStreamerAsync(channel, _lifetimeCts.Token)).Id.Value;
-            var (queue, played) = await FetchQueueAndHistory(name, _lifetimeCts.Token);
-            _streamerId = streamerId;
-            _nowPlaying = queue.Playing;
-            _playedSongs = played;
-            _availableSongs = SongAvailability.FilterAvailableSongs(queue.Items, played, _config);
-            StreamerInput = name;
-
+            await ChannelLoader.LoadAsync(name, _config, _lifetimeCts.Token);
+            // Session changes are ignored while the channel loads, so take the started session's state here.
+            ApplySessionSnapshot(StreamerSession.GetSnapshot());
             await RebuildWheel(_wheelCts.Token);
-            Logger.LogInformation(
-                "Loaded channel {Streamer} (streamer {StreamerId}) with {AvailableSongCount} spinnable songs",
-                name,
-                streamerId,
-                _availableSongs.Count);
             SetStatus($"Loaded {_availableSongs.Count} songs. Press SPIN!");
-            await StreamerSession.StartAsync(
-                streamerId,
-                name,
-                _config,
-                _availableSongs,
-                _playedSongs,
-                _nowPlaying,
-                _lifetimeCts.Token);
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
         }
         catch (Exception ex)
         {
-            ApplySessionSnapshot(previousSession);
+            // The session still holds the previous channel unless only the wheel rebuild failed.
+            ApplySessionSnapshot(StreamerSession.GetSnapshot());
             _showStreamerInput = true;
             _streamerInputError =
                 $"Could not find or load streamer \"{name}\". Check the name and platform, then try again.";
@@ -323,7 +307,7 @@ public partial class Dashboard
             return;
         }
 
-        if (string.IsNullOrEmpty(_currentStreamer))
+        if (_channel is null)
         {
             SetStatus("Please enter a streamer name first");
             return;
@@ -335,7 +319,7 @@ public partial class Dashboard
             return;
         }
 
-        var spinStreamer = _currentStreamer;
+        var spinStreamer = _channel.Name;
         _activity = DashboardActivity.Spinning;
         _winnerQueueId = null;
         _winnerQueuePosition = null;
@@ -395,9 +379,8 @@ public partial class Dashboard
         if (IsBusy) return;
         await StreamerSession.ClearAsync(_config);
         _showStreamerInput = true;
-        _currentStreamer = "";
+        _channel = null;
         StreamerInput = "";
-        _streamerId = 0;
         _nowPlaying = null;
         _availableSongs = [];
         _playedSongs = [];
@@ -425,24 +408,22 @@ public partial class Dashboard
     private async Task MarkNowPlayingPlayedAsync()
     {
         if (IsBusy || _nowPlaying is null) return;
-        if (_streamerId <= 0 || string.IsNullOrWhiteSpace(_currentStreamer))
+        if (_channel is not { } channel)
         {
             SetStatus("The current streamer is unavailable. Reload the streamer and try again.");
             return;
         }
 
-        var streamerId = _streamerId;
-        var streamer = _currentStreamer;
         var markedPlayed = false;
         _activity = DashboardActivity.MarkingNowPlaying;
         await InvokeAsync(StateHasChanged);
 
         try
         {
-            await SongListClient.MarkNowPlayingAsPlayedAsync(new StreamerId(streamerId), _lifetimeCts.Token);
+            await SongListClient.MarkNowPlayingAsPlayedAsync(channel.Id, _lifetimeCts.Token);
             markedPlayed = true;
             SetStatus("Now Playing marked as played.");
-            await RefreshSnapshotAsync(streamer, _lifetimeCts.Token);
+            await RefreshSnapshotAsync(channel.Name, _lifetimeCts.Token);
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
@@ -452,11 +433,14 @@ public partial class Dashboard
             if (markedPlayed)
             {
                 SetStatus($"Now Playing was marked as played, but the dashboard refresh failed: {ex.Message}");
-                Logger.LogError(ex, "Refreshing {Streamer} after marking Now Playing as played failed", streamer);
+                Logger.LogError(ex, "Refreshing {Streamer} after marking Now Playing as played failed", channel.Name);
             }
             else
             {
-                Logger.LogError(ex, "Marking Now Playing as played failed for streamer {StreamerId}", streamerId);
+                Logger.LogError(
+                    ex,
+                    "Marking Now Playing as played failed for streamer {StreamerId}",
+                    channel.Id.Value);
                 SetApiHealth(StreamerSessionHealth.Failed, ex.Message);
                 SetStatus($"StreamerSongList failed while marking Now Playing as played: {ex.Message}");
             }
@@ -589,23 +573,6 @@ public partial class Dashboard
     public void PublishPlayedListWidth(string width, string minWidth) =>
         OverlayService.UpdatePlayedListWidth(width, minWidth);
 
-    private Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchQueueAndHistory(
-        string streamer,
-        CancellationToken cancellationToken)
-    {
-        return TrackApiHealthAsync(FetchAsync(), cancellationToken);
-
-        async Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchAsync()
-        {
-            var period = _config.PlayHistory.Period;
-            var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
-            var queueTask = SongListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
-            var historyTask = SongListClient.FetchPlayHistoryAsync(channel, period, cancellationToken);
-            await Task.WhenAll(queueTask, historyTask);
-            return (await queueTask, await historyTask);
-        }
-    }
-
     // API health follows the Dashboard's queue fetches. A spin's later steps fail for other reasons, such as
     // the wheel script, so they leave it alone.
     private async Task<T> TrackApiHealthAsync<T>(Task<T> queueFetch, CancellationToken cancellationToken)
@@ -649,14 +616,14 @@ public partial class Dashboard
     {
         try
         {
-            if (IsSpinInProgress || string.IsNullOrEmpty(_currentStreamer)) return;
-            await RefreshSnapshotAsync(_currentStreamer, ct);
+            if (IsSpinInProgress || _channel is null) return;
+            await RefreshSnapshotAsync(_channel.Name, ct);
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
         {
             SetStatus($"Post-spin refresh failed: {ex.Message}");
-            Logger.LogError(ex, "Refreshing {Streamer} after the winner action failed", _currentStreamer);
+            Logger.LogError(ex, "Refreshing {Streamer} after the winner action failed", _channel?.Name);
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -700,8 +667,7 @@ public partial class Dashboard
         _apiHealthDetail = snapshot.ApiHealthDetail;
         _realtimeHealth = snapshot.RealtimeHealth;
         _realtimeHealthDetail = snapshot.RealtimeHealthDetail;
-        _streamerId = snapshot.StreamerId;
-        _currentStreamer = snapshot.Streamer;
+        _channel = snapshot.Channel;
         _availableSongs = snapshot.AvailableSongs.ToList();
         _playedSongs = snapshot.PlayedSongs;
         _nowPlaying = snapshot.NowPlaying;

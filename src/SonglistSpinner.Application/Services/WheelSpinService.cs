@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using SonglistSpinner.Core.PlayedSongs;
 using SonglistSpinner.Core.Settings;
 using SonglistSpinner.Core.StreamerSongList;
 using SonglistSpinner.Core.Winner;
@@ -64,15 +63,11 @@ public sealed class WheelSpinService
         _session.SetRefreshSuspended(true);
 
         var channel = new StreamerSongListChannel(streamer, config.Streamer.Platform);
-        var queueTask = _songListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
-        var historyTask = _songListClient.FetchPlayHistoryAsync(channel, config.PlayHistory.Period, cancellationToken);
-        await Task.WhenAll(queueTask, historyTask);
-        var queue = await queueTask;
-        var played = await historyTask;
+        var queue = await _songListClient.FetchQueueAndHistoryAsync(channel, config.PlayHistory.Period, cancellationToken);
 
-        var availableSongs = SongAvailability.FilterAvailableSongs(queue.Items, played, config);
+        var availableSongs = queue.AvailableSongs(config);
         int? winnerIndex = availableSongs.Count == 0 ? null : _winnerPicker.Next(availableSongs.Count);
-        return new SpinDraw(streamer, config, availableSongs, played, queue.Playing, winnerIndex);
+        return new SpinDraw(streamer, config, availableSongs, queue.PlayedSongs, queue.Queue.Playing, winnerIndex);
     }
 
     /// <summary>

@@ -7,8 +7,9 @@ namespace SonglistSpinner.Services;
 public static class StreamerSessionServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers the loaded-channel session and the spin and winner actions that work on it. They are scoped
-    /// to the Blazor WebView, which lives as long as the app window, so the session outlives page changes.
+    /// Registers the loaded-channel session, the loader that starts it, and the spin and winner actions that work
+    /// on it. They are scoped to the Blazor WebView, which lives as long as the app window, so the session
+    /// outlives page changes.
     /// The host registers the StreamerSongList API and event source, the overlay state and a TimeProvider.
     /// </summary>
     public static IServiceCollection AddStreamerSession(this IServiceCollection services)
@@ -17,6 +18,7 @@ public static class StreamerSessionServiceCollectionExtensions
         services.TryAddSingleton(Random.Shared);
         services.AddScoped<NowPlayingTransitionService>();
         services.AddScoped<StreamerSessionService>();
+        services.AddScoped<ChannelLoader>();
         services.AddScoped<WheelSpinService>();
         services.AddScoped<WinnerActionService>();
         return services;

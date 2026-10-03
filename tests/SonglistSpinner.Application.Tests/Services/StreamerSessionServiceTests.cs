@@ -123,6 +123,42 @@ public class StreamerSessionServiceTests
     }
 
     [Fact]
+    public async Task Given_ExcludePlayedSongsTurnedOnDuringRefresh_When_FetchCompletes_Then_FiltersWithTheLatestConfig()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var api = new ScriptedStreamerSongListClient();
+        var pendingQueue = new TaskCompletionSource<SpinnerQueueSnapshot>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        api.QueueResponses.Enqueue(_ => pendingQueue.Task);
+        api.PlayHistory = [new PlayHistoryItem { Song = new SpinnerSong { Id = 500 } }];
+        var includePlayed = new SpinnerConfig { PlayHistory = new SpinnerPlayHistoryConfig { ExcludePlayedSongs = false } };
+        var excludePlayed = new SpinnerConfig { PlayHistory = new SpinnerPlayHistoryConfig { ExcludePlayedSongs = true } };
+        // The fake clock never fires the debounced refresh that the config change requests.
+        await using var session = new StreamerSessionService(
+            api,
+            new ChannelEventSource(),
+            new OverlayStateService(),
+            new FakeTimeProvider());
+        await session.StartAsync(1, Streamer, includePlayed, [], [], null, cancellationToken);
+        var refresh = session.RefreshAsync(Streamer, cancellationToken);
+        await api.QueueFetchStarted.Task.WaitAsync(WaitLimit, cancellationToken);
+
+        session.UpdateConfig(excludePlayed);
+        pendingQueue.SetResult(new SpinnerQueueSnapshot
+        {
+            Items =
+            [
+                new SpinnerQueueItem { QueueId = 41, Song = new SpinnerSong { Id = 500 } },
+                new SpinnerQueueItem { QueueId = 42, Song = new SpinnerSong { Id = 501 } }
+            ]
+        });
+        var refreshed = await refresh.WaitAsync(WaitLimit, cancellationToken);
+
+        Assert.NotNull(refreshed);
+        Assert.Equal([42], refreshed.AvailableSongs.Select(song => song.QueueId));
+    }
+
+    [Fact]
     public async Task Given_RefreshSuspended_When_PublishingAnEmptyQueue_Then_OverlayShowsNoSongs()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

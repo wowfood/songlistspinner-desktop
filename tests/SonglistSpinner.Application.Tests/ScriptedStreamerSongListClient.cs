@@ -47,9 +47,13 @@ internal sealed class ScriptedStreamerSongListClient : IStreamerSongListClient
         string period = "week",
         CancellationToken cancellationToken = default) => Task.FromResult(PlayHistory);
 
+    /// <summary>Answers streamer lookups; lookups are not supported while this is unset.</summary>
+    public Func<StreamerSongListChannel, Task<StreamerSongListStreamer>>? ResolveStreamer { get; set; }
+
     public Task<StreamerSongListStreamer> ResolveStreamerAsync(
         StreamerSongListChannel channel,
-        CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        CancellationToken cancellationToken = default) =>
+        ResolveStreamer?.Invoke(channel) ?? throw new NotSupportedException();
 
     public Task MarkQueueItemAsPlayedAsync(QueueEntryId queueEntryId, CancellationToken cancellationToken = default)
     {

@@ -128,14 +128,12 @@ public partial class Setup
                         await CredentialStore.SaveCredentialAsync(candidateCredential, cancellationToken);
 
                     _resolvedStreamer = await SongListClient.ResolveStreamerAsync(channel, cancellationToken);
-                    var queueTask = SongListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
-                    var historyTask = SongListClient.FetchPlayHistoryAsync(
+                    var fetched = await SongListClient.FetchQueueAndHistoryAsync(
                         channel,
                         _settings.PlayHistoryPeriod,
                         cancellationToken);
-                    await Task.WhenAll(queueTask, historyTask);
-                    _queueCount = (await queueTask).Items.Length;
-                    _historyCount = (await historyTask).Length;
+                    _queueCount = fetched.Queue.Items.Length;
+                    _historyCount = fetched.PlayedSongs.Length;
 
                     _settings.DefaultStreamerName = channel.Name;
                     _settings.StreamerPlatform = channel.Platform;

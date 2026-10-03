@@ -8,6 +8,7 @@
 @inject OverlayStateService OverlayService
 @inject LocalOverlayServer OverlayServer
 @inject StreamerSessionService StreamerSession
+@inject ChannelLoader ChannelLoader
 @inject SonglistSpinner.Core.StreamerSongList.Api.V2.StreamerSongListApiOptions ApiOptions
 @inject NavigationManager Navigation
 @inject TimeProvider TimeProvider
@@ -39,9 +40,9 @@
     </div>
     <div class="dashboard-health-item dashboard-health-channel"
          title="The StreamerSongList channel currently loaded" tabindex="0"
-         aria-label="Channel: @(string.IsNullOrWhiteSpace(_currentStreamer) ? "Not loaded" : _currentStreamer)">
+         aria-label="Channel: @(string.IsNullOrWhiteSpace(DisplayedStreamer) ? "Not loaded" : DisplayedStreamer)">
         <span>Channel</span>
-        <strong>@(string.IsNullOrWhiteSpace(_currentStreamer) ? "Not loaded" : _currentStreamer)</strong>
+        <strong>@(string.IsNullOrWhiteSpace(DisplayedStreamer) ? "Not loaded" : DisplayedStreamer)</strong>
     </div>
     <div class="dashboard-health-environment @ApiEnvironmentClass" title="@ApiOptions.BaseAddress"
          tabindex="0" aria-label="API environment: @ApiEnvironmentLabel. @ApiOptions.BaseAddress">
@@ -103,7 +104,7 @@
                     }
                     else
                     {
-                        <span id="streamerLabel">Streamer: @_currentStreamer</span>
+                        <span id="streamerLabel">Streamer: @DisplayedStreamer</span>
                         @if (!_isLockedDefault)
                         {
                             <button id="changeStreamerBtn" class="small-button" @onclick="ChangeStreamer" disabled="@IsBusy">Change
@@ -140,7 +141,7 @@
                     <h3>Played Songs: <span id="playedCount">@_playedSongs.Length</span></h3>
                     <h3>Queued Songs: <span id="availableCount">@_availableSongs.Count</span></h3>
                 </div>
-                @if (!string.IsNullOrWhiteSpace(_currentStreamer) && _availableSongs.Count == 0)
+                @if (!string.IsNullOrWhiteSpace(DisplayedStreamer) && _availableSongs.Count == 0)
                 {
                     <p class="queue-empty-state" role="status">No eligible queued songs are available to spin.</p>
                 }
