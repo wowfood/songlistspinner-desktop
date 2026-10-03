@@ -208,7 +208,10 @@ public partial class Dashboard
 
         if (_jsInitialized) return;
         _jsInitialized = true;
+        // A new Dashboard (after Settings, say) starts with the wheel shown and the played list expanded; the
+        // overlay keeps the last layout it was sent, so send this one or OBS stays collapsed behind the Dashboard.
         OverlayService.BroadcastWheelVisibility(_wheelVisible);
+        OverlayService.UpdatePlayedListCollapsed(_playedListCollapsed);
 
         await JS.InvokeVoidAsync(
             SpinnerInteropMethods.ApplyTheme, _config.Colors, _config.PlayedList, _config.WinnerDialog);
