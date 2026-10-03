@@ -104,21 +104,36 @@ public class OverlayStateService
         return BroadcastAsync(OverlayEventNames.SpinCommand, new { winnerIndex, winnerQueueId, duration });
     }
 
+    // Winner and wheel visibility are recorded so a reconnecting overlay replays them in its initial
+    // state. Recording and broadcasting share the lock that SubscribeAsync takes to register a client
+    // and build its initial state, so a client sees either the old state plus the event, or the new state.
     public Task BroadcastWinnerRevealAsync(
         IReadOnlyList<WinnerDialogField> fields,
         int? queuePosition)
     {
-        return BroadcastAsync(OverlayEventNames.WinnerReveal, new { fields, queuePosition });
+        lock (_stateGate)
+        {
+            _snapshot = _snapshot with { Winner = new WinnerSnapshot([.. fields], queuePosition) };
+            return BroadcastAsync(OverlayEventNames.WinnerReveal, _snapshot.Winner);
+        }
     }
 
     public Task BroadcastCloseWinnerAsync()
     {
-        return BroadcastAsync(OverlayEventNames.CloseWinner, new { });
+        lock (_stateGate)
+        {
+            _snapshot = _snapshot with { Winner = null };
+            return BroadcastAsync(OverlayEventNames.CloseWinner, new { });
+        }
     }
 
     public Task BroadcastWheelVisibilityAsync(bool visible)
     {
-        return BroadcastAsync(OverlayEventNames.SetWheelVisible, new { visible });
+        lock (_stateGate)
+        {
+            _snapshot = _snapshot with { WheelVisible = visible };
+            return BroadcastAsync(OverlayEventNames.SetWheelVisible, new { visible });
+        }
     }
 
     public Task UpdatePlayedListCollapsedAsync(bool collapsed)
@@ -154,12 +169,18 @@ public class OverlayStateService
             AllowSynchronousContinuations = false
         });
         var key = Guid.NewGuid();
-        _clients[key] = channel;
+        string initialState;
+        lock (_stateGate)
+        {
+            initialState = BuildInitStateEvent();
+            _clients[key] = channel;
+        }
+
         OnHealthChanged();
 
         try
         {
-            yield return BuildInitStateEvent();
+            yield return initialState;
 
             Task<bool>? messageAvailable = null;
             while (!ct.IsCancellationRequested)
@@ -216,7 +237,9 @@ public class OverlayStateService
             availableCount = snapshot.AvailableSongs.Length,
             playedListCollapsed = snapshot.PlayedListCollapsed,
             playedListWidth = snapshot.PlayedListWidth,
-            playedListMinWidth = snapshot.PlayedListMinWidth
+            playedListMinWidth = snapshot.PlayedListMinWidth,
+            wheelVisible = snapshot.WheelVisible,
+            winner = snapshot.Winner
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOpts);
@@ -265,6 +288,8 @@ public class OverlayStateService
         }
     }
 
+    private sealed record WinnerSnapshot(WinnerDialogField[] Fields, int? QueuePosition);
+
     private sealed record OverlaySnapshot(
         SpinnerConfig Config,
         SpinnerQueueItem[] AvailableSongs,
@@ -275,6 +300,9 @@ public class OverlayStateService
         string PlayedListWidth,
         string PlayedListMinWidth)
     {
+        public bool WheelVisible { get; init; } = true;
+        public WinnerSnapshot? Winner { get; init; }
+
         public static OverlaySnapshot Empty { get; } = new(
             new SpinnerConfig(),
             [],

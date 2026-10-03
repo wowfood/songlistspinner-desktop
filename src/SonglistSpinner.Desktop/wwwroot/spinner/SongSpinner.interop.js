@@ -246,8 +246,9 @@ window.SpinnerInterop = (function () {
                     clearTimeout(_resizeTimeout)
                     _resizeTimeout = setTimeout(() => {
                         if (_wheel) {
-                            _wheel.remove()
-                            _wheel = buildWheel(container)
+                            // Preserve the current rotation and in-flight spin.
+                            _wheel.resize()
+                            _wheel.draw(performance.now())
                         }
                     }, 200)
                 }

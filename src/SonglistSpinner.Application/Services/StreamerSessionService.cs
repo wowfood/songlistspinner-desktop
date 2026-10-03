@@ -12,6 +12,9 @@ namespace SonglistSpinner.Services;
 /// </summary>
 public sealed class StreamerSessionService : IAsyncDisposable
 {
+    private static readonly TimeSpan InitialRefreshRetryDelay = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan MaxRefreshRetryDelay = TimeSpan.FromSeconds(30);
+
     private readonly ISpinnerApiService _apiService;
     private readonly IStreamerSongListEventSource _eventSource;
     private readonly OverlayStateService _overlayService;
@@ -92,6 +95,12 @@ public sealed class StreamerSessionService : IAsyncDisposable
         _refreshTask = RunRefreshesAsync(streamer, _refreshSignals.Reader, subscriptionToken);
     }
 
+    /// <summary>
+    /// Fetches the queue and history for <paramref name="expectedStreamer"/> and publishes them.
+    /// Returns <see langword="null"/> without publishing when another channel is loaded, or when
+    /// refresh is suspended before the fetch starts or before its result is committed, so a refresh
+    /// never replaces the songs under an active spin.
+    /// </summary>
     public async Task<StreamerSessionSnapshot?> RefreshAsync(
         string expectedStreamer,
         CancellationToken cancellationToken = default)
@@ -101,7 +110,11 @@ public sealed class StreamerSessionService : IAsyncDisposable
         {
             StreamerSessionSnapshot before;
             lock (_stateGate)
+            {
+                if (_refreshSuspended) return null;
                 before = _snapshot;
+            }
+
             if (!StringComparer.Ordinal.Equals(before.Streamer, expectedStreamer)) return null;
 
             try
@@ -120,7 +133,9 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 StreamerSessionSnapshot updated;
                 lock (_stateGate)
                 {
-                    if (!StringComparer.Ordinal.Equals(_snapshot.Streamer, expectedStreamer)) return null;
+                    if (_refreshSuspended ||
+                        !StringComparer.Ordinal.Equals(_snapshot.Streamer, expectedStreamer))
+                        return null;
 
                     var latestConfig = _snapshot.Config;
                     updated = _snapshot with
@@ -207,6 +222,10 @@ public sealed class StreamerSessionService : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Suspends refreshes while a spin owns the wheel. A refresh skipped or discarded while suspended
+    /// is requested again on resume. <see cref="UpdateSnapshotAsync"/> still publishes while suspended.
+    /// </summary>
     public void SetRefreshSuspended(bool suspended)
     {
         lock (_stateGate)
@@ -302,23 +321,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 {
                 }
 
-                bool suspended;
-                lock (_stateGate)
-                    suspended = _refreshSuspended;
-                if (suspended) continue;
-
-                try
-                {
-                    await RefreshAsync(streamer, cancellationToken);
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    Trace.WriteLine($"[SonglistSpinner] Realtime refresh failed and will retry on the next event: {ex}");
-                }
+                await RefreshUntilSucceededAsync(streamer, refreshSignals, cancellationToken);
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -329,6 +332,53 @@ public sealed class StreamerSessionService : IAsyncDisposable
             UpdateApiHealth(StreamerSessionHealth.Failed, ex.Message, $"Realtime refresh failed: {ex.Message}");
             Trace.WriteLine($"[SonglistSpinner] Realtime refresh failed: {ex}");
         }
+    }
+
+    /// <summary>
+    /// Retries a failed realtime refresh with exponential backoff instead of waiting for the next
+    /// event, which may never come. Stops retrying while refresh is suspended, because resuming
+    /// requests a fresh refresh.
+    /// </summary>
+    private async Task RefreshUntilSucceededAsync(
+        string streamer,
+        ChannelReader<bool> refreshSignals,
+        CancellationToken cancellationToken)
+    {
+        var retryDelay = InitialRefreshRetryDelay;
+        var failed = false;
+        while (!IsRefreshSuspended())
+        {
+            try
+            {
+                await RefreshAsync(streamer, cancellationToken);
+                if (failed) RaiseChanged("Realtime refresh recovered.");
+                return;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                failed = true;
+                Trace.WriteLine(
+                    $"[SonglistSpinner] Realtime refresh failed; retrying in {retryDelay.TotalSeconds:0}s: {ex}");
+            }
+
+            await Task.Delay(retryDelay, cancellationToken);
+            // The retry fetches the latest state, so signals that arrived while waiting are already covered.
+            while (refreshSignals.TryRead(out _))
+            {
+            }
+
+            retryDelay = retryDelay * 2 < MaxRefreshRetryDelay ? retryDelay * 2 : MaxRefreshRetryDelay;
+        }
+    }
+
+    private bool IsRefreshSuspended()
+    {
+        lock (_stateGate)
+            return _refreshSuspended;
     }
 
     private void UpdateApiHealth(StreamerSessionHealth health, string detail, string? announcement)

@@ -622,8 +622,9 @@ window.SpinnerInterop = (function () {
                     clearTimeout(_resizeTimeout)
                     _resizeTimeout = setTimeout(() => {
                         if (_wheel) {
-                            _wheel.remove()
-                            _wheel = buildWheel(container)
+                            // Preserve the current rotation and in-flight spin.
+                            _wheel.resize()
+                            _wheel.draw(performance.now())
                         }
                     }, 200)
                 }
@@ -749,6 +750,43 @@ window.SpinnerInterop = (function () {
 const _overlayState = { config: null, collapsed: false, wheelItems: [] }
 const _isSettingsPreview = new URLSearchParams(window.location.search).get('preview') === '1'
 
+function renderWinner(data) {
+    if (!data) {
+        document.getElementById('winnerModal').style.display = 'none'
+        return
+    }
+    const queuePosition = Number(data.queuePosition)
+    const hasQueuePosition = Number.isInteger(queuePosition) && queuePosition > 0
+    const queuePositionElement = document.getElementById('winnerQueuePosition')
+    const fieldsElement = document.getElementById('winnerFields')
+    const fields = Array.isArray(data.fields)
+        ? data.fields.filter(field => field && field.label && field.value)
+        : []
+    fieldsElement.replaceChildren()
+    fields.forEach((field, index) => {
+        if (index > 0) {
+            const separator = document.createElement('span')
+            separator.className = 'winner-field-separator'
+            separator.setAttribute('aria-hidden', 'true')
+            separator.textContent = '|'
+            fieldsElement.appendChild(separator)
+        }
+        const label = document.createElement('strong')
+        label.className = 'winner-field-label'
+        label.textContent = field.label
+        const value = document.createElement('span')
+        value.className = 'winner-field-value'
+        value.textContent = field.value
+        fieldsElement.append(label, value)
+    })
+    fieldsElement.hidden = fields.length === 0
+    document.getElementById('winnerQueuePositionValue').textContent = hasQueuePosition
+        ? `#${queuePosition}`
+        : ''
+    queuePositionElement.hidden = !hasQueuePosition
+    document.getElementById('winnerModal').style.display = 'block'
+}
+
 function connectSSE() {
     const es = new EventSource('/overlay/events')
     const events = _spinnerContracts.overlayEvents
@@ -762,6 +800,8 @@ function connectSSE() {
             _overlayState.collapsed,
             data.config && data.config.songList && data.config.songList.playedListPosition)
         updateSongs(data)
+        SpinnerInterop.setWheelVisible(data.wheelVisible !== false)
+        renderWinner(data.winner)
     })
 
     es.addEventListener(events.updateSongs, e => {
@@ -785,41 +825,12 @@ function connectSSE() {
 
     es.addEventListener(events.winnerReveal, e => {
         const data = JSON.parse(e.data)
-        const queuePosition = Number(data.queuePosition)
-        const hasQueuePosition = Number.isInteger(queuePosition) && queuePosition > 0
-        const queuePositionElement = document.getElementById('winnerQueuePosition')
-        const fieldsElement = document.getElementById('winnerFields')
-        const fields = Array.isArray(data.fields)
-            ? data.fields.filter(field => field && field.label && field.value)
-            : []
-        fieldsElement.replaceChildren()
-        fields.forEach((field, index) => {
-            if (index > 0) {
-                const separator = document.createElement('span')
-                separator.className = 'winner-field-separator'
-                separator.setAttribute('aria-hidden', 'true')
-                separator.textContent = '|'
-                fieldsElement.appendChild(separator)
-            }
-            const label = document.createElement('strong')
-            label.className = 'winner-field-label'
-            label.textContent = field.label
-            const value = document.createElement('span')
-            value.className = 'winner-field-value'
-            value.textContent = field.value
-            fieldsElement.append(label, value)
-        })
-        fieldsElement.hidden = fields.length === 0
-        document.getElementById('winnerQueuePositionValue').textContent = hasQueuePosition
-            ? `#${queuePosition}`
-            : ''
-        queuePositionElement.hidden = !hasQueuePosition
-        document.getElementById('winnerModal').style.display = 'block'
+        renderWinner(data)
         if (_overlayState.config) SpinnerInterop.runConfetti(_overlayState.config.wheelColors)
     })
 
     es.addEventListener(events.closeWinner, () => {
-        document.getElementById('winnerModal').style.display = 'none'
+        renderWinner(null)
     })
 
     es.addEventListener(events.setWheelVisible, e => {

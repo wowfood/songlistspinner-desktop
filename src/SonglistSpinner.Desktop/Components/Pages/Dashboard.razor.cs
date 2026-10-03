@@ -64,7 +64,9 @@ public partial class Dashboard
     private bool _preferMarkWinnerPlayed;
 
     private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
-    private bool IsSpinDisabled => _spinDisabled || _isSpinning || _markNowPlayingPending || _winnerVisible;
+    // A spin, channel load or Now Playing update each replaces the queue; only one may run at a time.
+    private bool IsBusy => _isSpinning || _channelLoadPending || _markNowPlayingPending;
+    private bool IsSpinDisabled => _spinDisabled || IsBusy || _winnerVisible;
     private string PreferredWinnerActionId => IsNowPlayingWinnerActionEnabled
         ? "setWinnerNowPlayingBtn"
         : _preferMarkWinnerPlayed
@@ -209,6 +211,7 @@ public partial class Dashboard
 
         if (_jsInitialized) return;
         _jsInitialized = true;
+        await OverlayService.BroadcastWheelVisibilityAsync(_wheelVisible);
 
         await JS.InvokeVoidAsync(
             SpinnerInteropMethods.ApplyTheme, _config.Colors, _config.PlayedList, _config.WinnerDialog);
@@ -245,6 +248,7 @@ public partial class Dashboard
 
     private async Task LoadStreamer()
     {
+        if (IsBusy) return;
         var name = _streamerInput.Trim();
         _streamerInputError = null;
         if (string.IsNullOrEmpty(name))
@@ -313,9 +317,9 @@ public partial class Dashboard
             return;
         }
 
-        if (_markNowPlayingPending)
+        if (IsBusy)
         {
-            SetStatus("Wait for the Now Playing update to finish.");
+            SetStatus("Wait for the current queue update to finish.");
             return;
         }
 
@@ -353,6 +357,14 @@ public partial class Dashboard
 
             if (_availableSongs.Count == 0)
             {
+                // Publish the empty queue so the wheel and overlay stop showing songs that are gone.
+                await RebuildWheel(_wheelCts.Token);
+                await StreamerSession.UpdateSnapshotAsync(
+                    _config,
+                    _availableSongs,
+                    _playedSongs,
+                    _nowPlaying,
+                    _lifetimeCts.Token);
                 SetStatus("No songs left to spin!");
                 _spinDisabled = false;
                 SignalSpinCompleted();
@@ -410,6 +422,7 @@ public partial class Dashboard
 
     private async Task ChangeStreamer()
     {
+        if (IsBusy) return;
         await StreamerSession.ClearAsync(_config);
         _showStreamerInput = true;
         _currentStreamer = "";
@@ -443,7 +456,7 @@ public partial class Dashboard
 
     private async Task MarkNowPlayingPlayedAsync()
     {
-        if (_markNowPlayingPending || _isSpinning || _nowPlaying is null) return;
+        if (IsBusy || _nowPlaying is null) return;
         if (_streamerId <= 0 || string.IsNullOrWhiteSpace(_currentStreamer))
         {
             SetStatus("The current streamer is unavailable. Reload the streamer and try again.");

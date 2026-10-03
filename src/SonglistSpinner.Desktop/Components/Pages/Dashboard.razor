@@ -95,18 +95,18 @@
                                @bind:event="oninput"
                                placeholder="Enter streamer name..."
                                @onkeydown="OnStreamerKeyDown"/>
-                        <button class="small-button" @onclick="LoadStreamer">Load</button>
+                        <button class="small-button" @onclick="LoadStreamer" disabled="@IsBusy">Load</button>
                     }
                     else
                     {
                         <span id="streamerLabel">Streamer: @_currentStreamer</span>
                         @if (!_isLockedDefault)
                         {
-                            <button id="changeStreamerBtn" class="small-button" @onclick="ChangeStreamer">Change
+                            <button id="changeStreamerBtn" class="small-button" @onclick="ChangeStreamer" disabled="@IsBusy">Change
                             </button>
                         }
                     }
-                    <button id="refreshSongsBtn" class="small-button" @onclick="LoadStreamer">Refresh</button>
+                    <button id="refreshSongsBtn" class="small-button" @onclick="LoadStreamer" disabled="@IsBusy">Refresh</button>
                     @if (_showStreamerInput && _streamerInputError is not null)
                     {
                         <div id="streamerInputError" class="streamer-input-error-message" role="alert">
@@ -125,7 +125,7 @@
                             <strong id="nowPlayingSong">@NowPlayingDisplayText</strong>
                         </div>
                         <button id="markNowPlayingPlayedBtn"
-                                disabled="@(_markNowPlayingPending || _isSpinning)"
+                                disabled="@IsBusy"
                                 aria-describedby="nowPlayingSong"
                                 @onclick="MarkNowPlayingPlayedAsync">
                             @(_markNowPlayingPending ? "Marking..." : "Mark Played")
