@@ -164,6 +164,20 @@ public class OverlayStateServiceTests
         Assert.Equal(": keep-alive\n\n", events.Current);
     }
 
+    [Fact]
+    public async Task Given_OverlayConnected_When_ItDisconnects_Then_EachConnectionChangeReportsTheClientCount()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var overlay = new OverlayStateService();
+        var reportedCounts = new List<int>();
+        overlay.ConnectedClientsChanged += (_, _) => reportedCounts.Add(overlay.ConnectedClientCount);
+
+        await using (var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken))
+            Assert.True(await events.MoveNextAsync());
+
+        Assert.Equal([1, 0], reportedCounts);
+    }
+
     internal static async Task<JsonDocument> ReadInitialStateAsync(OverlayStateService overlay)
     {
         await using var events = overlay.SubscribeAsync(TestContext.Current.CancellationToken).GetAsyncEnumerator();

@@ -230,12 +230,12 @@ public partial class Setup
         {
             using var http = HttpClientFactory.CreateClient();
             using var response = await http.GetAsync(
-                OverlayService.OverlayUrl,
+                OverlayServer.OverlayUrl,
                 HttpCompletionOption.ResponseHeadersRead,
                 timeout.Token);
             response.EnsureSuccessStatusCode();
             _overlayState = VerificationState.Passed;
-            _overlayMessage = $"Overlay available at {OverlayService.OverlayUrl}.";
+            _overlayMessage = $"Overlay available at {OverlayServer.OverlayUrl}.";
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !_lifetimeCts.IsCancellationRequested)
         {
@@ -252,7 +252,7 @@ public partial class Setup
 
     private async Task CopyOverlayUrlAsync()
     {
-        await Clipboard.SetTextAsync(OverlayService.OverlayUrl);
+        await Clipboard.SetTextAsync(OverlayServer.OverlayUrl);
         _completionMessage = "Overlay URL copied to the clipboard.";
     }
 
@@ -260,7 +260,7 @@ public partial class Setup
     {
         try
         {
-            await Launcher.OpenAsync(new Uri(OverlayService.OverlayUrl));
+            await Launcher.OpenAsync(new Uri(OverlayServer.OverlayUrl));
             _completionMessage = "Overlay preview opened in your browser.";
         }
         catch (Exception ex)

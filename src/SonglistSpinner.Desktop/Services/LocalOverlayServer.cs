@@ -22,16 +22,37 @@ public class LocalOverlayServer : IAsyncDisposable
     private readonly CancellationTokenSource _cts = new();
     private readonly OverlayStateService _overlay;
     private readonly ILogger<LocalOverlayServer> _logger;
+    private readonly object _healthGate = new();
     private HttpListener? _listener;
+    private LocalOverlayServerState _state = LocalOverlayServerState.Stopped;
+    private string? _error;
 
     public LocalOverlayServer(OverlayStateService overlay, ILogger<LocalOverlayServer> logger)
     {
         _overlay = overlay;
         _logger = logger;
+        _overlay.ConnectedClientsChanged += OnConnectedClientsChanged;
+    }
+
+    /// <summary>Raised when the server's state or its number of connected overlays changes.</summary>
+    public event EventHandler? HealthChanged;
+
+    public int Port { get; } = 5150;
+
+    /// <summary>The address OBS browser sources load.</summary>
+    public string OverlayUrl => $"http://localhost:{Port}/overlay";
+
+    public LocalOverlayHealth GetHealth()
+    {
+        lock (_healthGate)
+        {
+            return new LocalOverlayHealth(_state, _overlay.ConnectedClientCount, _error);
+        }
     }
 
     public async ValueTask DisposeAsync()
     {
+        _overlay.ConnectedClientsChanged -= OnConnectedClientsChanged;
         await _cts.CancelAsync();
         try
         {
@@ -42,7 +63,7 @@ public class LocalOverlayServer : IAsyncDisposable
             _logger.LogWarning(ex, "Closing the local overlay listener failed");
         }
 
-        _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
+        SetHealth(LocalOverlayServerState.Stopped);
         _cts.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -51,21 +72,21 @@ public class LocalOverlayServer : IAsyncDisposable
     // requests are accepted on a background loop whose faults are logged.
     public void Start()
     {
-        _overlay.SetServerHealth(LocalOverlayServerState.Starting);
+        SetHealth(LocalOverlayServerState.Starting);
         _listener = new HttpListener();
-        _listener.Prefixes.Add($"http://localhost:{_overlay.Port}/");
+        _listener.Prefixes.Add($"http://localhost:{Port}/");
         try
         {
             _listener.Start();
-            _overlay.SetServerHealth(LocalOverlayServerState.Running);
-            _logger.LogInformation("Local overlay server listening on port {Port}", _overlay.Port);
+            SetHealth(LocalOverlayServerState.Running);
+            _logger.LogInformation("Local overlay server listening on port {Port}", Port);
             ProcessRequestsAsync(_cts.Token)
                 .ObserveFaults(ex => _logger.LogError(ex, "The local overlay request loop failed"));
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Local overlay server failed to start on port {Port}", _overlay.Port);
-            _overlay.SetServerHealth(LocalOverlayServerState.Failed, ex.Message);
+            _logger.LogError(ex, "Local overlay server failed to start on port {Port}", Port);
+            SetHealth(LocalOverlayServerState.Failed, ex.Message);
         }
     }
 
@@ -81,7 +102,7 @@ public class LocalOverlayServer : IAsyncDisposable
             // DisposeAsync already closed the listener, so there is nothing left to stop.
         }
 
-        _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
+        SetHealth(LocalOverlayServerState.Stopped);
     }
 
     private async Task ProcessRequestsAsync(CancellationToken ct)
@@ -115,7 +136,7 @@ public class LocalOverlayServer : IAsyncDisposable
 
         if (!ct.IsCancellationRequested)
         {
-            _overlay.SetServerHealth(
+            SetHealth(
                 LocalOverlayServerState.Failed,
                 failure ?? "The local overlay server stopped unexpectedly.");
         }
@@ -177,6 +198,37 @@ public class LocalOverlayServer : IAsyncDisposable
         }
     }
 
+    private void SetHealth(LocalOverlayServerState state, string? error = null)
+    {
+        lock (_healthGate)
+        {
+            _state = state;
+            _error = error;
+        }
+
+        OnHealthChanged();
+    }
+
+    private void OnConnectedClientsChanged(object? sender, EventArgs e) => OnHealthChanged();
+
+    private void OnHealthChanged()
+    {
+        var handlers = HealthChanged;
+        if (handlers is null) return;
+
+        foreach (EventHandler handler in handlers.GetInvocationList())
+        {
+            try
+            {
+                handler(this, EventArgs.Empty);
+            }
+            catch (Exception ex)
+            {
+                // One failing observer must not stop the others or the server operation that changed health.
+                _logger.LogError(ex, "An overlay health observer failed");
+            }
+        }
+    }
     private static void AbortResponse(HttpListenerContext context)
     {
         try

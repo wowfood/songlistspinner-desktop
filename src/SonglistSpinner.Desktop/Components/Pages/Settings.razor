@@ -6,7 +6,7 @@
 @inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
-@inject OverlayStateService OverlayService
+@inject LocalOverlayServer OverlayServer
 @inject StreamerSessionService StreamerSession
 @inject ApplicationUpdateService UpdateService
 @inject IJSRuntime JS
@@ -721,7 +721,7 @@
                                 <dl class="ss-settings-endpoints">
                                     <div><dt>Application</dt><dd><code>SonglistSpinner @UpdateService.CurrentVersion</code></dd></div>
                                     <div><dt>API</dt><dd><code>@ApiOptions.BaseAddress</code></dd></div>
-                                    <div><dt>Local overlay</dt><dd><code>@OverlayService.OverlayUrl</code></dd></div>
+                                    <div><dt>Local overlay</dt><dd><code>@OverlayServer.OverlayUrl</code></dd></div>
                                     <div>
                                         <dt>Updates</dt>
                                         <dd>

@@ -106,7 +106,7 @@ public partial class Dashboard
     private string OverlayHealthDetail => _overlayHealth.ServerState switch
     {
         LocalOverlayServerState.Running =>
-            $"{OverlayService.OverlayUrl} — {_overlayHealth.ConnectedClients} connected browser source(s).",
+            $"{OverlayServer.OverlayUrl} — {_overlayHealth.ConnectedClients} connected browser source(s).",
         LocalOverlayServerState.Failed => _overlayHealth.Error ?? "The local overlay server failed.",
         LocalOverlayServerState.Starting => "The local OBS overlay server is starting.",
         _ => "The local OBS overlay server is stopped."
@@ -116,7 +116,7 @@ public partial class Dashboard
     {
         if (_overlayHealthSubscribed)
         {
-            OverlayService.HealthChanged -= OnOverlayHealthChanged;
+            OverlayServer.HealthChanged -= OnOverlayHealthChanged;
             _overlayHealthSubscribed = false;
         }
 
@@ -184,8 +184,8 @@ public partial class Dashboard
                 return;
             }
 
-            _overlayHealth = OverlayService.GetHealth();
-            OverlayService.HealthChanged += OnOverlayHealthChanged;
+            _overlayHealth = OverlayServer.GetHealth();
+            OverlayServer.HealthChanged += OnOverlayHealthChanged;
             _overlayHealthSubscribed = true;
             await JS.InvokeVoidAsync("document.body.classList.add", "spinner-page");
             var settings = LocalSettings.LoadSettings();
@@ -714,7 +714,7 @@ public partial class Dashboard
 
     private void OnOverlayHealthChanged(object? sender, EventArgs e)
     {
-        var health = OverlayService.GetHealth();
+        var health = OverlayServer.GetHealth();
         try
         {
             InvokeAsync(() =>

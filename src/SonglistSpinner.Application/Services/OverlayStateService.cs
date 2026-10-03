@@ -19,7 +19,6 @@ public class OverlayStateService
     };
 
     private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
-    private readonly object _healthGate = new();
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<OverlayStateService> _logger;
 
@@ -30,8 +29,6 @@ public class OverlayStateService
     // channels and never blocks.
     private readonly object _stateGate = new();
     private OverlaySnapshot _snapshot = OverlaySnapshot.Empty;
-    private string? _serverError;
-    private LocalOverlayServerState _serverState = LocalOverlayServerState.Stopped;
 
     public OverlayStateService(TimeProvider? timeProvider = null, ILogger<OverlayStateService>? logger = null)
     {
@@ -39,29 +36,11 @@ public class OverlayStateService
         _logger = logger ?? NullLogger<OverlayStateService>.Instance;
     }
 
-    public event EventHandler? HealthChanged;
+    /// <summary>Raised after an overlay connects or disconnects.</summary>
+    public event EventHandler? ConnectedClientsChanged;
 
-    public int Port { get; } = 5150;
-    public string OverlayUrl => $"http://localhost:{Port}/overlay";
+    public int ConnectedClientCount => _clients.Count;
 
-    public LocalOverlayHealth GetHealth()
-    {
-        lock (_healthGate)
-        {
-            return new LocalOverlayHealth(_serverState, _clients.Count, _serverError);
-        }
-    }
-
-    internal void SetServerHealth(LocalOverlayServerState state, string? error = null)
-    {
-        lock (_healthGate)
-        {
-            _serverState = state;
-            _serverError = error;
-        }
-
-        OnHealthChanged();
-    }
 
     public void UpdateState(
         SpinnerConfig config,
@@ -179,7 +158,7 @@ public class OverlayStateService
             _clients[key] = channel;
         }
 
-        OnHealthChanged();
+        OnConnectedClientsChanged();
 
         try
         {
@@ -210,7 +189,7 @@ public class OverlayStateService
         }
         finally
         {
-            if (_clients.TryRemove(key, out _)) OnHealthChanged();
+            if (_clients.TryRemove(key, out _)) OnConnectedClientsChanged();
             channel.Writer.TryComplete();
         }
     }
@@ -259,9 +238,9 @@ public class OverlayStateService
             : [new OverlayWheelItem("Waiting for Dashboard...")];
     }
 
-    private void OnHealthChanged()
+    private void OnConnectedClientsChanged()
     {
-        var handlers = HealthChanged;
+        var handlers = ConnectedClientsChanged;
         if (handlers is null) return;
 
         foreach (EventHandler handler in handlers.GetInvocationList())
@@ -272,7 +251,7 @@ public class OverlayStateService
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "An overlay health observer failed");
+                _logger.LogError(ex, "An overlay connection observer failed");
             }
         }
     }

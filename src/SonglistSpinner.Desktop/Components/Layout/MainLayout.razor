@@ -1,5 +1,5 @@
 @inherits LayoutComponentBase
-@inject OverlayStateService OverlayService
+@inject LocalOverlayServer OverlayServer
 @inject ApplicationUpdateService UpdateService
 @inject ISnackbar Snackbar
 @inject IClipboard Clipboard
@@ -83,7 +83,7 @@
 
     private async Task CopyOverlayUrl()
     {
-        await Clipboard.SetTextAsync(OverlayService.OverlayUrl);
+        await Clipboard.SetTextAsync(OverlayServer.OverlayUrl);
         Snackbar.Add("Overlay URL copied!", Severity.Success, config =>
         {
             config.ShowCloseIcon = false;

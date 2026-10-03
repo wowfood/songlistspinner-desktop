@@ -62,7 +62,7 @@ public partial class Settings
     private string? _savedSettingsFormState;
     private bool _testingCredential;
 
-    private string PreviewUrl => $"{OverlayService.OverlayUrl}?preview=1";
+    private string PreviewUrl => $"{OverlayServer.OverlayUrl}?preview=1";
 
     private string WheelColorsRaw
     {
