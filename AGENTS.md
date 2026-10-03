@@ -50,7 +50,7 @@ rejects a bare directory.
 ## Conventions
 
 - Code style is in `.editorconfig`; shared build settings and analyzers are in
-  `Directory.Build.props`.
+  `Directory.Build.props`, which treats warnings as errors.
 - Test methods are named `Given_X_When_Y_Then_Z`, with Arrange, Act and Assert separated by blank
   lines. A test class is `<TypeUnderTest>Tests`, in the folder that mirrors the type's `src` path.
 - Test projects need `<OutputType>Exe</OutputType>` (xunit.v3 on Microsoft.Testing.Platform).
