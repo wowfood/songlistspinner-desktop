@@ -36,11 +36,11 @@ public sealed class PreferencesSettingsService : ILocalSettingsService
         try
         {
             wheelColors = JsonSerializer.Deserialize<string[]>(dto.WheelColors, JsonOpts) ??
-                          SpinnerConfig.DefaultWheelColors;
+                          SpinnerConfig.CreateDefaultWheelColors();
         }
         catch
         {
-            wheelColors = SpinnerConfig.DefaultWheelColors;
+            wheelColors = SpinnerConfig.CreateDefaultWheelColors();
         }
 
         var fields = SettingsDtoNormalizer.ParseFields(dto.SongListFields);

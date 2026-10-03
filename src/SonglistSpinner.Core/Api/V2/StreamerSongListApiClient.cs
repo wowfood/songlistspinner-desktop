@@ -180,7 +180,8 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             StreamerSongListCredentialKind.OAuthBearer => StreamerSongListAuthenticationSchemes.Bearer,
             StreamerSongListCredentialKind.Streamer => StreamerSongListAuthenticationSchemes.Streamer,
             StreamerSongListCredentialKind.User => StreamerSongListAuthenticationSchemes.User,
-            _ => throw new ArgumentOutOfRangeException(nameof(credential.Kind))
+            _ => throw new InvalidOperationException(
+                $"Unsupported StreamerSongList credential kind '{credential.Kind}'.")
         };
 
         request.Headers.Authorization = new AuthenticationHeaderValue(scheme, credential.Token.Trim());

@@ -149,7 +149,7 @@ public sealed class SettingsViewModel
 
     public static string NormalizeHexColor(string color)
     {
-        return color.ToLower() switch
+        return color.ToLowerInvariant() switch
         {
             "wheat" => "#f5deb3",
             "white" => "#ffffff",

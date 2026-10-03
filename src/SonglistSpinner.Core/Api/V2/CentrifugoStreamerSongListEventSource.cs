@@ -139,7 +139,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
                 throw new WebSocketException("The StreamerSongList event server requested a reconnect.");
 
             if (CentrifugoProtocol.TryParseNotification(message, out var notification))
-                yield return notification!;
+                yield return notification;
         }
     }
 
@@ -171,7 +171,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
             }
 
             if (CentrifugoProtocol.TryParseNotification(message, out var notification))
-                pending.Add(notification!);
+                pending.Add(notification);
         }
     }
 

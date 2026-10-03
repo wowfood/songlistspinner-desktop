@@ -1,3 +1,4 @@
+using System.Globalization;
 using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Core.Services;
@@ -220,7 +221,7 @@ public static class SpinnerDataService
     {
         if (request is null) return fallback;
         var amount = request.DonationAmount ?? request.Donation ?? request.Amount ?? request.Price;
-        return amount.HasValue ? $"{amount.Value}" : fallback;
+        return amount.HasValue ? amount.Value.ToString(CultureInfo.InvariantCulture) : fallback;
     }
 
     // O(n×m) — acceptable for typical queue sizes (< 200 songs, < 100 played).

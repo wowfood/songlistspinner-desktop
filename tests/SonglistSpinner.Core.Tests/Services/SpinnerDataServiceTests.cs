@@ -1,3 +1,4 @@
+using System.Globalization;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
 using Xunit;
@@ -234,6 +235,30 @@ public class SpinnerDataServiceTests
             Requests = [new SpinnerRequest { Donation = 3m }]
         };
         Assert.Equal("3", SpinnerDataService.FormatDonation(q));
+    }
+
+    [Fact]
+    public void Given_CommaDecimalCulture_When_FormatDonation_Then_UsesInvariantDecimalPoint()
+    {
+        var q = new SpinnerQueueItem
+        {
+            Song = new SpinnerSong(),
+            Requests = [new SpinnerRequest { DonationAmount = 5.50m }]
+        };
+        var originalCulture = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = new CultureInfo("de-DE");
+
+        string formatted;
+        try
+        {
+            formatted = SpinnerDataService.FormatDonation(q);
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = originalCulture;
+        }
+
+        Assert.Equal("5.50", formatted);
     }
 
     [Fact]

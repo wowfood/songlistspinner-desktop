@@ -30,7 +30,7 @@ public static class ColorExtensions
 
     private static string NormalizeHex(string color)
     {
-        return color.ToLower() switch
+        return color.ToLowerInvariant() switch
         {
             "wheat" => "#f5deb3",
             "white" => "#ffffff",

@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Net;
 using System.Net.Http.Headers;
@@ -81,7 +82,7 @@ public sealed class GitHubReleaseUpdateChecker
             Math.Max(0, version.Build));
     }
 
-    private static bool TryGetTrustedReleaseUri(string? value, out Uri uri)
+    private static bool TryGetTrustedReleaseUri(string? value, [NotNullWhen(true)] out Uri? uri)
     {
         if (Uri.TryCreate(value, UriKind.Absolute, out var parsed) &&
             parsed.Scheme == Uri.UriSchemeHttps &&
@@ -93,7 +94,7 @@ public sealed class GitHubReleaseUpdateChecker
             return true;
         }
 
-        uri = null!;
+        uri = null;
         return false;
     }
 

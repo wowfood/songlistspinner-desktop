@@ -355,6 +355,21 @@ public class StreamerSongListApiClientTests
     }
 
     [Fact]
+    public async Task Given_UndefinedCredentialKind_When_FetchQueueAsync_Then_FailsNamingTheKindBeforeSendingRequest()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("{}"));
+        var client = CreateClient(handler, (StreamerSongListCredentialKind)99);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            client.FetchQueueAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("Unsupported StreamerSongList credential kind '99'.", exception.Message);
+        Assert.Equal(0, handler.RequestCount);
+    }
+
+    [Fact]
     public async Task Given_UnauthorizedResponse_When_FetchQueueAsync_Then_ReportsAuthenticationFailure()
     {
         var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.Unauthorized)

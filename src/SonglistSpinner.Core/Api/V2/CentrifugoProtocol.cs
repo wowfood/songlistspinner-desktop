@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
 using SonglistSpinner.Core.Contracts;
 
@@ -59,7 +60,9 @@ internal static class CentrifugoProtocol
                push.TryGetProperty("disconnect", out _);
     }
 
-    public static bool TryParseNotification(string message, out StreamerSongListEvent? notification)
+    public static bool TryParseNotification(
+        string message,
+        [NotNullWhen(true)] out StreamerSongListEvent? notification)
     {
         using var document = JsonDocument.Parse(message);
         var root = document.RootElement;
