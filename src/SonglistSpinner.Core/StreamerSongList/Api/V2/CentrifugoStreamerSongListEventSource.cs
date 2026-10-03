@@ -132,19 +132,20 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     {
         using var socket = await _connectAsync(_options.Endpoint, cancellationToken);
 
+        var received = new Queue<string>();
         var pending = new List<StreamerSongListEvent>();
         await SendCommandAsync(socket, CentrifugoProtocol.CreateConnectCommand(1), cancellationToken);
-        await AwaitCommandReplyAsync(socket, 1, pending, cancellationToken);
+        await AwaitCommandReplyAsync(socket, received, 1, pending, cancellationToken);
 
         await SendCommandAsync(socket,
             CentrifugoProtocol.CreateSubscribeCommand(2, $"streamer:{streamerId}-queue"),
             cancellationToken);
-        await AwaitCommandReplyAsync(socket, 2, pending, cancellationToken);
+        await AwaitCommandReplyAsync(socket, received, 2, pending, cancellationToken);
 
         await SendCommandAsync(socket,
             CentrifugoProtocol.CreateSubscribeCommand(3, $"streamer:{streamerId}-play_history"),
             cancellationToken);
-        await AwaitCommandReplyAsync(socket, 3, pending, cancellationToken);
+        await AwaitCommandReplyAsync(socket, received, 3, pending, cancellationToken);
 
         yield return new StreamerSongListEvent(StreamerSongListEventKind.Connected);
         foreach (var notification in pending)
@@ -152,7 +153,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
 
         while (!cancellationToken.IsCancellationRequested)
         {
-            var message = await ReceiveTextAsync(socket, cancellationToken);
+            var message = await ReceiveMessageAsync(socket, received, cancellationToken);
             if (message is null)
                 throw new WebSocketException("The StreamerSongList event server closed the connection.");
 
@@ -172,13 +173,14 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
 
     private async Task AwaitCommandReplyAsync(
         WebSocket socket,
+        Queue<string> received,
         int commandId,
         ICollection<StreamerSongListEvent> pending,
         CancellationToken cancellationToken)
     {
         while (true)
         {
-            var message = await ReceiveTextAsync(socket, cancellationToken);
+            var message = await ReceiveMessageAsync(socket, received, cancellationToken);
             if (message is null)
                 throw new WebSocketException("The StreamerSongList event server closed during setup.");
 
@@ -213,6 +215,28 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
             WebSocketMessageType.Text,
             true,
             cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns the next protocol message, or null once the server closes. Centrifugo's JSON transport may batch
+    /// several messages into one frame, one per line (JSON escapes newlines inside strings), so the rest of a
+    /// frame waits in <paramref name="received"/> for the following calls.
+    /// </summary>
+    private async Task<string?> ReceiveMessageAsync(
+        WebSocket socket,
+        Queue<string> received,
+        CancellationToken cancellationToken)
+    {
+        while (received.Count == 0)
+        {
+            var frame = await ReceiveTextAsync(socket, cancellationToken);
+            if (frame is null) return null;
+
+            foreach (var message in frame.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                received.Enqueue(message);
+        }
+
+        return received.Dequeue();
     }
 
     private async Task<string?> ReceiveTextAsync(

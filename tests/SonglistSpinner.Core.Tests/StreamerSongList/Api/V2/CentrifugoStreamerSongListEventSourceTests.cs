@@ -100,6 +100,25 @@ public class CentrifugoStreamerSongListEventSourceTests
     }
 
     [Fact]
+    public async Task Given_ServerBatchesNewlineSeparatedMessagesInOneFrame_When_Subscribing_Then_HandlesEachMessage()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // Centrifugo's JSON transport may join several replies or pushes into one frame, one per line.
+        var socket = new ScriptedWebSocket();
+        socket.Push("""{"id":1,"connect":{}}""" + "\n" + """{"id":2,"subscribe":{}}""");
+        socket.Push("""{"id":3,"subscribe":{}}""" + "\n" + Publication("queue_add"));
+        var source = CreateSource(new ScriptedConnector().Accept(socket), new FakeTimeProvider());
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        var first = await NextAsync(events, cancellationToken);
+        var second = await NextAsync(events, cancellationToken);
+
+        Assert.Equal(new StreamerSongListEvent(StreamerSongListEventKind.Connected), first);
+        Assert.Equal(new StreamerSongListEvent(StreamerSongListEventKind.QueueChanged, "queue_add"), second);
+    }
+
+    [Fact]
     public async Task Given_ConnectedSubscription_When_ServerPublishesAPlayHistoryChange_Then_YieldsPlayHistoryChanged()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
