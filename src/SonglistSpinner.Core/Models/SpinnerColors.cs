@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace SonglistSpinner.Core.Models;
 
 public class SpinnerColors
@@ -12,5 +14,8 @@ public class SpinnerColors
     public string ToggleBackground { get; set; } = "#222222";
     public string ButtonBackground { get; set; } = "#555555";
     public string ButtonText { get; set; } = "#CCCCCC";
+
+    [SuppressMessage("Naming", "CA1720:Identifier contains type name",
+        Justification = "The wheel's pointer is the domain name for this colour.")]
     public string Pointer { get; set; } = "wheat";
 }

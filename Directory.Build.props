@@ -1,0 +1,12 @@
+<Project>
+
+    <!-- Settings shared by every project in the repository. Project files hold only what differs. -->
+    <PropertyGroup>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+        <AnalysisLevel>latest-recommended</AnalysisLevel>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <!-- TreatWarningsAsErrors is turned on once the remaining analyzer warnings reach zero. -->
+    </PropertyGroup>
+
+</Project>

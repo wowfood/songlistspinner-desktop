@@ -113,6 +113,7 @@ public partial class DisplayFieldOrderEditor : IAsyncDisposable
         finally
         {
             _dotNetReference?.Dispose();
+            GC.SuppressFinalize(this);
         }
     }
 }
