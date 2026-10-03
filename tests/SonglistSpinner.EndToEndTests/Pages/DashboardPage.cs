@@ -97,7 +97,10 @@ internal sealed partial class DashboardPage(IPage page)
 
     public async Task SetWheelVisibleAsync(bool visible)
     {
-        await ShowWheelCheckbox.SetCheckedAsync(visible);
+        // The checkbox has no size of its own (the switch draws a slider over it), so press the switch, as a user does.
+        if (await ShowWheelCheckbox.IsCheckedAsync() != visible)
+            await Page.Locator("label.switch").Filter(new() { Has = ShowWheelCheckbox }).ClickAsync();
+        await Expect(ShowWheelCheckbox).ToBeCheckedAsync(new() { Checked = visible });
         if (visible) await Expect(WheelContents).ToBeVisibleAsync();
         else await Expect(WheelContents).ToBeHiddenAsync();
     }
