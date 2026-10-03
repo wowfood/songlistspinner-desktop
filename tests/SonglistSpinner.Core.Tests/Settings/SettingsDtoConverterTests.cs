@@ -25,9 +25,9 @@ public class SettingsDtoConverterTests
     }
 
     [Fact]
-    public void Given_CustomisedSettingsSavedByRelease120_When_ConvertedToConfig_Then_MapsEverySavedValue()
+    public void Given_CustomisedSettingsSavedByDevelop4f36e18_When_ConvertedToConfig_Then_MapsEverySavedValue()
     {
-        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Develop4f36e18Customised);
 
         var config = SettingsDtoConverter.ToSpinnerConfig(settings);
 
@@ -75,6 +75,51 @@ public class SettingsDtoConverterTests
         Assert.Equal("#707070", config.Colors.ButtonBackground);
         Assert.Equal("#000000", config.Colors.ButtonText);
         Assert.Equal("#ff0000", config.Colors.Pointer);
+    }
+
+    [Fact]
+    public void Given_SettingsSavedByRelease120_When_ConvertedToConfig_Then_WinnerDialogShowsThePlayedListFieldsAndRequester()
+    {
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+
+        var config = SettingsDtoConverter.ToSpinnerConfig(settings);
+
+        Assert.Equal(["title", "donation", "requester"], config.WinnerDialog.Fields);
+    }
+
+    [Fact]
+    public void Given_SettingsSavedByRelease120_When_ConvertedToConfig_Then_MapsSavedValuesAndDefaultsTheRest()
+    {
+        var defaults = new SpinnerConfig();
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+
+        var config = SettingsDtoConverter.ToSpinnerConfig(settings);
+
+        Assert.True(config.Debug);
+        Assert.Equal(["#123456", "#abcdef"], config.WheelColors);
+        Assert.Equal("transparent", config.Background.Mode);
+        Assert.Equal("youtube", config.Streamer.Platform);
+        Assert.True(config.PlayHistory.ExcludePlayedSongs);
+        Assert.Equal("month", config.PlayHistory.Period);
+        Assert.Equal(["title", "donation"], config.PlayedList.Fields);
+        Assert.Equal("left", config.PlayedList.Position);
+        Assert.Equal(4, config.PlayedList.MaxLines);
+        Assert.Equal(defaults.PlayedList.Separator, config.PlayedList.Separator);
+        Assert.Equal(defaults.PlayedList.ShowLabels, config.PlayedList.ShowLabels);
+        Assert.Equal(defaults.PlayedList.ShowFieldHeaders, config.PlayedList.ShowFieldHeaders);
+        Assert.Equal(defaults.PlayedList.ShowNumbers, config.PlayedList.ShowNumbers);
+        Assert.Equal(defaults.PlayedList.NumberingStart, config.PlayedList.NumberingStart);
+        Assert.True(config.NowPlaying.Enabled);
+        Assert.Equal(["requester", "artist"], config.NowPlaying.Fields);
+        Assert.Equal(defaults.NowPlaying.Separator, config.NowPlaying.Separator);
+        Assert.Equal(defaults.NowPlaying.ShowLabels, config.NowPlaying.ShowLabels);
+        Assert.Equal("top-right", config.NowPlaying.Position);
+        Assert.Equal(defaults.WinnerDialog.FontFamily, config.WinnerDialog.FontFamily);
+        Assert.Equal(defaults.WinnerDialog.FontSize, config.WinnerDialog.FontSize);
+        Assert.Equal(defaults.WinnerDialog.Width, config.WinnerDialog.Width);
+        Assert.Equal(defaults.WinnerDialog.ShowQueuePosition, config.WinnerDialog.ShowQueuePosition);
+        // With no saved opacity, the Now Playing panel follows the played-list background.
+        Assert.Equal("#101820", config.Colors.NowPlayingBackground);
     }
 
     [Fact]

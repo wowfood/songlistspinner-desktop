@@ -111,9 +111,9 @@ public class SettingsDtoTests
     }
 
     [Theory]
-    [InlineData(SavedSettingsFixture.Release120Defaults)]
-    [InlineData(SavedSettingsFixture.Release120Customised)]
-    public void Given_SettingsSavedByRelease120_When_LoadedAndSavedAgain_Then_WritesTheSameJson(string fixtureName)
+    [InlineData(SavedSettingsFixture.Develop4f36e18Defaults)]
+    [InlineData(SavedSettingsFixture.Develop4f36e18Customised)]
+    public void Given_SettingsSavedByDevelop4f36e18_When_LoadedAndSavedAgain_Then_WritesTheSameJson(string fixtureName)
     {
         var savedJson = SavedSettingsFixture.ReadJson(fixtureName);
 
@@ -123,9 +123,9 @@ public class SettingsDtoTests
     }
 
     [Fact]
-    public void Given_CustomisedSettingsSavedByRelease120_When_Loaded_Then_KeepsEverySavedValue()
+    public void Given_CustomisedSettingsSavedByDevelop4f36e18_When_Loaded_Then_KeepsEverySavedValue()
     {
-        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Develop4f36e18Customised);
 
         Assert.Equal("""["#123456","#abcdef","#fedcba"]""", settings.WheelColors);
         Assert.Equal("transparent", settings.BackgroundMode);
@@ -172,6 +172,86 @@ public class SettingsDtoTests
         Assert.Equal(4, settings.PlayedListMaxLines);
         Assert.True(settings.PlayedListShowNumbers);
         Assert.Equal("top", settings.PlayedListNumberingStart);
+    }
+
+    [Fact]
+    public void Given_CustomisedSettingsSavedByRelease120_When_Loaded_Then_KeepsEverySavedValue()
+    {
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+
+        Assert.Equal("""["#123456","#abcdef"]""", settings.WheelColors);
+        Assert.Equal("transparent", settings.BackgroundMode);
+        Assert.Equal("#202020", settings.BackgroundColor);
+        Assert.Equal("https://example.com/stage.png", settings.BackgroundImage);
+        Assert.Equal("examplestreamer", settings.DefaultStreamerName);
+        Assert.Equal("youtube", settings.StreamerPlatform);
+        Assert.False(settings.HideChangeOptionWhenDefault);
+        Assert.Equal("""["title","donation"]""", settings.PlayedListFields);
+        Assert.True(settings.ExcludePlayedSongs);
+        Assert.Equal("left", settings.PlayedListPosition);
+        Assert.Equal("month", settings.PlayHistoryPeriod);
+        Assert.True(settings.UpdateQueueAfterSpin);
+        Assert.True(settings.DisplayNowPlaying);
+        Assert.Equal("""["requester","artist"]""", settings.NowPlayingFields);
+        Assert.Equal("Georgia, serif", settings.NowPlayingFontFamily);
+        Assert.Equal("1.5rem", settings.NowPlayingFontSize);
+        Assert.Equal("40rem", settings.NowPlayingWidth);
+        Assert.Equal("top-right", settings.NowPlayingPosition);
+        Assert.True(settings.DebugMode);
+        Assert.Equal("#eeeeee", settings.ColorText);
+        Assert.Equal("rgba(10, 20, 30, 0.5)", settings.ColorStatusBackground);
+        Assert.Equal("#101820", settings.ColorPlayedListBackground);
+        Assert.Equal("#303030", settings.ColorPlayedItemBackground);
+        Assert.Equal("#404040", settings.ColorResizeHandleBackground);
+        Assert.Equal("#606060", settings.ColorResizeHandleHoverBackground);
+        Assert.Equal("#505050", settings.ColorToggleBackground);
+        Assert.Equal("#707070", settings.ColorButtonBackground);
+        Assert.Equal("#000000", settings.ColorButtonText);
+        Assert.Equal("#ff0000", settings.ColorPointer);
+        Assert.Equal("Arial", settings.PlayedListFontFamily);
+        Assert.Equal("1rem", settings.PlayedListFontSize);
+        Assert.Equal(4, settings.PlayedListMaxLines);
+    }
+
+    [Fact]
+    public void Given_SettingsSavedByRelease120_When_Loaded_Then_PropertiesAddedSinceTakeTheirDefaults()
+    {
+        var defaults = new SettingsDto();
+
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+
+        Assert.Equal(defaults.PlayedListSeparator, settings.PlayedListSeparator);
+        Assert.Equal(defaults.PlayedListShowLabels, settings.PlayedListShowLabels);
+        Assert.Equal(defaults.PlayedListShowFieldHeaders, settings.PlayedListShowFieldHeaders);
+        Assert.Equal(defaults.PlayedListShowNumbers, settings.PlayedListShowNumbers);
+        Assert.Equal(defaults.PlayedListNumberingStart, settings.PlayedListNumberingStart);
+        Assert.Equal(defaults.NowPlayingSeparator, settings.NowPlayingSeparator);
+        Assert.Equal(defaults.NowPlayingShowLabels, settings.NowPlayingShowLabels);
+        Assert.Null(settings.NowPlayingBackgroundOpacity);
+        // Null marks settings saved before the winner dialog had its own fields; see SettingsDtoNormalizer.
+        Assert.Null(settings.WinnerDialogFields);
+        Assert.Equal(defaults.WinnerDialogFontFamily, settings.WinnerDialogFontFamily);
+        Assert.Equal(defaults.WinnerDialogFontSize, settings.WinnerDialogFontSize);
+        Assert.Equal(defaults.WinnerDialogWidth, settings.WinnerDialogWidth);
+        Assert.Equal(defaults.WinnerDialogShowQueuePosition, settings.WinnerDialogShowQueuePosition);
+    }
+
+    // Saving adds the properties 1.2.0 did not have, so the saved JSON is a superset rather than the same bytes.
+    [Fact]
+    public void Given_SettingsSavedByRelease120_When_LoadedAndSavedAgain_Then_KeepsEverySavedKeyAndValue()
+    {
+        var savedJson = JsonNode.Parse(SavedSettingsFixture.ReadJson(SavedSettingsFixture.Release120Customised))!
+            .AsObject();
+
+        var resavedJson = JsonNode.Parse(
+                SavedSettingsFixture.Save(SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised)))!
+            .AsObject();
+
+        var missingOrChanged = savedJson
+            .Where(saved => !resavedJson.TryGetPropertyValue(saved.Key, out var resaved) ||
+                            !JsonNode.DeepEquals(saved.Value, resaved))
+            .Select(saved => saved.Key);
+        Assert.Empty(missingOrChanged);
     }
 
     private static string ToComparableJson(string json) =>
