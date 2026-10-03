@@ -22,20 +22,13 @@ internal sealed partial class FieldOrderEditor(ILocator root)
     }
 
     /// <summary>Selects or clears <paramref name="label"/> (the chip's text, such as "Requester").</summary>
-    /// <remarks>
-    /// Selection is read from the chip's <c>ss-chip-selected</c> class: the toggle's <c>aria-pressed</c> renders
-    /// as "" when pressed and is left out otherwise, so it does not carry the state.
-    /// </remarks>
     public async Task SetSelectedAsync(string label, bool selected)
     {
-        var chip = Chip(label);
-        var isSelected = (await chip.GetAttributeAsync("class") ?? "").Split(' ').Contains("ss-chip-selected");
-        if (isSelected != selected) await Toggle(label).ClickAsync();
-        await Expect(chip).ToHaveClassAsync(new Regex(selected ? @"\bss-chip-selected\b" : @"\bss-chip-unselected\b"));
+        var toggle = Toggle(label);
+        var pressed = selected ? "true" : "false";
+        if (await toggle.GetAttributeAsync("aria-pressed") != pressed) await toggle.ClickAsync();
+        await Expect(toggle).ToHaveAttributeAsync("aria-pressed", pressed);
     }
-
-    /// <summary>The chip of <paramref name="label"/>; its class is <c>ss-chip-selected</c> while the field is shown.</summary>
-    public ILocator Chip(string label) => Chips.Filter(new() { Has = Toggle(label) });
 
     public Task MoveEarlierAsync(string label) =>
         root.GetByRole(AriaRole.Button, new() { Name = $"Move {label} earlier", Exact = true }).ClickAsync();
@@ -43,7 +36,7 @@ internal sealed partial class FieldOrderEditor(ILocator root)
     public Task MoveLaterAsync(string label) =>
         root.GetByRole(AriaRole.Button, new() { Name = $"Move {label} later", Exact = true }).ClickAsync();
 
-    /// <summary>The chip's toggle button.</summary>
+    /// <summary>The chip's toggle button; <c>aria-pressed</c> is "true" while the field is shown.</summary>
     public ILocator Toggle(string label) =>
         root.Locator(".ss-chip-toggle").Filter(new() { HasTextRegex = new Regex($"^\\s*{Regex.Escape(label)}\\s*$") });
 }

@@ -85,7 +85,7 @@
             <div id="playedListTop">
                 <button id="collapseBtn" class="collapse-button" @onclick="ToggleCollapse"
                         aria-controls="playedListContent"
-                        aria-expanded="@(!_playedListCollapsed)"
+                        aria-expanded="@(_playedListCollapsed ? "false" : "true")"
                         aria-label="@(_playedListCollapsed ? "Expand played songs" : "Collapse played songs")">
                     <span id="collapseIcon" aria-hidden="true"></span>
                 </button>
@@ -232,7 +232,7 @@
 </div>
 
 <dialog id="winnerModal" class="winner-modal" aria-labelledby="winnerTitle" aria-describedby="winnerActionPrompt">
-    <div class="winner-modal-content" aria-busy="@_winnerActionPending">
+    <div class="winner-modal-content" aria-busy="@(_winnerActionPending ? "true" : "false")">
         <div id="winnerConfetti" class="winner-confetti" aria-hidden="true"></div>
         <h2 id="winnerTitle">Winner</h2>
         @if (_winnerFields.Length > 0)

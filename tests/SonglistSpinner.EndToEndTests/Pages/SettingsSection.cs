@@ -16,8 +16,6 @@ internal abstract partial class SettingsSection(IPage page, string name)
         await Page.GetByRole(AriaRole.Navigation, new() { Name = "Settings sections" })
             .GetByRole(AriaRole.Button, new() { Name = name })
             .ClickAsync();
-        // The navigation's aria-pressed does not say which section is selected (it renders "" or nothing), so
-        // the section's own eyebrow heading does.
         await Expect(Page.Locator(".ss-settings-section-heading > span")).ToHaveTextAsync(name);
     }
 

@@ -42,31 +42,31 @@
             <div class="ss-settings-workspace">
                 <nav class="ss-settings-nav" aria-label="Settings sections">
                     <button type="button" class="@SectionClass(SettingsSection.Connection)"
-                            aria-pressed="@(_activeSection == SettingsSection.Connection)"
+                            aria-pressed="@(_activeSection == SettingsSection.Connection ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Connection))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#128268;</span>
                         <span><strong>Connection</strong><small>Channel and API access</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Spinner)"
-                            aria-pressed="@(_activeSection == SettingsSection.Spinner)"
+                            aria-pressed="@(_activeSection == SettingsSection.Spinner ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Spinner))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#8635;</span>
                         <span><strong>Spinner &amp; Queue</strong><small>Winner and history rules</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Overlay)"
-                            aria-pressed="@(_activeSection == SettingsSection.Overlay)"
+                            aria-pressed="@(_activeSection == SettingsSection.Overlay ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Overlay))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9638;</span>
                         <span><strong>Overlay Layout</strong><small>Panels and winner dialog</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Appearance)"
-                            aria-pressed="@(_activeSection == SettingsSection.Appearance)"
+                            aria-pressed="@(_activeSection == SettingsSection.Appearance ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Appearance))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9680;</span>
                         <span><strong>Appearance</strong><small>Colors and wheel style</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Advanced)"
-                            aria-pressed="@(_activeSection == SettingsSection.Advanced)"
+                            aria-pressed="@(_activeSection == SettingsSection.Advanced ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Advanced))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9881;</span>
                         <span><strong>Advanced</strong><small>Diagnostics and endpoints</small></span>
