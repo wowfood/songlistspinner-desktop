@@ -180,6 +180,64 @@ public class OverlayStateServiceTests
         Assert.Equal([1, 0], reportedCounts);
     }
 
+    [Fact]
+    public async Task Given_AKeepAliveWasSent_When_TheOverlayStateChanges_Then_TheOverlayStillReceivesTheChange()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider();
+        var overlay = new OverlayStateService(time);
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await events.MoveNextAsync());
+        var keepAlive = events.MoveNextAsync().AsTask();
+        time.Advance(TimeSpan.FromSeconds(15));
+        Assert.True(await keepAlive.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken));
+
+        overlay.BroadcastCloseWinner();
+
+        Assert.True(await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15), cancellationToken));
+        Assert.Equal(OverlayEventNames.CloseWinner, events.Current.Name);
+    }
+
+    [Fact]
+    public async Task Given_AnOverlayThatStoppedReading_When_MoreChangesArriveThanItsBufferHolds_Then_ItLosesTheOldest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // The heartbeat never fires on this clock, so every event read is a broadcast.
+        var overlay = new OverlayStateService(new FakeTimeProvider());
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await events.MoveNextAsync());
+
+        for (var width = 1; width <= OverlayStateService.ClientBufferCapacity + 1; width++)
+            overlay.UpdatePlayedListWidth($"{width}px", "");
+
+        var widths = new List<string?>();
+        for (var read = 0; read < OverlayStateService.ClientBufferCapacity; read++)
+        {
+            Assert.True(await events.MoveNextAsync());
+            using var payload = ParseEventData(events.Current, OverlayEventNames.SetPlayedListWidth);
+            widths.Add(payload.RootElement.GetProperty("width").GetString());
+        }
+
+        Assert.Equal(
+            Enumerable.Range(2, OverlayStateService.ClientBufferCapacity).Select(width => $"{width}px"),
+            widths);
+    }
+
+    [Fact]
+    public async Task Given_AConnectionObserverThrows_When_AnOverlayConnects_Then_LaterObserversStillHearIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var overlay = new OverlayStateService();
+        var reportedCounts = new List<int>();
+        overlay.ConnectedClientsChanged += (_, _) => throw new InvalidOperationException("Observer failed");
+        overlay.ConnectedClientsChanged += (_, _) => reportedCounts.Add(overlay.ConnectedClientCount);
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+
+        Assert.True(await events.MoveNextAsync());
+
+        Assert.Equal([1], reportedCounts);
+    }
+
     internal static async Task<JsonDocument> ReadInitialStateAsync(OverlayStateService overlay)
     {
         await using var events = overlay.SubscribeAsync(TestContext.Current.CancellationToken).GetAsyncEnumerator();

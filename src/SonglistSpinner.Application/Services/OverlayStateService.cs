@@ -14,7 +14,8 @@ namespace SonglistSpinner.Services;
 
 public class OverlayStateService
 {
-    private const int ClientBufferCapacity = 32;
+    /// <summary>How many events a connected overlay may fall behind before it loses the oldest.</summary>
+    internal const int ClientBufferCapacity = 32;
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(15);
     private static readonly JsonSerializerOptions JsonOpts = new()
     {

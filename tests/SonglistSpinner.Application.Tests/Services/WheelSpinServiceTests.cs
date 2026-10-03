@@ -207,25 +207,79 @@ public class WheelSpinServiceTests
     }
 
     [Fact]
-    public async Task Given_SpinFinished_When_TheSessionRefreshes_Then_TheRefreshIsPublished()
+    public async Task Given_TheQueueChangedDuringASpin_When_TheSpinFinishes_Then_TheChangedQueueIsPublishedWithoutAManualRefresh()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new TimerTrackingTimeProvider();
+        var api = new ScriptedStreamerSongListClient();
+        var events = new ChannelEventSource();
+        var overlay = new OverlayStateService();
+        await using var session = await StartSessionAsync(api, overlay, Streamer, time, events);
+        var spins = new WheelSpinService(api, session, overlay, new FixedRandom(1), time);
+        api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41, 42)));
+        await spins.DrawAsync(Streamer, new SpinnerConfig(), cancellationToken);
+        events.Publish(StreamerSongListEventKind.QueueChanged);
+        // The debounced refresh runs while the spin holds refreshes, so it is skipped.
+        time.Advance(await time.WaitForTimerAsync(cancellationToken).AsTask().WaitAsync(WaitLimit, cancellationToken));
+        api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41, 42, 43)));
+        var published = new TaskCompletionSource<StreamerSessionSnapshot>(TaskCreationOptions.RunContinuationsAsynchronously);
+        session.Changed += (_, change) =>
+        {
+            if (change.Snapshot.AvailableSongs.Length == 3) published.TrySetResult(change.Snapshot);
+        };
+
+        spins.Finish();
+        var snapshot = await AdvanceTimersUntilAsync(time, published.Task, cancellationToken);
+
+        Assert.Equal([41, 42, 43], snapshot.AvailableSongs.Select(song => song.QueueId));
+        Assert.Equal(2, api.QueueFetches);
+    }
+
+    [Fact]
+    public async Task Given_ExcludePlayedSongsOn_When_Drawing_Then_PlayedSongsCannotWinAndHistoryCoversTheConfiguredPeriod()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var api = new ScriptedStreamerSongListClient();
-        await using var spin = await DrawWinnerAsync(api, new FakeTimeProvider(), showQueuePosition: false);
-        spin.Spins.Finish();
+        api.QueueResponses.Enqueue(_ => Task.FromResult(new SpinnerQueueSnapshot
+        {
+            Items =
+            [
+                new SpinnerQueueItem { QueueId = 41, Song = new SpinnerSong { Id = 500 } },
+                new SpinnerQueueItem { QueueId = 42, Song = new SpinnerSong { Id = 501 } }
+            ]
+        }));
+        api.PlayHistory = [new PlayHistoryItem { Song = new SpinnerSong { Id = 500 } }];
+        await using var session = await StartSessionAsync(api, new OverlayStateService(), Streamer);
+        // Slot 0 of the whole queue is the played song.
+        var spins = new WheelSpinService(api, session, new OverlayStateService(), new FixedRandom(0));
+        var config = new SpinnerConfig
+        {
+            PlayHistory = new SpinnerPlayHistoryConfig { ExcludePlayedSongs = true, Period = "month" }
+        };
 
-        var refreshed = await spin.Session.RefreshAsync(Streamer, cancellationToken);
+        var draw = await spins.DrawAsync(Streamer, config, cancellationToken);
 
-        Assert.NotNull(refreshed);
+        Assert.Equal([42], draw.AvailableSongs.Select(song => song.QueueId));
+        Assert.Equal(42, draw.Winner?.QueueId);
+        Assert.Equal(["month"], api.PlayHistoryPeriods);
     }
 
     private static async Task<StreamerSessionService> StartSessionAsync(
         ScriptedStreamerSongListClient api,
         OverlayStateService overlay,
         string streamer,
+        params SpinnerQueueItem[] availableSongs) =>
+        await StartSessionAsync(api, overlay, streamer, TimeProvider.System, new ChannelEventSource(), availableSongs);
+
+    private static async Task<StreamerSessionService> StartSessionAsync(
+        ScriptedStreamerSongListClient api,
+        OverlayStateService overlay,
+        string streamer,
+        TimeProvider time,
+        ChannelEventSource events,
         params SpinnerQueueItem[] availableSongs)
     {
-        var session = new StreamerSessionService(api, new ChannelEventSource(), overlay);
+        var session = new StreamerSessionService(api, events, overlay, time);
         await session.StartAsync(
             1,
             streamer,
@@ -253,6 +307,26 @@ public class WheelSpinServiceTests
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41, 42)));
         var draw = await spins.DrawAsync(Streamer, config, TestContext.Current.CancellationToken);
         return new SpinScenario(session, spins, draw);
+    }
+
+    /// <summary>
+    /// Moves the clock past each delay the session starts until <paramref name="outcome"/> completes. Whether
+    /// resuming needs its own debounce depends on whether the skipped refresh had finished, so the test does not
+    /// assume a number of delays.
+    /// </summary>
+    private static async Task<T> AdvanceTimersUntilAsync<T>(
+        TimerTrackingTimeProvider time,
+        Task<T> outcome,
+        CancellationToken cancellationToken)
+    {
+        while (!outcome.IsCompleted)
+        {
+            var timer = time.WaitForTimerAsync(cancellationToken).AsTask();
+            if (await Task.WhenAny(outcome, timer).WaitAsync(WaitLimit, cancellationToken) == timer)
+                time.Advance(await timer);
+        }
+
+        return await outcome;
     }
 
     private static async Task<SpinnerQueueSnapshot> HangUntilCancelledAsync(CancellationToken cancellationToken)

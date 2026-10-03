@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using SonglistSpinner.Core.StreamerSongList;
 
 namespace SonglistSpinner.Application.Tests;
@@ -42,10 +43,20 @@ internal sealed class ScriptedStreamerSongListClient : IStreamerSongListClient
         return respond(cancellationToken);
     }
 
+    /// <summary>The period of each play-history fetch, in order.</summary>
+    public ConcurrentQueue<string> PlayHistoryPeriods { get; } = new();
+
     public Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
         StreamerSongListChannel channel,
         string period = "week",
-        CancellationToken cancellationToken = default) => Task.FromResult(PlayHistory);
+        CancellationToken cancellationToken = default)
+    {
+        PlayHistoryPeriods.Enqueue(period);
+        return Task.FromResult(PlayHistory);
+    }
+
+    /// <summary>When set, marking a queue entry played fails with this instead of recording it.</summary>
+    public Exception? MarkPlayedFailure { get; set; }
 
     /// <summary>Answers streamer lookups; lookups are not supported while this is unset.</summary>
     public Func<StreamerSongListChannel, Task<StreamerSongListStreamer>>? ResolveStreamer { get; set; }
@@ -57,6 +68,8 @@ internal sealed class ScriptedStreamerSongListClient : IStreamerSongListClient
 
     public Task MarkQueueItemAsPlayedAsync(QueueEntryId queueEntryId, CancellationToken cancellationToken = default)
     {
+        if (MarkPlayedFailure is not null) return Task.FromException(MarkPlayedFailure);
+
         MarkedPlayed.Add(queueEntryId.Value);
         return Task.CompletedTask;
     }
