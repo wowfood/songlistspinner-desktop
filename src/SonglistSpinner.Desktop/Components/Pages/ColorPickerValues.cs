@@ -1,9 +1,13 @@
 using MudBlazor.Utilities;
 using SonglistSpinner.Core.Models;
 
-namespace SonglistSpinner.Extensions;
+namespace SonglistSpinner.Components.Pages;
 
-public static class ColorExtensions
+/// <summary>
+/// Converts the CSS colours stored in settings to and from the values the Settings colour pickers edit. A colour
+/// that cannot be read shows as black rather than failing the page.
+/// </summary>
+public static class ColorPickerValues
 {
     private const string FallbackHex = "#000000";
 
@@ -18,12 +22,6 @@ public static class ColorExtensions
         {
             return new MudColor(FallbackHex);
         }
-    }
-
-    public static MudColor ToMudColorWithAlpha(this string? hex, double alpha)
-    {
-        var c = hex.ToMudColor();
-        return new MudColor(c.R, c.G, c.B, (byte)(alpha * 255));
     }
 
     public static string ToHexString(this MudColor color)

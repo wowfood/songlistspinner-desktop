@@ -49,7 +49,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         _logger = logger ?? NullLogger<StreamerSessionService>.Instance;
     }
 
-    public event EventHandler<StreamerSessionChangedEventArgs>? Changed;
+    public event EventHandler<StreamerSessionChange>? Changed;
 
     public StreamerSessionSnapshot GetSnapshot()
     {
@@ -419,8 +419,8 @@ public sealed class StreamerSessionService : IAsyncDisposable
         var handlers = Changed;
         if (handlers is null) return;
 
-        var args = new StreamerSessionChangedEventArgs(GetSnapshot(), announcement);
-        foreach (EventHandler<StreamerSessionChangedEventArgs> handler in handlers.GetInvocationList())
+        var args = new StreamerSessionChange(GetSnapshot(), announcement);
+        foreach (EventHandler<StreamerSessionChange> handler in handlers.GetInvocationList())
         {
             try
             {
@@ -499,7 +499,7 @@ public sealed record StreamerSessionSnapshot(
         "Waiting for a channel to be loaded.");
 }
 
-public sealed record StreamerSessionChangedEventArgs(
+public sealed record StreamerSessionChange(
     StreamerSessionSnapshot Snapshot,
     string? Announcement);
 

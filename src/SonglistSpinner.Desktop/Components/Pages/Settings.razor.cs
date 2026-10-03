@@ -10,12 +10,11 @@ using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
-using SonglistSpinner.Extensions;
 using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
 
-// Injected properties (LocalSettings, Config) come from @inject in Settings.razor.
+// Injected properties come from the @inject directives in Settings.razor.
 public partial class Settings
 {
     private static readonly (string Value, string Label)[] FontChoices =

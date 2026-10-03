@@ -179,9 +179,3 @@ public sealed class SettingsViewModel
             : null;
     }
 }
-
-public sealed class DisplayField
-{
-    public string Name { get; set; } = "";
-    public bool Selected { get; set; }
-}

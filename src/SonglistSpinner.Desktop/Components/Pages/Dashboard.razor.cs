@@ -218,7 +218,7 @@ public partial class Dashboard
 
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeObserver);
         _dotNetRef = DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef, nameof(OnResizeEnd));
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef, nameof(PublishPlayedListWidth));
 
         var activeSession = StreamerSession.GetSnapshot();
         if (activeSession.HasChannel)
@@ -585,7 +585,7 @@ public partial class Dashboard
     }
 
     [JSInvokable]
-    public void OnResizeEnd(string width, string minWidth) =>
+    public void PublishPlayedListWidth(string width, string minWidth) =>
         OverlayService.UpdatePlayedListWidth(width, minWidth);
 
     private Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchQueueAndHistory(
@@ -670,7 +670,7 @@ public partial class Dashboard
         StateHasChanged();
     }
 
-    private void OnStreamerSessionChanged(object? sender, StreamerSessionChangedEventArgs e)
+    private void OnStreamerSessionChanged(object? sender, StreamerSessionChange e)
     {
         if (_activity == DashboardActivity.LoadingChannel || _lifetimeCts.IsCancellationRequested) return;
 

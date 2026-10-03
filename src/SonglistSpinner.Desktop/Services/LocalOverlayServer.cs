@@ -80,7 +80,7 @@ public class LocalOverlayServer : IAsyncDisposable
             _listener.Start();
             SetHealth(LocalOverlayServerState.Running);
             _logger.LogInformation("Local overlay server listening on port {Port}", Port);
-            ProcessRequestsAsync(_cts.Token)
+            AcceptConnectionsAsync(_cts.Token)
                 .ObserveFaults(ex => _logger.LogError(ex, "The local overlay request loop failed"));
         }
         catch (Exception ex)
@@ -105,7 +105,7 @@ public class LocalOverlayServer : IAsyncDisposable
         SetHealth(LocalOverlayServerState.Stopped);
     }
 
-    private async Task ProcessRequestsAsync(CancellationToken ct)
+    private async Task AcceptConnectionsAsync(CancellationToken ct)
     {
         string? failure = null;
         while (!ct.IsCancellationRequested && _listener?.IsListening == true)
@@ -130,7 +130,7 @@ public class LocalOverlayServer : IAsyncDisposable
                 break;
             }
 
-            Task.Run(() => HandleRequestAsync(context, ct), CancellationToken.None)
+            Task.Run(() => ServeOverlayRequestAsync(context, ct), CancellationToken.None)
                 .ObserveFaults(ex => _logger.LogError(ex, "Serving a local overlay request failed"));
         }
 
@@ -142,7 +142,7 @@ public class LocalOverlayServer : IAsyncDisposable
         }
     }
 
-    private async Task HandleRequestAsync(HttpListenerContext context, CancellationToken ct)
+    private async Task ServeOverlayRequestAsync(HttpListenerContext context, CancellationToken ct)
     {
         var path = context.Request.Url?.AbsolutePath.TrimEnd('/') ?? "";
         try
