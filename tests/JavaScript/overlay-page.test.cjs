@@ -15,7 +15,6 @@ function createElement(id = null) {
         dataset: {},
         children: [],
         textContent: '',
-        innerHTML: '',
         hidden: false,
         classList: {
             add: name => classes.add(name),
@@ -23,6 +22,9 @@ function createElement(id = null) {
             toggle: (name, force) => (force ?? !classes.has(name)) ? classes.add(name) : classes.delete(name),
             contains: name => classes.has(name)
         },
+        // Clearing the markup removes the children, as it does in a browser.
+        set innerHTML(value) { this.children = []; this.textContent = value; },
+        get innerHTML() { return this.textContent; },
         appendChild(child) { this.children.push(child); return child; },
         append(...children) { this.children.push(...children); },
         replaceChildren() { this.children = []; },
@@ -34,11 +36,15 @@ function createElement(id = null) {
 
 // Loads the overlay the way OBS does: the contracts, the wheel library, the shared interop and the
 // page's inline scripts in one global scope, with only the elements Overlay.html declares.
-function loadOverlayPage() {
+// `search` is the page's query string; `reducedMotion` is what prefers-reduced-motion reports.
+function loadOverlayPage({ search = '', reducedMotion = true } = {}) {
     const elements = new Map(
         [...overlayHtml.matchAll(/\bid="([^"]+)"/g)].map(match => [match[1], createElement(match[1])]));
     const windowListeners = {};
     const eventSources = [];
+    const wheels = [];
+    const timers = [];
+    const errors = [];
     const context = {
         document: {
             getElementById: id => elements.get(id) ?? null,
@@ -46,26 +52,27 @@ function loadOverlayPage() {
             body: createElement(),
             documentElement: createElement()
         },
-        location: { search: '' },
+        location: { search },
         URLSearchParams,
         addEventListener(type, listener) { windowListeners[type] = listener; },
-        matchMedia: () => ({ matches: true }),
+        matchMedia: () => ({ matches: reducedMotion }),
         ResizeObserver: class { observe() { } disconnect() { } },
         EventSource: class {
-            constructor(url) { this.url = url; this.listeners = {}; eventSources.push(this); }
+            constructor(url) { this.url = url; this.listeners = {}; this.closed = false; eventSources.push(this); }
             addEventListener(type, listener) { this.listeners[type] = listener; }
-            close() { }
+            close() { this.closed = true; }
         },
         spinWheel: {
             Wheel: class {
-                constructor(container, options) { this.items = options.items; }
+                constructor(container, options) { this.items = options.items; this.spins = []; wheels.push(this); }
+                spinToItem(index, duration) { this.spins.push({ index, duration }); }
                 remove() { }
             }
         },
-        setTimeout() { },
+        setTimeout(callback, delay) { timers.push({ callback, delay }); },
         clearTimeout() { },
         performance: { now: () => 0 },
-        console
+        console: { error: message => errors.push(message), warn() { }, log() { } }
     };
     context.window = context;
     vm.createContext(context);
@@ -77,9 +84,10 @@ function loadOverlayPage() {
     }
 
     windowListeners.load();
-    const events = eventSources[0];
-    const send = (eventName, data) => events.listeners[eventName]({ data: JSON.stringify(data) });
-    return { elements, send, context };
+    // Events go to the newest connection, which is the live one after a reconnect.
+    const send = (eventName, data) => eventSources.at(-1).listeners[eventName]({ data: JSON.stringify(data) });
+    const currentWheel = () => wheels.at(-1);
+    return { elements, send, context, eventSources, currentWheel, timers, errors, windowListeners };
 }
 
 function initialState(overrides = {}) {
@@ -200,4 +208,151 @@ test('Overlay: no winner on connect keeps the winner dialog closed', () => {
     send('init_state', initialState({ winner: null }));
 
     assert.equal(elements.get('winnerModal').style.display, 'none');
+});
+
+test('Overlay: a spin command spins to the winner by queue id when the wheel order differs', () => {
+    const { send, currentWheel } = loadOverlayPage();
+    send('init_state', initialState({
+        wheelItems: [{ queueId: 5, label: 'First' }, { queueId: 9, label: 'Second' }]
+    }));
+
+    send('spin_command', { winnerIndex: 0, winnerQueueId: 9, duration: 5000 });
+
+    assert.deepEqual(currentWheel().spins, [{ index: 1, duration: 5000 }]);
+});
+
+test('Overlay: a spin command for a winner missing from the wheel does not spin', () => {
+    const { send, currentWheel, errors } = loadOverlayPage();
+    send('init_state', initialState({ wheelItems: [{ queueId: 5, label: 'First' }] }));
+
+    send('spin_command', { winnerIndex: 0, winnerQueueId: 9, duration: 5000 });
+
+    assert.deepEqual(currentWheel().spins, []);
+    assert.deepEqual(errors, ['The selected winner is not present in the overlay wheel.']);
+});
+
+test('Overlay: a live winner reveal shows the winner and runs confetti in the wheel colours', () => {
+    const { elements, send } = loadOverlayPage({ reducedMotion: false });
+    const state = initialState();
+    state.config.wheelColors = ['#111111', '#222222'];
+    send('init_state', state);
+
+    send('winner_reveal', { fields: [{ label: 'Title', value: 'Song One' }], queuePosition: 2 });
+
+    assert.equal(elements.get('winnerModal').style.display, 'block');
+    assert.deepEqual(elements.get('winnerFields').children.map(child => child.textContent), ['Title', 'Song One']);
+    assert.equal(elements.get('winnerQueuePositionValue').textContent, '#2');
+    const confetti = elements.get('winnerConfetti').children;
+    assert.equal(confetti.length, 36);
+    assert.deepEqual([...new Set(confetti.map(piece => piece.style.backgroundColor))], ['#111111', '#222222']);
+});
+
+test('Overlay: closing the winner hides it', () => {
+    const { elements, send } = loadOverlayPage();
+    send('init_state', initialState());
+    send('winner_reveal', { fields: [{ label: 'Title', value: 'Song One' }], queuePosition: null });
+
+    send('close_winner', {});
+
+    assert.equal(elements.get('winnerModal').style.display, 'none');
+});
+
+test('Overlay: wheel visibility and played-list collapse apply while connected', () => {
+    const { elements, send } = loadOverlayPage();
+    send('init_state', initialState());
+
+    send('set_wheel_visible', { visible: false });
+    send('set_collapse', { collapsed: true });
+
+    assert.equal(elements.get('wheelContents').style.display, 'none');
+    assert.equal(elements.get('playedList').classList.contains('collapsed'), true);
+});
+
+test('Overlay: Now Playing stays hidden when the workflow is off or nothing is playing', () => {
+    const { elements, send } = loadOverlayPage();
+    const workflowOff = initialState({ nowPlayingText: 'Artist: A' });
+    workflowOff.config.nowPlaying.enabled = false;
+    const nothingPlaying = initialState({ nowPlayingText: null });
+    nothingPlaying.config.nowPlaying.enabled = true;
+
+    send('update_songs', workflowOff);
+    const hiddenWhenOff = elements.get('nowPlaying').hidden;
+    send('update_songs', nothingPlaying);
+
+    assert.equal(hiddenWhenOff, true);
+    assert.equal(elements.get('nowPlaying').hidden, true);
+    assert.equal(elements.get('nowPlayingText').textContent, '');
+});
+
+test('Overlay: played songs with field headers render a numbered table under a header row', () => {
+    const { elements, send } = loadOverlayPage();
+    const state = initialState({
+        playedFieldTable: {
+            headers: ['Artist', 'Title'],
+            rows: [{ number: 1, values: ['Artist A', 'Title A'] }],
+            separator: ' / '
+        }
+    });
+    state.config.playedList.showFieldHeaders = true;
+    state.config.playedList.showNumbers = true;
+
+    send('init_state', state);
+
+    const rows = elements.get('playedSongsUl').children.map(row => row.children.map(cell => cell.textContent));
+    assert.deepEqual(rows, [['#', 'Artist', ' / ', 'Title'], ['1.', 'Artist A', ' / ', 'Title A']]);
+});
+
+test('Overlay: a queue update replaces the played list and the song counts', () => {
+    const { elements, send } = loadOverlayPage();
+    send('init_state', initialState({ playedTexts: ['Old song'], playedCount: 1 }));
+
+    send('update_songs', initialState({ playedTexts: ['Song A', 'Song B'], playedCount: 2, availableCount: 5 }));
+
+    assert.deepEqual(
+        elements.get('playedSongsUl').children.map(row => row.children[0].textContent),
+        ['Song A', 'Song B']);
+    assert.equal(elements.get('playedCount').textContent, 2);
+    assert.equal(elements.get('availableCount').textContent, 5);
+});
+
+test('Overlay: a dropped event connection reconnects after three seconds and resynchronises', () => {
+    const { elements, send, eventSources, timers } = loadOverlayPage();
+    send('init_state', initialState({ streamer: 'before-drop' }));
+
+    eventSources[0].onerror();
+    const retry = timers.at(-1);
+    retry.callback();
+    send('init_state', initialState({ streamer: 'after-reconnect' }));
+
+    assert.equal(eventSources[0].closed, true);
+    assert.equal(retry.delay, 3000);
+    assert.equal(eventSources.length, 2);
+    assert.equal(eventSources[1].url, '/overlay/events');
+    assert.equal(elements.get('streamerLabel').textContent, 'after-reconnect');
+});
+
+test('Overlay: the Settings preview ignores the event stream and applies only preview messages', () => {
+    const { elements, context, eventSources, windowListeners } = loadOverlayPage({ search: '?preview=1' });
+    const settingsPreview = context.SonglistSpinnerContracts.messageTypes.settingsPreview;
+
+    windowListeners.message({ data: { type: 'something-else', payload: initialState({ streamer: 'ignored' }) } });
+    windowListeners.message({ data: { type: settingsPreview, payload: initialState({ streamer: 'draft-channel' }) } });
+
+    assert.equal(eventSources.length, 0);
+    assert.equal(context.document.body.classList.contains('settings-preview-mode'), true);
+    assert.equal(elements.get('streamerLabel').textContent, 'draft-channel');
+});
+
+test('Overlay: the live OBS overlay ignores Settings preview messages', () => {
+    const { elements, context, send, windowListeners } = loadOverlayPage();
+    send('init_state', initialState({ streamer: 'live-channel' }));
+
+    windowListeners.message({
+        data: {
+            type: context.SonglistSpinnerContracts.messageTypes.settingsPreview,
+            payload: initialState({ streamer: 'draft-channel' })
+        }
+    });
+
+    assert.equal(elements.get('streamerLabel').textContent, 'live-channel');
 });
