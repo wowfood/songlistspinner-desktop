@@ -16,26 +16,34 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
 
-        builder.Services.AddSingleton<ILocalSettingsService, PreferencesSettingsService>();
+        builder.Services.AddSingleton(Preferences.Default);
+        builder.Services.AddSingleton(SecureStorage.Default);
+        builder.Services.AddSingleton(Clipboard.Default);
+        builder.Services.AddSingleton(Launcher.Default);
+        builder.Services.AddSingleton<PreferencesSettingsService>();
         AddDiagnosticLog(builder);
 
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddMudServices();
-        builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
+        // Every HTTP client keeps the 30-second timeout the app used before it had a client factory.
+        builder.Services.ConfigureHttpClientDefaults(http =>
+            http.ConfigureHttpClient(client => client.Timeout = TimeSpan.FromSeconds(30)));
         builder.Services.AddSingleton(TimeProvider.System);
         // Random.Shared is thread-safe; WheelSpinService picks spin winners from it.
         builder.Services.AddSingleton(Random.Shared);
-        builder.Services.AddSingleton<GitHubReleaseUpdateChecker>();
+        builder.Services.AddHttpClient<GitHubReleaseUpdateChecker>();
         builder.Services.AddSingleton<ApplicationUpdateService>();
-        builder.Services.AddSingleton(CreateStreamerSongListApiOptions());
-        builder.Services.AddSingleton(CreateStreamerSongListEventsOptions());
+        var environment = EnvironmentOverrides.Read(Environment.GetEnvironmentVariable);
+        builder.Services.AddSingleton(environment);
+        builder.Services.AddSingleton(environment.Api);
+        builder.Services.AddSingleton(environment.Events);
         builder.Services.AddSingleton<SecureStorageStreamerSongListCredentialStore>();
         builder.Services.AddSingleton<IStreamerSongListCredentialProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddSingleton<IStreamerSongListCredentialStore>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddSingleton<ApiCredentialTest>();
-        builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
+        builder.Services.AddHttpClient<ISpinnerApiService, StreamerSongListApiClient>();
         builder.Services.AddScoped<NowPlayingTransitionService>();
         builder.Services.AddScoped<StreamerSessionService>();
         builder.Services.AddScoped<WheelSpinService>();
@@ -66,25 +74,5 @@ public static class MauiProgram
         // The file keeps the app's own debug detail but only warnings and errors from the frameworks.
         builder.Logging.AddFilter<DiagnosticFileLoggerProvider>("SonglistSpinner", LogLevel.Debug);
         builder.Logging.AddFilter<DiagnosticFileLoggerProvider>(null, LogLevel.Warning);
-    }
-
-    private static StreamerSongListApiOptions CreateStreamerSongListApiOptions()
-    {
-        var configuredAddress = Environment.GetEnvironmentVariable("SONGLISTSPINNER_SSL_API_BASE_URL");
-        var baseAddress = Uri.TryCreate(configuredAddress, UriKind.Absolute, out var parsedAddress)
-            ? parsedAddress
-            : StreamerSongListApiOptions.ProductionBaseAddress;
-
-        return new StreamerSongListApiOptions { BaseAddress = baseAddress };
-    }
-
-    private static StreamerSongListEventsOptions CreateStreamerSongListEventsOptions()
-    {
-        var configuredEndpoint = Environment.GetEnvironmentVariable("SONGLISTSPINNER_SSL_EVENTS_URL");
-        var endpoint = Uri.TryCreate(configuredEndpoint, UriKind.Absolute, out var parsedEndpoint)
-            ? parsedEndpoint
-            : StreamerSongListEventsOptions.ProductionEndpoint;
-
-        return new StreamerSongListEventsOptions { Endpoint = endpoint };
     }
 }

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
 using SonglistSpinner.Services;
@@ -188,7 +189,7 @@ public partial class Dashboard
             _overlayHealthSubscribed = true;
             await JS.InvokeVoidAsync("document.body.classList.add", "spinner-page");
             var settings = LocalSettings.LoadSettings();
-            _config = LocalSettings.ToSpinnerConfig(settings);
+            _config = SettingsDtoConverter.ToSpinnerConfig(settings);
             _preferMarkWinnerPlayed = settings.UpdateQueueAfterSpin && !settings.DisplayNowPlaying;
             _isLockedDefault = _config.Streamer.HideChangeOptionWhenDefault
                                && !string.IsNullOrWhiteSpace(_config.Streamer.DefaultName);

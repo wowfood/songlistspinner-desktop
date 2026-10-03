@@ -381,7 +381,7 @@ public partial class Settings
             var previewDto = JsonSerializer.Deserialize<SettingsDto>(JsonSerializer.Serialize(_dto))
                              ?? new SettingsDto();
             _vm.ApplyToDto(previewDto);
-            var config = LocalSettings.ToSpinnerConfig(previewDto);
+            var config = SettingsDtoConverter.ToSpinnerConfig(previewDto);
             var previewPlayedSongs = PreviewSongs.Take(3).ToArray();
 
             var payload = new OverlayStatePayload(
@@ -450,7 +450,7 @@ public partial class Settings
             LocalSettings.SaveSettings(_dto);
             RefreshSeparatorChoices();
             DiagnosticLog.SetEnabled(_dto.DebugMode);
-            await StreamerSession.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
+            await StreamerSession.UpdateConfigAsync(SettingsDtoConverter.ToSpinnerConfig(_dto));
 
             var submittedToken = _credentialToken.Trim();
             var token = string.IsNullOrWhiteSpace(submittedToken)

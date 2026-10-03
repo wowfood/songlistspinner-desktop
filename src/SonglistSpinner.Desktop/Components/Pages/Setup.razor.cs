@@ -228,7 +228,8 @@ public partial class Setup
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            using var response = await Http.GetAsync(
+            using var http = HttpClientFactory.CreateClient();
+            using var response = await http.GetAsync(
                 OverlayService.OverlayUrl,
                 HttpCompletionOption.ResponseHeadersRead,
                 timeout.Token);
@@ -259,7 +260,7 @@ public partial class Setup
     {
         try
         {
-            await Launcher.Default.OpenAsync(new Uri(OverlayService.OverlayUrl));
+            await Launcher.OpenAsync(new Uri(OverlayService.OverlayUrl));
             _completionMessage = "Overlay preview opened in your browser.";
         }
         catch (Exception ex)

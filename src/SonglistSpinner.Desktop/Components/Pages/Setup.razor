@@ -1,6 +1,6 @@
 @page "/setup"
 @layout MainLayout
-@inject ILocalSettingsService LocalSettings
+@inject PreferencesSettingsService LocalSettings
 @inject IStreamerSongListCredentialStore CredentialStore
 @inject ApiCredentialTest CredentialTest
 @inject ISpinnerApiService ApiService
@@ -8,8 +8,10 @@
 @inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
 @inject SonglistSpinner.Core.Api.V2.StreamerSongListEventsOptions EventOptions
 @inject OverlayStateService OverlayService
-@inject HttpClient Http
+@inject IHttpClientFactory HttpClientFactory
 @inject NavigationManager Navigation
+@inject IClipboard Clipboard
+@inject ILauncher Launcher
 @implements IDisposable
 
 <main class="ss-main ss-setup-shell">

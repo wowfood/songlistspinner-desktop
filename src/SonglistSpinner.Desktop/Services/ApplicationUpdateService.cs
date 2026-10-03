@@ -8,12 +8,14 @@ public sealed class ApplicationUpdateService
     private const string DismissedReleaseKey = "dismissed_application_update";
     private readonly object _checkGate = new();
     private readonly GitHubReleaseUpdateChecker _checker;
+    private readonly IPreferences _preferences;
     private readonly Version _currentVersion;
     private Task<ApplicationUpdateInfo?>? _checkTask;
 
-    public ApplicationUpdateService(GitHubReleaseUpdateChecker checker)
+    public ApplicationUpdateService(GitHubReleaseUpdateChecker checker, IPreferences preferences)
     {
         _checker = checker;
+        _preferences = preferences;
         var assemblyVersion = typeof(ApplicationUpdateService).Assembly.GetName().Version ?? new Version(0, 0, 0);
         _currentVersion = new Version(
             Math.Max(0, assemblyVersion.Major),
@@ -45,7 +47,7 @@ public sealed class ApplicationUpdateService
 
     public void Dismiss(ApplicationUpdateInfo update)
     {
-        Preferences.Set(DismissedReleaseKey, update.Tag);
+        _preferences.Set(DismissedReleaseKey, update.Tag);
     }
 
     private async Task<ApplicationUpdateInfo?> CheckCoreAsync(CancellationToken cancellationToken)
@@ -53,7 +55,7 @@ public sealed class ApplicationUpdateService
         var update = await _checker.CheckAsync(_currentVersion, cancellationToken);
         if (update is null) return null;
 
-        var dismissedTag = Preferences.Get(DismissedReleaseKey, "");
+        var dismissedTag = _preferences.Get(DismissedReleaseKey, "");
         return string.Equals(dismissedTag, update.Tag, StringComparison.OrdinalIgnoreCase) ? null : update;
     }
 }

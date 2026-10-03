@@ -9,7 +9,7 @@ public partial class App
 
     public App(
         LocalOverlayServer overlayServer,
-        ILocalSettingsService localSettings,
+        PreferencesSettingsService localSettings,
         DiagnosticFileLoggerProvider diagnosticLog,
         ILogger<App> logger)
     {
