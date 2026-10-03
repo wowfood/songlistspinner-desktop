@@ -2,6 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Settings;
 using SonglistSpinner.Core.StreamerSongList;
 using SonglistSpinner.Services;
+using SonglistSpinner.Testing;
 using Xunit;
 using static SonglistSpinner.Application.Tests.ScriptedStreamerSongListClient;
 

@@ -13,6 +13,7 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` composing the feature registrations |
 | `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
 | `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
+| `tests/SonglistSpinner.Testing` | Helpers both test projects share (a fake clock that reports its timers, `wwwroot` reader). Holds no tests |
 | `tests/JavaScript` | `node:test` tests for the wheel scripts |
 | `scripts/` | Single-file publish, smoke test, release checks (used by CI) |
 | `docs/` | API v2 notes, release process, single-file distribution |

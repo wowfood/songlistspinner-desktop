@@ -1,14 +1,14 @@
 using System.Threading.Channels;
 using Microsoft.Extensions.Time.Testing;
 
-namespace SonglistSpinner.Application.Tests;
+namespace SonglistSpinner.Testing;
 
 /// <summary>
 /// A <see cref="FakeTimeProvider"/> that reports each timer as it is created. Advancing the clock before
 /// a background task has started its delay would skip that delay's timer, so a test waits for the timer
 /// first and then advances by exactly its due time.
 /// </summary>
-internal sealed class TimerTrackingTimeProvider : FakeTimeProvider
+public sealed class TimerTrackingTimeProvider : FakeTimeProvider
 {
     private readonly Channel<TimeSpan> _createdTimers = Channel.CreateUnbounded<TimeSpan>();
 

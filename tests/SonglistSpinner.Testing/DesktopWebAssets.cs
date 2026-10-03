@@ -1,7 +1,7 @@
-namespace SonglistSpinner.Core.Tests;
+namespace SonglistSpinner.Testing;
 
 // Contract tests compare C# constants with the Desktop project's JavaScript, read from the source tree.
-internal static class DesktopWebAssets
+public static class DesktopWebAssets
 {
     public static string Read(string pathUnderWwwroot)
     {

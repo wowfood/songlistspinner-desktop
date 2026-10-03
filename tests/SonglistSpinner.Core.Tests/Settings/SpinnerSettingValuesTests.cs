@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Testing;
 using Xunit;
 
 namespace SonglistSpinner.Core.Tests.Settings;
