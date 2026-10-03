@@ -34,6 +34,7 @@ public static class MauiProgram
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         builder.Services.AddSingleton<IStreamerSongListCredentialStore>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
+        builder.Services.AddSingleton<ApiCredentialTest>();
         builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
         builder.Services.AddScoped<NowPlayingTransitionService>();
         builder.Services.AddScoped<StreamerSessionService>();

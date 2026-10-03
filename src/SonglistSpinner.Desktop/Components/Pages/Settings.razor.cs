@@ -717,7 +717,6 @@ public partial class Settings
         _credentialTestResult = null;
         _credentialTestSucceeded = false;
         var previousCredential = _existingCredential;
-        var credentialWasChanged = false;
 
         try
         {
@@ -734,36 +733,40 @@ public partial class Settings
                 return;
             }
 
-            credentialWasChanged = !Equals(previousCredential, _existingCredential);
-
-            var channel = new StreamerSongListChannel(streamerName, _dto.StreamerPlatform);
-            var queue = await ApiService.FetchQueueAsync(channel);
-            var history = await ApiService.FetchPlayHistoryAsync(channel, _dto.PlayHistoryPeriod);
+            var platform = _dto.StreamerPlatform;
+            var period = _dto.PlayHistoryPeriod;
+            var (queueCount, historyCount) = await CredentialTest.RunAsync(
+                previousCredential,
+                _existingCredential,
+                async cancellationToken =>
+                {
+                    var channel = new StreamerSongListChannel(streamerName, platform);
+                    var queue = await ApiService.FetchQueueAsync(channel, cancellationToken);
+                    var history = await ApiService.FetchPlayHistoryAsync(channel, period, cancellationToken);
+                    return (queue.Length, history.Length);
+                });
             _credentialTestSucceeded = true;
             _credentialTestResult =
-                $"Connected to {ApiOptions.BaseAddress} and loaded {queue.Length} queued song(s) " +
-                $"and {history.Length} history item(s) for {streamerName}.";
+                $"Connected to {ApiOptions.BaseAddress} and loaded {queueCount} queued song(s) " +
+                $"and {historyCount} history item(s) for {streamerName}.";
+        }
+        catch (ApiCredentialTestFailedException ex)
+        {
+            if (ex.PreviousRestored)
+                ShowSavedCredential(previousCredential);
+
+            _credentialTestResult = $"Connection failed: {ex.Message}" +
+                                    (ex.PreviousRestored
+                                        ? " The previous credential was restored."
+                                        : ex.RestoreFailureDescription is { } restoreFailure
+                                            ? " " + restoreFailure
+                                            : null);
+            Logger.LogError(ex.InnerException, "API connection test failed");
         }
         catch (Exception ex)
         {
-            string? rollbackError = null;
-            if (credentialWasChanged)
-            {
-                try
-                {
-                    await RestoreCredentialAsync(previousCredential);
-                }
-                catch (Exception restoreException)
-                {
-                    Logger.LogError(restoreException, "Restoring the previous API credential failed");
-                    rollbackError = $" The previous credential could not be restored: {restoreException.Message}";
-                }
-            }
-
-            _credentialTestResult = $"Connection failed: {ex.Message}" +
-                                    (credentialWasChanged && rollbackError is null
-                                        ? " The previous credential was restored."
-                                        : rollbackError);
+            // Validating the draft before saving it runs page script, which can fail before any credential changes.
+            _credentialTestResult = $"Connection failed: {ex.Message}";
             Logger.LogError(ex, "API connection test failed");
         }
         finally
@@ -772,13 +775,8 @@ public partial class Settings
         }
     }
 
-    private async Task RestoreCredentialAsync(StreamerSongListCredential? credential)
+    private void ShowSavedCredential(StreamerSongListCredential? credential)
     {
-        if (credential is null)
-            await CredentialStore.ClearCredentialAsync();
-        else
-            await CredentialStore.SaveCredentialAsync(credential);
-
         _existingCredential = credential;
         _hasCredential = credential is not null;
         _credentialKind = credential?.Kind ?? StreamerSongListCredentialKind.Streamer;
@@ -786,7 +784,6 @@ public partial class Settings
         _credentialToken = "";
         _savedCredentialFormState = CaptureCredentialFormState();
     }
-
     private async Task ConfirmNavigationAsync(LocationChangingContext context)
     {
         if (_allowNavigation || !HasUnsavedChanges) return;

@@ -3,6 +3,7 @@ using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
+using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -117,58 +118,54 @@ public partial class Setup
         await InvokeAsync(StateHasChanged);
 
         var credentialWasReplaced = !string.IsNullOrWhiteSpace(submittedToken);
+        StreamerSongListStreamer resolvedStreamer;
         try
         {
-            if (credentialWasReplaced)
-                await CredentialStore.SaveCredentialAsync(candidateCredential, _lifetimeCts.Token);
+            resolvedStreamer = await CredentialTest.RunAsync(
+                _existingCredential,
+                candidateCredential,
+                async cancellationToken =>
+                {
+                    if (credentialWasReplaced)
+                        await CredentialStore.SaveCredentialAsync(candidateCredential, cancellationToken);
 
-            _resolvedStreamer = await ApiService.ResolveStreamerAsync(channel, _lifetimeCts.Token);
-            var queueTask = ApiService.FetchQueueAsync(channel, _lifetimeCts.Token);
-            var historyTask = ApiService.FetchPlayHistoryAsync(
-                channel,
-                _settings.PlayHistoryPeriod,
+                    _resolvedStreamer = await ApiService.ResolveStreamerAsync(channel, cancellationToken);
+                    var queueTask = ApiService.FetchQueueAsync(channel, cancellationToken);
+                    var historyTask = ApiService.FetchPlayHistoryAsync(
+                        channel,
+                        _settings.PlayHistoryPeriod,
+                        cancellationToken);
+                    await Task.WhenAll(queueTask, historyTask);
+                    _queueCount = (await queueTask).Length;
+                    _historyCount = (await historyTask).Length;
+
+                    _settings.DefaultStreamerName = channel.Name;
+                    _settings.StreamerPlatform = channel.Platform;
+                    LocalSettings.SaveSettings(_settings);
+                    return _resolvedStreamer;
+                },
                 _lifetimeCts.Token);
-            await Task.WhenAll(queueTask, historyTask);
-            _queueCount = (await queueTask).Length;
-            _historyCount = (await historyTask).Length;
-
-            _settings.DefaultStreamerName = channel.Name;
-            _settings.StreamerPlatform = channel.Platform;
-            LocalSettings.SaveSettings(_settings);
             _existingCredential = candidateCredential;
             _hasExistingCredential = true;
             _token = "";
             _apiState = VerificationState.Passed;
-            _apiMessage = $"Connected to channel #{_resolvedStreamer.Id} with {_queueCount} queued song(s).";
+            _apiMessage = $"Connected to channel #{resolvedStreamer.Id} with {_queueCount} queued song(s).";
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
             return;
         }
-        catch (Exception ex)
+        catch (ApiCredentialTestFailedException ex)
         {
-            string? rollbackError = null;
-            if (credentialWasReplaced)
-            {
-                try
-                {
-                    await RestoreCredentialAsync(_existingCredential);
-                }
-                catch (Exception restoreException)
-                {
-                    rollbackError = $" The previous credential could not be restored: {restoreException.Message}";
-                }
-            }
-
             _apiState = VerificationState.Failed;
             _apiMessage = "Connection failed";
-            _error = ex.Message + rollbackError;
+            _error = ex.Message + (ex.RestoreFailureDescription is { } restoreFailure ? " " + restoreFailure : null);
             _busy = false;
             return;
         }
 
         await InvokeAsync(StateHasChanged);
-        await VerifyRealtimeAsync(_resolvedStreamer.Id);
+        await VerifyRealtimeAsync(resolvedStreamer.Id);
         await InvokeAsync(StateHasChanged);
         await VerifyOverlayAsync();
 
@@ -246,13 +243,6 @@ public partial class Setup
         }
     }
 
-    private async Task RestoreCredentialAsync(StreamerSongListCredential? credential)
-    {
-        if (credential is null)
-            await CredentialStore.ClearCredentialAsync(_lifetimeCts.Token);
-        else
-            await CredentialStore.SaveCredentialAsync(credential, _lifetimeCts.Token);
-    }
 
     private void ContinueWithWarnings()
     {
