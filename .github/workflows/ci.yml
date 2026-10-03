@@ -129,7 +129,7 @@ jobs:
       - name: Set up .NET and MAUI Windows
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
           workloads: maui-windows
 
       - name: Restore
@@ -139,7 +139,7 @@ jobs:
         run: dotnet format SonglistSpinner.Desktop.sln --verify-no-changes --severity warn --no-restore
 
       - name: Test
-        run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
+        run: dotnet test --solution SonglistSpinner.Desktop.sln --configuration Release --no-restore
 
       - name: Build
         run: dotnet build SonglistSpinner.Desktop.sln --configuration Release --no-restore
