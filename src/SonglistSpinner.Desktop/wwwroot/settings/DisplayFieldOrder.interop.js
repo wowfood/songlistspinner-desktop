@@ -1,4 +1,4 @@
-export function initialize(container, dotNetReference) {
+export function initialize(container, dotNetReference, reorderedMethodName) {
     if (!window.Sortable) {
         throw new Error("SortableJS is not loaded.");
     }
@@ -34,7 +34,7 @@ export function initialize(container, dotNetReference) {
                 .filter(element => element.matches(".ss-chip") && element !== event.item);
             event.from.insertBefore(event.item, siblings[oldIndex] ?? null);
 
-            dotNetReference.invokeMethodAsync("OnFieldReordered", fieldName, newIndex)
+            dotNetReference.invokeMethodAsync(reorderedMethodName, fieldName, newIndex)
                 .catch(error => {
                     if (!disposed) {
                         console.error("Unable to reorder display field.", error);

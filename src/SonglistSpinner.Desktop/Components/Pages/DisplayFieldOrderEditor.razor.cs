@@ -44,7 +44,8 @@ public partial class DisplayFieldOrderEditor : IAsyncDisposable
             _sortable = await _module.InvokeAsync<IJSObjectReference>(
                 "initialize",
                 _container,
-                _dotNetReference);
+                _dotNetReference,
+                nameof(OnFieldReordered));
         }
         catch (Exception exception) when (exception is JSException or InvalidOperationException)
         {

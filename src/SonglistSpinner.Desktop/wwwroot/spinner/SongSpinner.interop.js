@@ -1,6 +1,9 @@
-const _spinnerContracts = window.SonglistSpinnerContracts
-
+// The wheel, resize and theme interop shared by the dashboard (index.html) and the OBS overlay
+// (Overlay.html, served by LocalOverlayServer from an embedded copy). The exported method names are the
+// C# contract in SpinnerInteropMethods; page-specific behaviour stays in each page.
 window.SpinnerInterop = (function () {
+    const _spinnerContracts = window.SonglistSpinnerContracts
+
     let _wheel = null
     let _isResizing = false
     let _resizePointerId = null
@@ -11,9 +14,11 @@ window.SpinnerInterop = (function () {
     let _resizeHandle = null
     let _resizePlayedList = null
     let _resizeDotNetRef = null
+    let _resizeEndMethodName = null
     let _winnerDialog = null
     let _winnerDialogCancelHandler = null
     let _winnerDialogDotNetRef = null
+    let _winnerDialogCancelledMethodName = null
     let _winnerReturnFocus = null
     let _wheelItems = []
     let _wheelColors = []
@@ -103,6 +108,7 @@ window.SpinnerInterop = (function () {
         _resizeHandle = null
         _resizePlayedList = null
         _resizeDotNetRef = null
+        _resizeEndMethodName = null
         resetResizeInteraction()
     }
 
@@ -118,6 +124,7 @@ window.SpinnerInterop = (function () {
         _winnerDialog = null
         _winnerDialogCancelHandler = null
         _winnerDialogDotNetRef = null
+        _winnerDialogCancelledMethodName = null
         _winnerReturnFocus = null
 
         if (!restoreFocus) return
@@ -144,12 +151,12 @@ window.SpinnerInterop = (function () {
     }
 
     function synchronizePlayedListWidth() {
-        if (!_resizePlayedList || !_resizeDotNetRef) return
+        if (!_resizePlayedList || !_resizeDotNetRef || !_resizeEndMethodName) return
         const width = _resizePlayedList.style.width
         const minWidth = _resizePlayedList.style.minWidth
         if (!width) return
 
-        _resizeDotNetRef.invokeMethodAsync('OnResizeEnd', width, minWidth)
+        _resizeDotNetRef.invokeMethodAsync(_resizeEndMethodName, width, minWidth)
             .catch(error => console.warn('Unable to synchronize the played-list width.', error))
     }
 
@@ -233,9 +240,6 @@ window.SpinnerInterop = (function () {
             if (_wheel) _wheel.spinToItem(index, duration)
         },
 
-        getItems() {
-            return _wheel ? _wheel.items : []
-        },
 
         setupResizeObserver() {
             const container = document.getElementById('wheelContainer')
@@ -256,7 +260,7 @@ window.SpinnerInterop = (function () {
             _resizeObserver.observe(container)
         },
 
-        setupResizeHandlers(dotNetRef) {
+        setupResizeHandlers(dotNetRef, resizeEndMethodName) {
             detachResizeHandlers()
             const handle = document.getElementById('resizeHandle')
             const playedList = document.getElementById('playedList')
@@ -265,6 +269,7 @@ window.SpinnerInterop = (function () {
             _resizeHandle = handle
             _resizePlayedList = playedList
             _resizeDotNetRef = dotNetRef
+            _resizeEndMethodName = resizeEndMethodName
             const currentWidth = Math.round(playedList.getBoundingClientRect().width)
             _resizeHandle.setAttribute('aria-valuenow', `${currentWidth}`)
             _resizeHandle.setAttribute('aria-valuetext', `${currentWidth} pixels`)
@@ -275,7 +280,7 @@ window.SpinnerInterop = (function () {
             document.addEventListener('pointercancel', handleResizePointerUp)
         },
 
-        openWinnerDialog(preferredActionId, dotNetRef) {
+        openWinnerDialog(preferredActionId, dotNetRef, cancelledMethodName) {
             cleanupWinnerDialog(false)
             const dialog = document.getElementById('winnerModal')
             if (!(dialog instanceof HTMLDialogElement)) {
@@ -284,13 +289,14 @@ window.SpinnerInterop = (function () {
 
             _winnerDialog = dialog
             _winnerDialogDotNetRef = dotNetRef
+            _winnerDialogCancelledMethodName = cancelledMethodName
             _winnerReturnFocus = document.activeElement instanceof HTMLElement
                 ? document.activeElement
                 : null
             _winnerDialogCancelHandler = event => {
                 event.preventDefault()
-                if (!_winnerDialogDotNetRef) return
-                _winnerDialogDotNetRef.invokeMethodAsync('OnWinnerDialogCancelled')
+                if (!_winnerDialogDotNetRef || !_winnerDialogCancelledMethodName) return
+                _winnerDialogDotNetRef.invokeMethodAsync(_winnerDialogCancelledMethodName)
                     .catch(error => console.warn('Unable to close the winner dialog.', error))
             }
             dialog.addEventListener('cancel', _winnerDialogCancelHandler)
@@ -365,16 +371,16 @@ window.SpinnerInterop = (function () {
 
         applyPlayedListPosition(position) {
             const container = document.getElementById('container')
-            const icon = document.getElementById('collapseIcon')
-            if (!container || !icon) return
+            if (!container) return
             const positions = _spinnerContracts.playedListPositions
-            if ((position || positions.default).toLowerCase() === positions.left) {
-                container.classList.add('played-list-left')
-                icon.innerText = '◀'
-            } else {
-                container.classList.remove('played-list-left')
-                icon.innerText = '▶'
-            }
+            const normalizedPosition = (position || positions.default).toLowerCase()
+            const isLeft = normalizedPosition === positions.left
+            container.classList.toggle('played-list-left', isLeft)
+            // The overlay has no collapse button, so it has no icon to update.
+            const icon = document.getElementById('collapseIcon')
+            if (icon) icon.innerText = isLeft ? '◀' : '▶'
+            const playedList = document.getElementById('playedList')
+            if (playedList) playedList.dataset.position = normalizedPosition
         },
 
         runConfetti(colors) {
@@ -382,7 +388,9 @@ window.SpinnerInterop = (function () {
             if (!el) return
             el.innerHTML = ''
             if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-            const palette = colors || ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24']
+            // The palette is the configured wheel colours, sent by the caller.
+            const palette = Array.isArray(colors) ? colors : []
+            if (palette.length === 0) return
             for (let i = 0; i < 36; i++) {
                 const piece = document.createElement('span')
                 piece.className = 'winner-confetti-piece'
@@ -420,13 +428,6 @@ window.SpinnerInterop = (function () {
             }
         },
 
-        setPlayedListWidth(width, minWidth) {
-            const el = document.getElementById('playedList')
-            if (el) {
-                el.style.width = width
-                el.style.minWidth = minWidth
-            }
-        },
 
         updateSettingsPreview(frameId, payload) {
             const frame = document.getElementById(frameId)

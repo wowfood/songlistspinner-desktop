@@ -9,12 +9,15 @@ public class LocalOverlayServer : IAsyncDisposable
     private const string OverlayResourceName = "SonglistSpinner.WebAssets.Overlay.html";
     private const string ContractsResourceName = "SonglistSpinner.WebAssets.SongSpinner.contracts.js";
     private const string SpinWheelResourceName = "SonglistSpinner.WebAssets.spin-wheel-iife.js";
+    private const string InteropResourceName = "SonglistSpinner.WebAssets.SongSpinner.interop.js";
     private static readonly Lazy<byte[]> OverlayDocument = new(() =>
         LoadEmbeddedResource(OverlayResourceName, "The embedded overlay document is missing."));
     private static readonly Lazy<byte[]> SpinWheelScript = new(() =>
         LoadEmbeddedResource(SpinWheelResourceName, "The embedded wheel script is missing."));
     private static readonly Lazy<byte[]> ContractsScript = new(() =>
         LoadEmbeddedResource(ContractsResourceName, "The embedded overlay contracts script is missing."));
+    private static readonly Lazy<byte[]> InteropScript = new(() =>
+        LoadEmbeddedResource(InteropResourceName, "The embedded wheel interop script is missing."));
 
     private readonly CancellationTokenSource _cts = new();
     private readonly OverlayStateService _overlay;
@@ -138,6 +141,9 @@ public class LocalOverlayServer : IAsyncDisposable
                     break;
                 case "/overlay/SongSpinner.contracts.js":
                     await ServeScriptAsync(context, ContractsScript.Value, "no-cache");
+                    break;
+                case "/overlay/SongSpinner.interop.js":
+                    await ServeScriptAsync(context, InteropScript.Value, "no-cache");
                     break;
                 case "/overlay/spin-wheel-iife.js":
                     await ServeScriptAsync(

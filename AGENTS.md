@@ -11,7 +11,7 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | `src/SonglistSpinner.Core` | MAUI-free domain: StreamerSongList API v2 and Centrifugo client (`Api/V2`), settings DTO and normaliser (`Data`), models, services |
 | `src/SonglistSpinner.Application` | MAUI-free app services: `StreamerSessionService` (queue session, realtime refresh), `OverlayStateService` (overlay state and SSE) |
 | `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` DI |
-| `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
+| `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
 | `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
 | `tests/JavaScript` | `node:test` tests for the wheel scripts |
 | `scripts/` | Single-file publish, smoke test, release checks (used by CI) |
@@ -57,6 +57,12 @@ rejects a bare directory.
 - Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
   renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
   migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step.
+- Default settings live once, in `SpinnerDefaults` (Core). `SettingsDto` and the `Spinner*Config` models
+  both start from it, and `SettingsDtoTests` locks the values a user with no saved settings gets.
+- JavaScript contracts are guarded by tests that read `wwwroot` from the source tree, so they need the
+  repository checkout: `OverlayEventNames`, `SpinnerSettingValues` and `SpinnerInteropMethods` must
+  match `SongSpinner.contracts.js` and the `SpinnerInterop` exports. Pass `[JSInvokable]` names to
+  JavaScript with `nameof` instead of writing them in the script.
 - Fix defects test-first.
 
 ## Branches and releases

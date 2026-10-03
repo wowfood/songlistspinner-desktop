@@ -219,7 +219,7 @@ public partial class Dashboard
 
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeObserver);
         _dotNetRef = DotNetObjectReference.Create(this);
-        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef);
+        await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef, nameof(OnResizeEnd));
 
         var activeSession = StreamerSession.GetSnapshot();
         if (activeSession.HasChannel)
@@ -506,7 +506,8 @@ public partial class Dashboard
             await JS.InvokeVoidAsync(
                 SpinnerInteropMethods.OpenWinnerDialog,
                 PreferredWinnerActionId,
-                _dotNetRef);
+                _dotNetRef,
+                nameof(OnWinnerDialogCancelled));
         }
         catch
         {

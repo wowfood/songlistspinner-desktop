@@ -67,6 +67,9 @@
                           LogicalName="SonglistSpinner.WebAssets.SongSpinner.contracts.js"/>
         <EmbeddedResource Include="wwwroot\spinner\spin-wheel-iife.js"
                           LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
+        <!-- The overlay and the dashboard share one SpinnerInterop script. -->
+        <EmbeddedResource Include="wwwroot\spinner\SongSpinner.interop.js"
+                          LogicalName="SonglistSpinner.WebAssets.SongSpinner.interop.js"/>
     </ItemGroup>
 
     <!--

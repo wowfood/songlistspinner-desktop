@@ -526,227 +526,40 @@ button{
 
 <script src="/overlay/SongSpinner.contracts.js"></script>
 <script src="/overlay/spin-wheel-iife.js"></script>
+<script src="/overlay/SongSpinner.interop.js"></script>
 <script>
 const _spinnerContracts = window.SonglistSpinnerContracts
 
-window.SpinnerInterop = (function () {
-    let _wheel = null
-    let _resizeTimeout = null
-    let _wheelItems = []
-    let _wheelColors = []
+// Overlay-only layout. The shared wheel, theme and background code is window.SpinnerInterop.
+function applyNowPlayingConfig(config) {
+    const el = document.getElementById('nowPlaying')
+    const text = document.getElementById('nowPlayingText')
+    if (!el || !text || !config) return
+    const positions = _spinnerContracts.nowPlayingPositions
+    const position = (config.position || positions.default).toLowerCase()
+    el.dataset.position = positions.values.includes(position)
+        ? position
+        : positions.default
+    // The app fills in defaults for empty values, so these always arrive set.
+    el.style.width = config.width || ''
+    text.style.fontFamily = config.fontFamily || ''
+    text.style.fontSize = config.fontSize || ''
+}
 
-    const wheelLabelRadius = 0.9
-    const wheelLabelRadiusMax = 0.08
-    const wheelLabelFontSizeMin = 12
-    const wheelLabelFontSizeMax = 28
+// A collapsed played list is hidden here (CSS), not narrowed to a button as in the app.
+function setPlayedListCollapsed(collapsed) {
+    const el = document.getElementById('playedList')
+    if (el) el.classList.toggle('collapsed', Boolean(collapsed))
+}
 
-    function calculateWheelLabelFontSize(itemCount) {
-        if (itemCount <= 1) return wheelLabelFontSizeMax
+// The app's width is replayed on connect; an empty width (never resized) keeps the overlay's CSS width.
+function setPlayedListWidth(width, minWidth) {
+    const el = document.getElementById('playedList')
+    if (!el) return
+    if (width) el.style.width = width
+    if (minWidth) el.style.minWidth = minWidth
+}
 
-        const referenceLabelRadius = 250 * 0.95 * 0.55
-        const sliceHeight = 2 * referenceLabelRadius * Math.sin(Math.PI / itemCount)
-        return Math.max(
-            wheelLabelFontSizeMin,
-            Math.min(wheelLabelFontSizeMax, Math.floor(sliceHeight * 0.68)))
-    }
-
-    function fitWheelLabel(context, label, fontSize, maxWidth) {
-        if (!context || typeof label !== 'string') return label || ''
-
-        context.font = `${fontSize}px sans-serif`
-        if (context.measureText(label).width <= maxWidth) return label
-
-        const ellipsis = '…'
-        let lower = 0
-        let upper = label.length
-        while (lower < upper) {
-            const length = Math.ceil((lower + upper) / 2)
-            const candidate = `${label.slice(0, length).trimEnd()}${ellipsis}`
-            if (context.measureText(candidate).width <= maxWidth) {
-                lower = length
-            } else {
-                upper = length - 1
-            }
-        }
-
-        return `${label.slice(0, lower).trimEnd()}${ellipsis}`
-    }
-
-    function buildWheel(container) {
-        const fontSize = calculateWheelLabelFontSize(_wheelItems.length)
-        const referenceRadius = 250 * 0.95
-        const maxLabelWidth = referenceRadius * (wheelLabelRadius - wheelLabelRadiusMax)
-        const measureContext = document.createElement('canvas').getContext('2d')
-        const fittedItems = _wheelItems.map(item => ({
-            ...item,
-            label: fitWheelLabel(measureContext, item.label, fontSize, maxLabelWidth)
-        }))
-
-        return new spinWheel.Wheel(container, {
-            items: fittedItems,
-            itemBackgroundColors: _wheelColors,
-            itemLabelFontSizeMax: fontSize,
-            itemLabelRadius: wheelLabelRadius,
-            itemLabelRadiusMax: wheelLabelRadiusMax,
-            itemLabelStrokeWidth: 1,
-            borderWidth: 0,
-            lineWidth: 0,
-            radius: 0.95,
-            isInteractive: false
-        })
-    }
-
-    return {
-        createWheel(items, colors) {
-            const container = document.getElementById('wheelContainer')
-            if (!container) return
-            if (!window.spinWheel || !window.spinWheel.Wheel) {
-                container.textContent = 'The wheel component could not be loaded.'
-                return
-            }
-            if (_wheel) { _wheel.remove(); _wheel = null }
-            _wheelItems = Array.isArray(items) ? items : []
-            _wheelColors = Array.isArray(colors) ? colors : []
-            _wheel = buildWheel(container)
-        },
-
-        spinToItem(index, duration) {
-            if (_wheel) _wheel.spinToItem(index, duration)
-        },
-
-        setupResizeObserver() {
-            const container = document.getElementById('wheelContainer')
-            if (!container || !window.ResizeObserver) return
-            new ResizeObserver(() => {
-                if (_wheel) {
-                    clearTimeout(_resizeTimeout)
-                    _resizeTimeout = setTimeout(() => {
-                        if (_wheel) {
-                            // Preserve the current rotation and in-flight spin.
-                            _wheel.resize()
-                            _wheel.draw(performance.now())
-                        }
-                    }, 200)
-                }
-            }).observe(container)
-        },
-
-        applyTheme(colors, playedList, winnerDialog) {
-            const r = document.documentElement
-            if (!colors) return
-            r.style.setProperty('--app-text-color', colors.text || '')
-            r.style.setProperty('--app-status-bg', colors.statusBackground || '')
-            r.style.setProperty('--app-played-list-bg', colors.playedListBackground || '')
-            r.style.setProperty('--app-now-playing-bg', colors.nowPlayingBackground || colors.playedListBackground || '')
-            r.style.setProperty('--app-played-item-bg', colors.playedItemBackground || '')
-            r.style.setProperty('--app-resize-handle-bg', colors.resizeHandleBackground || '')
-            r.style.setProperty('--app-resize-handle-hover-bg', colors.resizeHandleHoverBackground || '')
-            r.style.setProperty('--app-toggle-bg', colors.toggleBackground || '')
-            r.style.setProperty('--app-button-bg', colors.buttonBackground || '')
-            r.style.setProperty('--app-button-text', colors.buttonText || '')
-            r.style.setProperty('--app-pointer-color', colors.pointer || '')
-            if (playedList) {
-                r.style.setProperty('--app-played-list-font-family', playedList.fontFamily || '')
-                r.style.setProperty('--app-played-list-font-size', playedList.fontSize || '')
-                r.style.setProperty('--app-played-list-max-lines', playedList.maxLines ?? '')
-            }
-            if (winnerDialog) {
-                r.style.setProperty('--app-winner-dialog-font-family', winnerDialog.fontFamily || '')
-                r.style.setProperty('--app-winner-dialog-font-size', winnerDialog.fontSize || '')
-                r.style.setProperty('--app-winner-dialog-width', winnerDialog.width || '')
-            }
-        },
-
-        applyBackground(background) {
-            if (!background) return
-            const modes = _spinnerContracts.backgroundModes
-            const mode = (background.mode || modes.color).toLowerCase()
-            document.body.style.backgroundColor = background.color || ''
-            if (mode === modes.transparent || mode === modes.legacyTransparent) {
-                document.body.style.backgroundColor = modes.transparent
-                document.body.style.backgroundImage = 'none'
-            } else if (mode === modes.color) {
-                document.body.style.backgroundImage = 'none'
-            }
-        },
-
-        applyPlayedListPosition(position) {
-            const container = document.getElementById('container')
-            const icon = document.getElementById('collapseIcon')
-            if (!container) return
-            const positions = _spinnerContracts.playedListPositions
-            if ((position || positions.default).toLowerCase() === positions.left) {
-                container.classList.add('played-list-left')
-                if (icon) icon.innerText = '\u25BA'
-            } else {
-                container.classList.remove('played-list-left')
-                if (icon) icon.innerText = '\u25C4'
-            }
-            const pl = document.getElementById('playedList')
-            if (pl) pl.dataset.position = (position || positions.default).toLowerCase()
-        },
-
-        applyNowPlayingConfig(config) {
-            const el = document.getElementById('nowPlaying')
-            const text = document.getElementById('nowPlayingText')
-            if (!el || !text || !config) return
-            const positions = _spinnerContracts.nowPlayingPositions
-            const position = (config.position || positions.default).toLowerCase()
-            el.dataset.position = positions.values.includes(position)
-                ? position
-                : positions.default
-            el.style.width = config.width || '28rem'
-            text.style.fontFamily = config.fontFamily || 'sans-serif'
-            text.style.fontSize = config.fontSize || '1.125rem'
-        },
-
-        runConfetti(colors) {
-            const el = document.getElementById('winnerConfetti')
-            if (!el) return
-            el.innerHTML = ''
-            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
-            const palette = colors || ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24']
-            for (let i = 0; i < 36; i++) {
-                const piece = document.createElement('span')
-                piece.className = 'winner-confetti-piece'
-                piece.style.left = `${Math.random() * 100}%`
-                piece.style.backgroundColor = palette[i % palette.length]
-                piece.style.animationDelay = `${Math.random() * 0.5}s`
-                piece.style.animationDuration = `${1.2 + Math.random() * 1.1}s`
-                el.appendChild(piece)
-            }
-        },
-
-        setWheelVisible(visible) {
-            const el = document.getElementById('wheelContents')
-            if (el) el.style.display = visible ? 'flex' : 'none'
-        },
-
-        setPlayedListCollapsed(collapsed, position) {
-            const el = document.getElementById('playedList')
-            const icon = document.getElementById('collapseIcon')
-            if (!el) return
-            const positions = _spinnerContracts.playedListPositions
-            const pos = (position || positions.default).toLowerCase()
-            if (collapsed) {
-                el.classList.add('collapsed')
-                if (icon) icon.innerText = pos === positions.left ? '\u25C4' : '\u25BA'
-            } else {
-                el.classList.remove('collapsed')
-                if (icon) icon.innerText = pos === positions.left ? '\u25BA' : '\u25C4'
-            }
-        },
-
-        setPlayedListWidth(width, minWidth) {
-            const el = document.getElementById('playedList')
-            if (!el) return
-            if (width) el.style.width = width
-            if (minWidth) el.style.minWidth = minWidth
-        }
-    }
-})()
-</script>
-<script>
 const _overlayState = { config: null, collapsed: false, wheelItems: [] }
 const _isSettingsPreview = new URLSearchParams(window.location.search).get('preview') === '1'
 
@@ -795,10 +608,8 @@ function connectSSE() {
         const data = JSON.parse(e.data)
         _overlayState.config = data.config
         _overlayState.collapsed = Boolean(data.playedListCollapsed)
-        SpinnerInterop.setPlayedListWidth(data.playedListWidth, data.playedListMinWidth)
-        SpinnerInterop.setPlayedListCollapsed(
-            _overlayState.collapsed,
-            data.config && data.config.songList && data.config.songList.playedListPosition)
+        setPlayedListWidth(data.playedListWidth, data.playedListMinWidth)
+        setPlayedListCollapsed(_overlayState.collapsed)
         updateSongs(data)
         SpinnerInterop.setWheelVisible(data.wheelVisible !== false)
         renderWinner(data.winner)
@@ -840,13 +651,12 @@ function connectSSE() {
     es.addEventListener(events.setCollapse, e => {
         const data = JSON.parse(e.data)
         _overlayState.collapsed = data.collapsed
-        const pos = _overlayState.config && _overlayState.config.songList && _overlayState.config.songList.playedListPosition
-        SpinnerInterop.setPlayedListCollapsed(data.collapsed, pos)
+        setPlayedListCollapsed(data.collapsed)
     })
 
     es.addEventListener(events.setPlayedListWidth, e => {
         const data = JSON.parse(e.data)
-        SpinnerInterop.setPlayedListWidth(data.width, data.minWidth)
+        setPlayedListWidth(data.width, data.minWidth)
     })
 
     es.onerror = () => {
@@ -909,7 +719,7 @@ function updateSongs(data) {
         SpinnerInterop.applyBackground(data.config.background)
         SpinnerInterop.applyPlayedListPosition(
             data.config.songList && data.config.songList.playedListPosition)
-        SpinnerInterop.applyNowPlayingConfig(data.config.nowPlaying)
+        applyNowPlayingConfig(data.config.nowPlaying)
     }
     const cfg = _overlayState.config
     _overlayState.wheelItems = data.wheelItems || []
