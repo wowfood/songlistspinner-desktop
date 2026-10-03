@@ -134,7 +134,7 @@ public class StreamerSessionServiceTests
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
         session.SetRefreshSuspended(true);
 
-        await session.UpdateSnapshotAsync(new SpinnerConfig(), [], [], null, cancellationToken);
+        session.UpdateSnapshot(new SpinnerConfig(), [], [], null);
 
         Assert.Empty(session.GetSnapshot().AvailableSongs);
         using var overlayState = await OverlayStateServiceTests.ReadInitialStateAsync(overlay);

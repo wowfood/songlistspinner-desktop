@@ -55,7 +55,7 @@ public class WheelSpinServiceTests
         await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
         Assert.True(await events.MoveNextAsync());
 
-        await spins.StartAsync(draw, cancellationToken);
+        spins.Start(draw);
 
         Assert.True(await events.MoveNextAsync());
         using var queue = OverlayStateServiceTests.ParseEventData(events.Current, OverlayEventNames.UpdateSongs);
@@ -77,9 +77,9 @@ public class WheelSpinServiceTests
         await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
         Assert.True(await events.MoveNextAsync());
 
-        await spins.StartAsync(draw, cancellationToken);
+        spins.Start(draw);
         // A later broadcast marks the end of what the start sent.
-        await overlay.BroadcastCloseWinnerAsync();
+        overlay.BroadcastCloseWinner();
 
         Assert.True(await events.MoveNextAsync());
         using var queue = OverlayStateServiceTests.ParseEventData(events.Current, OverlayEventNames.UpdateSongs);

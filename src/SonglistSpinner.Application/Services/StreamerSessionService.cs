@@ -84,7 +84,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 $"Connecting to realtime updates for {streamer}.");
         }
 
-        await _overlayService.UpdateStateAsync(
+        _overlayService.UpdateState(
             config,
             availableSongs.ToList(),
             playedSongs.ToArray(),
@@ -161,7 +161,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                     _snapshot = updated;
                 }
 
-                await _overlayService.UpdateStateAsync(
+                _overlayService.UpdateState(
                     updated.Config,
                     updated.AvailableSongs.ToList(),
                     updated.PlayedSongs,
@@ -182,12 +182,11 @@ public sealed class StreamerSessionService : IAsyncDisposable
         }
     }
 
-    public async Task UpdateSnapshotAsync(
+    public void UpdateSnapshot(
         SpinnerConfig config,
         IReadOnlyCollection<SpinnerQueueItem> availableSongs,
         IReadOnlyCollection<PlayHistoryItem> playedSongs,
-        SpinnerQueueItem? nowPlaying,
-        CancellationToken cancellationToken = default)
+        SpinnerQueueItem? nowPlaying)
     {
         StreamerSessionSnapshot updated;
         lock (_stateGate)
@@ -204,8 +203,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
             _snapshot = updated;
         }
 
-        cancellationToken.ThrowIfCancellationRequested();
-        await _overlayService.UpdateStateAsync(
+        _overlayService.UpdateState(
             config,
             availableSongs.ToList(),
             playedSongs.ToArray(),
@@ -214,7 +212,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         RaiseChanged();
     }
 
-    public async Task UpdateConfigAsync(SpinnerConfig config, CancellationToken cancellationToken = default)
+    public void UpdateConfig(SpinnerConfig config)
     {
         var hasChannel = false;
         lock (_stateGate)
@@ -223,18 +221,15 @@ public sealed class StreamerSessionService : IAsyncDisposable
             hasChannel = _snapshot.HasChannel;
         }
 
-        await _overlayService.UpdateConfigAsync(config);
+        _overlayService.UpdateConfig(config);
         RaiseChanged();
         if (hasChannel)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
             _refreshSignals?.Writer.TryWrite(true);
-        }
     }
 
     /// <summary>
     /// Suspends refreshes while a spin owns the wheel. A refresh skipped or discarded while suspended
-    /// is requested again on resume. <see cref="UpdateSnapshotAsync"/> still publishes while suspended.
+    /// is requested again on resume. <see cref="UpdateSnapshot"/> still publishes while suspended.
     /// </summary>
     public void SetRefreshSuspended(bool suspended)
     {
@@ -254,7 +249,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
             _snapshot = StreamerSessionSnapshot.Empty with { Config = config };
         }
 
-        await _overlayService.UpdateStateAsync(config, [], [], null, "");
+        _overlayService.UpdateState(config, [], [], null, "");
         RaiseChanged();
     }
 

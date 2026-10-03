@@ -450,7 +450,7 @@ public partial class Settings
             LocalSettings.SaveSettings(_dto);
             RefreshSeparatorChoices();
             DiagnosticLog.SetEnabled(_dto.DebugMode);
-            await StreamerSession.UpdateConfigAsync(SettingsDtoConverter.ToSpinnerConfig(_dto));
+            StreamerSession.UpdateConfig(SettingsDtoConverter.ToSpinnerConfig(_dto));
 
             var submittedToken = _credentialToken.Trim();
             var token = string.IsNullOrWhiteSpace(submittedToken)

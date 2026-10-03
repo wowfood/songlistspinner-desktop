@@ -126,7 +126,7 @@ public partial class Dashboard
         if (IsSpinInProgress)
             FinishSpin();
         if (winnerShown)
-            await OverlayService.BroadcastCloseWinnerAsync();
+            OverlayService.BroadcastCloseWinner();
 
         _lifetimeCts.Cancel();
         _playedRefreshCts?.Cancel();
@@ -193,7 +193,7 @@ public partial class Dashboard
             _preferMarkWinnerPlayed = settings.UpdateQueueAfterSpin && !settings.DisplayNowPlaying;
             _isLockedDefault = _config.Streamer.HideChangeOptionWhenDefault
                                && !string.IsNullOrWhiteSpace(_config.Streamer.DefaultName);
-            await StreamerSession.UpdateConfigAsync(_config, _lifetimeCts.Token);
+            StreamerSession.UpdateConfig(_config);
             ApplySessionSnapshot(StreamerSession.GetSnapshot());
             StreamerSession.Changed += OnStreamerSessionChanged;
 
@@ -204,7 +204,7 @@ public partial class Dashboard
 
         if (_jsInitialized) return;
         _jsInitialized = true;
-        await OverlayService.BroadcastWheelVisibilityAsync(_wheelVisible);
+        OverlayService.BroadcastWheelVisibility(_wheelVisible);
 
         await JS.InvokeVoidAsync(
             SpinnerInteropMethods.ApplyTheme, _config.Colors, _config.PlayedList, _config.WinnerDialog);
@@ -355,7 +355,7 @@ public partial class Dashboard
 
             if (draw.WinnerIndex is not { } winnerIndex)
             {
-                await Spins.StartAsync(draw, _lifetimeCts.Token);
+                Spins.Start(draw);
                 SetStatus("No songs left to spin!");
                 FinishSpin();
                 await InvokeAsync(StateHasChanged);
@@ -364,7 +364,7 @@ public partial class Dashboard
 
             SetStatus("Spinning...");
             await InvokeAsync(StateHasChanged);
-            await Spins.StartAsync(draw, _lifetimeCts.Token);
+            Spins.Start(draw);
             await JS.InvokeVoidAsync(
                 SpinnerInteropMethods.SpinToItem,
                 winnerIndex,
@@ -373,7 +373,7 @@ public partial class Dashboard
             var winner = await Spins.RevealWinnerAsync(draw, _lifetimeCts.Token);
             _winnerQueueId = winner.Song.QueueId;
             await ShowWinnerModalAsync(winner.Fields, winner.QueuePosition);
-            await OverlayService.BroadcastWinnerRevealAsync(winner.Fields, winner.QueuePosition);
+            OverlayService.BroadcastWinnerReveal(winner.Fields, winner.QueuePosition);
             SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(winner.Song)}");
             StateHasChanged();
         }
@@ -410,7 +410,7 @@ public partial class Dashboard
     {
         _wheelVisible = (bool)(e.Value ?? true);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetWheelVisible, _wheelVisible);
-        await OverlayService.BroadcastWheelVisibilityAsync(_wheelVisible);
+        OverlayService.BroadcastWheelVisibility(_wheelVisible);
     }
 
     private async Task ToggleCollapse()
@@ -418,7 +418,7 @@ public partial class Dashboard
         _playedListCollapsed = !_playedListCollapsed;
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetPlayedListCollapsed,
             _playedListCollapsed, _config.SongList.PlayedListPosition);
-        await OverlayService.UpdatePlayedListCollapsedAsync(_playedListCollapsed);
+        OverlayService.UpdatePlayedListCollapsed(_playedListCollapsed);
     }
 
     private async Task MarkNowPlayingPlayedAsync()
@@ -573,7 +573,7 @@ public partial class Dashboard
         FinishSpin();
         await InvokeAsync(StateHasChanged);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.CloseWinnerDialog);
-        await OverlayService.BroadcastCloseWinnerAsync();
+        OverlayService.BroadcastCloseWinner();
         SetStatus(statusMessage);
 
         _winnerQueueId = null;
@@ -585,8 +585,8 @@ public partial class Dashboard
     }
 
     [JSInvokable]
-    public Task OnResizeEnd(string width, string minWidth) =>
-        OverlayService.UpdatePlayedListWidthAsync(width, minWidth);
+    public void OnResizeEnd(string width, string minWidth) =>
+        OverlayService.UpdatePlayedListWidth(width, minWidth);
 
     private Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchQueueAndHistory(
         string streamer,

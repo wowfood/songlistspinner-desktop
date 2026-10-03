@@ -23,8 +23,8 @@ public class OverlayStateServiceTests
     public async Task Given_HiddenWheelAndRevealedWinner_When_OverlayReconnects_Then_InitialStateReplaysBoth()
     {
         var overlay = new OverlayStateService();
-        await overlay.BroadcastWheelVisibilityAsync(false);
-        await overlay.BroadcastWinnerRevealAsync([new WinnerDialogField("Title", "Winner")], 7);
+        overlay.BroadcastWheelVisibility(false);
+        overlay.BroadcastWinnerReveal([new WinnerDialogField("Title", "Winner")], 7);
 
         using var state = await ReadInitialStateAsync(overlay);
 
@@ -40,8 +40,8 @@ public class OverlayStateServiceTests
     public async Task Given_WinnerClosed_When_OverlayReconnects_Then_InitialStateHasNoWinner()
     {
         var overlay = new OverlayStateService();
-        await overlay.BroadcastWinnerRevealAsync([new WinnerDialogField("Title", "Winner")], 7);
-        await overlay.BroadcastCloseWinnerAsync();
+        overlay.BroadcastWinnerReveal([new WinnerDialogField("Title", "Winner")], 7);
+        overlay.BroadcastCloseWinner();
 
         using var state = await ReadInitialStateAsync(overlay);
 
@@ -52,8 +52,8 @@ public class OverlayStateServiceTests
     public async Task Given_CollapsedPlayedListWithCustomWidth_When_OverlayReconnects_Then_InitialStateReplaysLayout()
     {
         var overlay = new OverlayStateService();
-        await overlay.UpdatePlayedListCollapsedAsync(true);
-        await overlay.UpdatePlayedListWidthAsync("320px", "200px");
+        overlay.UpdatePlayedListCollapsed(true);
+        overlay.UpdatePlayedListWidth("320px", "200px");
 
         using var state = await ReadInitialStateAsync(overlay);
 
@@ -70,12 +70,12 @@ public class OverlayStateServiceTests
         await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
         Assert.True(await events.MoveNextAsync());
 
-        await overlay.UpdateConfigAsync(new SpinnerConfig());
-        await overlay.UpdatePlayedListCollapsedAsync(true);
-        await overlay.UpdatePlayedListWidthAsync("320px", "200px");
-        await overlay.BroadcastWheelVisibilityAsync(false);
-        await overlay.BroadcastWinnerRevealAsync([new WinnerDialogField("Title", "Winner")], 7);
-        await overlay.BroadcastCloseWinnerAsync();
+        overlay.UpdateConfig(new SpinnerConfig());
+        overlay.UpdatePlayedListCollapsed(true);
+        overlay.UpdatePlayedListWidth("320px", "200px");
+        overlay.BroadcastWheelVisibility(false);
+        overlay.BroadcastWinnerReveal([new WinnerDialogField("Title", "Winner")], 7);
+        overlay.BroadcastCloseWinner();
 
         var received = new List<string>();
         for (var i = 0; i < 6; i++)
@@ -128,7 +128,7 @@ public class OverlayStateServiceTests
             Requests = [new SpinnerRequest { Name = "Viewer" }]
         };
 
-        await overlay.UpdateStateAsync(new SpinnerConfig(), [song], [], song, "streamer");
+        overlay.UpdateState(new SpinnerConfig(), [song], [], song, "streamer");
 
         Assert.True(await events.MoveNextAsync());
         using var update = ParseEventData(events.Current, OverlayEventNames.UpdateSongs);

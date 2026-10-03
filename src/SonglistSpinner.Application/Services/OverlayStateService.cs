@@ -63,7 +63,7 @@ public class OverlayStateService
         OnHealthChanged();
     }
 
-    public Task UpdateStateAsync(
+    public void UpdateState(
         SpinnerConfig config,
         List<SpinnerQueueItem> available,
         PlayHistoryItem[] played,
@@ -80,87 +80,86 @@ public class OverlayStateService
                 NowPlaying = nowPlaying,
                 CurrentStreamer = streamer
             };
-            return BroadcastStateAsync(_snapshot);
+            BroadcastState(_snapshot);
         }
     }
 
-    public Task UpdateConfigAsync(SpinnerConfig config)
+    public void UpdateConfig(SpinnerConfig config)
     {
         lock (_stateGate)
         {
             _snapshot = _snapshot with { Config = config };
-            return BroadcastStateAsync(_snapshot);
+            BroadcastState(_snapshot);
         }
     }
 
-    private Task BroadcastStateAsync(OverlaySnapshot snapshot)
+    private void BroadcastState(OverlaySnapshot snapshot)
     {
-        return BroadcastAsync(OverlayEventNames.UpdateSongs, CreateStatePayload(snapshot));
+        Broadcast(OverlayEventNames.UpdateSongs, CreateStatePayload(snapshot));
     }
 
-    public Task BroadcastSpinCommandAsync(
+    public void BroadcastSpinCommand(
         int winnerIndex,
         int winnerQueueId,
         int duration)
     {
-        return BroadcastAsync(OverlayEventNames.SpinCommand, new { winnerIndex, winnerQueueId, duration });
+        Broadcast(OverlayEventNames.SpinCommand, new { winnerIndex, winnerQueueId, duration });
     }
 
     // Winner and wheel visibility are recorded so a reconnecting overlay replays them in its initial state.
-    public Task BroadcastWinnerRevealAsync(
+    public void BroadcastWinnerReveal(
         IReadOnlyList<WinnerDialogField> fields,
         int? queuePosition)
     {
         lock (_stateGate)
         {
             _snapshot = _snapshot with { Winner = new WinnerSnapshot([.. fields], queuePosition) };
-            return BroadcastAsync(OverlayEventNames.WinnerReveal, _snapshot.Winner);
+            Broadcast(OverlayEventNames.WinnerReveal, _snapshot.Winner);
         }
     }
 
-    public Task BroadcastCloseWinnerAsync()
+    public void BroadcastCloseWinner()
     {
         lock (_stateGate)
         {
             _snapshot = _snapshot with { Winner = null };
-            return BroadcastAsync(OverlayEventNames.CloseWinner, new { });
+            Broadcast(OverlayEventNames.CloseWinner, new { });
         }
     }
 
-    public Task BroadcastWheelVisibilityAsync(bool visible)
+    public void BroadcastWheelVisibility(bool visible)
     {
         lock (_stateGate)
         {
             _snapshot = _snapshot with { WheelVisible = visible };
-            return BroadcastAsync(OverlayEventNames.SetWheelVisible, new { visible });
+            Broadcast(OverlayEventNames.SetWheelVisible, new { visible });
         }
     }
 
-    public Task UpdatePlayedListCollapsedAsync(bool collapsed)
+    public void UpdatePlayedListCollapsed(bool collapsed)
     {
         lock (_stateGate)
         {
             _snapshot = _snapshot with { PlayedListCollapsed = collapsed };
-            return BroadcastAsync(OverlayEventNames.SetCollapse, new { collapsed });
+            Broadcast(OverlayEventNames.SetCollapse, new { collapsed });
         }
     }
 
-    public Task UpdatePlayedListWidthAsync(string width, string minWidth)
+    public void UpdatePlayedListWidth(string width, string minWidth)
     {
         lock (_stateGate)
         {
             _snapshot = _snapshot with { PlayedListWidth = width, PlayedListMinWidth = minWidth };
-            return BroadcastAsync(OverlayEventNames.SetPlayedListWidth, new { width, minWidth });
+            Broadcast(OverlayEventNames.SetPlayedListWidth, new { width, minWidth });
         }
     }
 
-    private Task BroadcastAsync(string eventName, object payload)
+    private void Broadcast(string eventName, object payload)
     {
         var json = JsonSerializer.Serialize(payload, JsonOpts);
         var message = $"event: {eventName}\ndata: {json}\n\n";
         foreach (var (_, channel) in _clients)
             channel.Writer.TryWrite(message);
-        return Task.CompletedTask;
     }
 
     public async IAsyncEnumerable<string> SubscribeAsync([EnumeratorCancellation] CancellationToken ct = default)

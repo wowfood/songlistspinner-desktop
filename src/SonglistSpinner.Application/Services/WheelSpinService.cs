@@ -8,7 +8,7 @@ namespace SonglistSpinner.Services;
 
 /// <summary>
 /// Runs one spin of the wheel for the loaded channel, in the order the Dashboard calls it:
-/// <see cref="DrawAsync"/> fetches the queue and picks the winner, <see cref="StartAsync"/> publishes the
+/// <see cref="DrawAsync"/> fetches the queue and picks the winner, <see cref="Start"/> publishes the
 /// queue and starts the overlay's wheel, <see cref="RevealWinnerAsync"/> waits for the wheel to stop, and
 /// <see cref="Finish"/> ends the spin. Session refreshes are suspended from the draw until
 /// <see cref="Finish"/>, so a realtime update never replaces the songs on a turning wheel or under an
@@ -78,14 +78,9 @@ public sealed class WheelSpinService
     /// Publishes the drawn queue to the session and the overlay, then tells the overlay to spin to the winner.
     /// A draw with no winner publishes the empty queue so nothing shows songs that have gone.
     /// </summary>
-    public async Task StartAsync(SpinDraw draw, CancellationToken cancellationToken)
+    public void Start(SpinDraw draw)
     {
-        await _session.UpdateSnapshotAsync(
-            draw.Config,
-            draw.AvailableSongs,
-            draw.PlayedSongs,
-            draw.NowPlaying,
-            cancellationToken);
+        _session.UpdateSnapshot(draw.Config, draw.AvailableSongs, draw.PlayedSongs, draw.NowPlaying);
 
         if (draw is not { WinnerIndex: { } winnerIndex, Winner: { } winner })
         {
@@ -98,7 +93,7 @@ public sealed class WheelSpinService
             draw.Streamer,
             winner.QueueId,
             draw.AvailableSongs.Count);
-        await _overlay.BroadcastSpinCommandAsync(winnerIndex, winner.QueueId, (int)SpinDuration.TotalMilliseconds);
+        _overlay.BroadcastSpinCommand(winnerIndex, winner.QueueId, (int)SpinDuration.TotalMilliseconds);
     }
 
     /// <summary>
