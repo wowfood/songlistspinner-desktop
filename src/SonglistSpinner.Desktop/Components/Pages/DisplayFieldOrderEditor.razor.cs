@@ -1,5 +1,5 @@
-using System.Diagnostics;
 using Microsoft.AspNetCore.Components;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 
 namespace SonglistSpinner.Components.Pages;
@@ -50,13 +50,16 @@ public partial class DisplayFieldOrderEditor : IAsyncDisposable
         catch (Exception exception) when (exception is JSException or InvalidOperationException)
         {
             _dragUnavailable = true;
-            Trace.WriteLine($"Display-field drag initialization failed: {exception.Message}");
+            Logger.LogWarning(exception, "Display-field drag reordering is unavailable");
             StateHasChanged();
         }
     }
 
     [Inject]
     private IJSRuntime JS { get; set; } = default!;
+
+    [Inject]
+    private ILogger<DisplayFieldOrderEditor> Logger { get; set; } = default!;
 
     [JSInvokable]
     public Task OnFieldReordered(string fieldName, int newIndex) =>
@@ -109,7 +112,7 @@ public partial class DisplayFieldOrderEditor : IAsyncDisposable
         }
         catch (Exception exception) when (exception is JSDisconnectedException or ObjectDisposedException)
         {
-            Trace.WriteLine($"Display-field drag cleanup skipped: {exception.Message}");
+            Logger.LogDebug(exception, "Display-field drag cleanup skipped because the page has closed");
         }
         finally
         {

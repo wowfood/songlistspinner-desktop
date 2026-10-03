@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
@@ -140,29 +140,33 @@ public partial class Dashboard
         _playedRefreshCts?.Dispose();
         _wheelCts.Cancel();
         _wheelCts.Dispose();
-        try
-        {
-            await JS.InvokeVoidAsync(SpinnerInteropMethods.DisposeDashboardBindings);
-        }
-        catch (Exception ex) { _ = ex; }
+        await InvokePageCleanupAsync(SpinnerInteropMethods.DisposeDashboardBindings);
 
         _dotNetRef?.Dispose();
         _dotNetRef = null;
-        try
-        {
-            await JS.InvokeVoidAsync("document.body.classList.remove", "spinner-page");
-        }
-        catch (Exception ex) { _ = ex; }
-
-        try
-        {
-            await JS.InvokeVoidAsync(SpinnerInteropMethods.ResetBackground);
-        }
-        catch (Exception ex) { _ = ex; }
+        await InvokePageCleanupAsync("document.body.classList.remove", "spinner-page");
+        await InvokePageCleanupAsync(SpinnerInteropMethods.ResetBackground);
 
         _winnerTransitionGate.Dispose();
         _lifetimeCts.Dispose();
         GC.SuppressFinalize(this);
+    }
+
+    // Disposal also runs when the whole window closes, after the WebView and its scripts are gone.
+    private async Task InvokePageCleanupAsync(string identifier, params object?[] args)
+    {
+        try
+        {
+            await JS.InvokeVoidAsync(identifier, args);
+        }
+        catch (JSDisconnectedException)
+        {
+            // The WebView has closed, which leaves no page to clean up.
+        }
+        catch (JSException ex)
+        {
+            Logger.LogWarning(ex, "Dashboard page cleanup {Function} failed", identifier);
+        }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
@@ -174,8 +178,11 @@ public partial class Dashboard
             {
                 credential = await CredentialStore.GetCredentialAsync(_lifetimeCts.Token);
             }
-            catch
+            catch (Exception ex)
             {
+                // Windows secure storage failures have no documented exception type. Setup lets the user
+                // enter the credential again, so an unreadable one is treated as missing.
+                Logger.LogWarning(ex, "The API credential could not be read; opening Setup");
                 credential = null;
             }
 
@@ -273,6 +280,11 @@ public partial class Dashboard
             StreamerInput = name;
 
             await RebuildWheel(_wheelCts.Token);
+            Logger.LogInformation(
+                "Loaded channel {Streamer} (streamer {StreamerId}) with {AvailableSongCount} spinnable songs",
+                name,
+                streamerId,
+                _availableSongs.Count);
             SetStatus($"Loaded {_availableSongs.Count} songs. Press SPIN!");
             await StreamerSession.StartAsync(
                 streamerId,
@@ -294,6 +306,7 @@ public partial class Dashboard
                 $"Could not find or load streamer \"{name}\". Check the name and platform, then try again.";
             SetApiHealth(StreamerSessionHealth.Failed, ex.Message);
             SetStatus($"Error: {ex.Message}");
+            Logger.LogError(ex, "Loading channel {Streamer} failed", name);
         }
         finally
         {
@@ -359,6 +372,7 @@ public partial class Dashboard
                     _playedSongs,
                     _nowPlaying,
                     _lifetimeCts.Token);
+                Logger.LogInformation("Spin for {Streamer} found no songs left to spin", spinStreamer);
                 SetStatus("No songs left to spin!");
                 _spinDisabled = false;
                 SignalSpinCompleted();
@@ -373,6 +387,11 @@ public partial class Dashboard
             await InvokeAsync(StateHasChanged);
 
             var spinWinner = _availableSongs[winnerIndex];
+            Logger.LogInformation(
+                "Spin for {Streamer} picked queue entry {QueueId} from {AvailableSongCount} songs",
+                spinStreamer,
+                spinWinner.QueueId,
+                _availableSongs.Count);
             var winnerFields = SpinnerDataService.CreateWinnerDialogFields(spinWinner, _config);
             await StreamerSession.UpdateSnapshotAsync(
                 _config,
@@ -410,6 +429,7 @@ public partial class Dashboard
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Spin for {Streamer} failed", spinStreamer);
             SetStatus($"Error: {ex.Message}");
             _spinDisabled = false;
             SignalSpinCompleted();
@@ -481,10 +501,11 @@ public partial class Dashboard
             if (markedPlayed)
             {
                 SetStatus($"Now Playing was marked as played, but the dashboard refresh failed: {ex.Message}");
-                Trace.WriteLine($"[SonglistSpinner] Refresh after marking Now Playing failed: {ex}");
+                Logger.LogError(ex, "Refreshing {Streamer} after marking Now Playing as played failed", streamer);
             }
             else
             {
+                Logger.LogError(ex, "Marking Now Playing as played failed for streamer {StreamerId}", streamerId);
                 SetApiHealth(StreamerSessionHealth.Failed, ex.Message);
                 SetStatus($"StreamerSongList failed while marking Now Playing as played: {ex.Message}");
             }
@@ -522,7 +543,7 @@ public partial class Dashboard
         // Confetti is decoration: the winner reveal does not wait for it or fail with it.
         JS.InvokeVoidAsync(SpinnerInteropMethods.RunConfetti, (object)_config.WheelColors)
             .AsTask()
-            .ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Winner confetti failed: {ex}"));
+            .ObserveFaults(ex => Logger.LogWarning(ex, "Winner confetti failed"));
     }
 
     [JSInvokable]
@@ -578,6 +599,7 @@ public partial class Dashboard
         try
         {
             await action(queueId, _lifetimeCts.Token);
+            Logger.LogInformation("Completed {WinnerAction} for queue entry {QueueId}", actionDescription, queueId);
             await CompleteWinnerActionAsync(successMessage);
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
@@ -585,6 +607,7 @@ public partial class Dashboard
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Failed {WinnerAction} for queue entry {QueueId}", actionDescription, queueId);
             SetApiHealth(StreamerSessionHealth.Failed, ex.Message);
             _winnerActionError = $"StreamerSongList failed while {actionDescription}: {ex.Message}";
             SetStatus(_winnerActionError);
@@ -641,7 +664,11 @@ public partial class Dashboard
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {
-            Trace.WriteLine("[SonglistSpinner] Timed out while refreshing the winner queue position.");
+            Logger.LogWarning(
+                "Looking up the position of queue entry {QueueId} timed out after {TimeoutMilliseconds} ms; " +
+                "the winner is shown without it",
+                queueId,
+                WinnerQueuePositionLookupTimeoutMilliseconds);
             return null;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -650,7 +677,10 @@ public partial class Dashboard
         }
         catch (Exception ex)
         {
-            Trace.WriteLine($"[SonglistSpinner] Could not refresh the winner queue position: {ex}");
+            Logger.LogWarning(
+                ex,
+                "Looking up the position of queue entry {QueueId} failed; the winner is shown without it",
+                queueId);
             return null;
         }
     }
@@ -712,7 +742,6 @@ public partial class Dashboard
     {
         _status = message;
         _statusVisible = visible && !string.IsNullOrWhiteSpace(message);
-        Trace.WriteLine($"[SonglistSpinner] {message}");
     }
 
     private async Task OnStreamerKeyDown(KeyboardEventArgs e)
@@ -731,7 +760,7 @@ public partial class Dashboard
         catch (Exception ex)
         {
             SetStatus($"Post-spin refresh failed: {ex.Message}");
-            Trace.WriteLine($"[SonglistSpinner] Post-spin refresh failed: {ex}");
+            Logger.LogError(ex, "Refreshing {Streamer} after the winner action failed", _currentStreamer);
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -762,7 +791,7 @@ public partial class Dashboard
                 if (!string.IsNullOrWhiteSpace(e.Announcement))
                     SetStatus(e.Announcement);
                 StateHasChanged();
-            }).ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Applying a session update failed: {ex}"));
+            }).ObserveFaults(ex => Logger.LogError(ex, "Applying a streamer session update to the dashboard failed"));
         }
         catch (InvalidOperationException)
         {
@@ -797,7 +826,7 @@ public partial class Dashboard
             {
                 _overlayHealth = health;
                 StateHasChanged();
-            }).ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Showing overlay health failed: {ex}"));
+            }).ObserveFaults(ex => Logger.LogError(ex, "Showing the overlay health on the dashboard failed"));
         }
         catch (InvalidOperationException)
         {

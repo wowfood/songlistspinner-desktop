@@ -10,6 +10,8 @@
 @inject ApplicationUpdateService UpdateService
 @inject IJSRuntime JS
 @inject TimeProvider TimeProvider
+@inject DiagnosticFileLoggerProvider DiagnosticLog
+@inject ILogger<Settings> Logger
 @implements IDisposable
 
 <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"

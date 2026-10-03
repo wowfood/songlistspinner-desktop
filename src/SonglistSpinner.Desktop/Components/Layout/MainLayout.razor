@@ -2,6 +2,7 @@
 @inject OverlayStateService OverlayService
 @inject ApplicationUpdateService UpdateService
 @inject ISnackbar Snackbar
+@inject ILogger<MainLayout> Logger
 @implements IDisposable
 
 <nav class="ss-nav">
@@ -68,7 +69,7 @@
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Trace.WriteLine($"[SonglistSpinner] Update check failed: {ex}");
+            Logger.LogWarning(ex, "Checking for an application update failed");
         }
     }
 

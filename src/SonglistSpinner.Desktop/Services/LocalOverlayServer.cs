@@ -1,6 +1,6 @@
-using System.Diagnostics;
 using System.Net;
 using System.Text;
+using Microsoft.Extensions.Logging;
 
 namespace SonglistSpinner.Services;
 
@@ -21,11 +21,13 @@ public class LocalOverlayServer : IAsyncDisposable
 
     private readonly CancellationTokenSource _cts = new();
     private readonly OverlayStateService _overlay;
+    private readonly ILogger<LocalOverlayServer> _logger;
     private HttpListener? _listener;
 
-    public LocalOverlayServer(OverlayStateService overlay)
+    public LocalOverlayServer(OverlayStateService overlay, ILogger<LocalOverlayServer> logger)
     {
         _overlay = overlay;
+        _logger = logger;
     }
 
     public async ValueTask DisposeAsync()
@@ -37,7 +39,7 @@ public class LocalOverlayServer : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            Trace.WriteLine($"[OverlayServer] Listener close failed: {ex}");
+            _logger.LogWarning(ex, "Closing the local overlay listener failed");
         }
 
         _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
@@ -56,12 +58,13 @@ public class LocalOverlayServer : IAsyncDisposable
         {
             _listener.Start();
             _overlay.SetServerHealth(LocalOverlayServerState.Running);
+            _logger.LogInformation("Local overlay server listening on port {Port}", _overlay.Port);
             ProcessRequestsAsync(_cts.Token)
-                .ObserveFaults(ex => Trace.WriteLine($"[OverlayServer] The request loop failed: {ex}"));
+                .ObserveFaults(ex => _logger.LogError(ex, "The local overlay request loop failed"));
         }
         catch (Exception ex)
         {
-            Trace.WriteLine($"[OverlayServer] Failed to start on port {_overlay.Port}: {ex.Message}");
+            _logger.LogError(ex, "Local overlay server failed to start on port {Port}", _overlay.Port);
             _overlay.SetServerHealth(LocalOverlayServerState.Failed, ex.Message);
         }
     }
@@ -73,7 +76,10 @@ public class LocalOverlayServer : IAsyncDisposable
         {
             _listener?.Stop();
         }
-        catch (ObjectDisposedException ex) { _ = ex; }
+        catch (ObjectDisposedException)
+        {
+            // DisposeAsync already closed the listener, so there is nothing left to stop.
+        }
 
         _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
     }
@@ -104,7 +110,7 @@ public class LocalOverlayServer : IAsyncDisposable
             }
 
             Task.Run(() => HandleRequestAsync(context, ct), CancellationToken.None)
-                .ObserveFaults(ex => Trace.WriteLine($"[OverlayServer] Serving a request failed: {ex}"));
+                .ObserveFaults(ex => _logger.LogError(ex, "Serving a local overlay request failed"));
         }
 
         if (!ct.IsCancellationRequested)
@@ -157,13 +163,29 @@ public class LocalOverlayServer : IAsyncDisposable
                     break;
             }
         }
+        catch (Exception ex) when (ex is HttpListenerException or IOException or ObjectDisposedException)
+        {
+            // The browser source closed the connection mid-response, which OBS does when it reloads.
+            _logger.LogDebug(ex, "Overlay client disconnected while serving {Path}", path);
+            AbortResponse(context);
+        }
         catch
         {
-            try
-            {
-                context.Response.Abort();
-            }
-            catch (Exception ex) { _ = ex; }
+            // Release the connection, then let the request task's fault handler log the failure.
+            AbortResponse(context);
+            throw;
+        }
+    }
+
+    private static void AbortResponse(HttpListenerContext context)
+    {
+        try
+        {
+            context.Response.Abort();
+        }
+        catch (Exception ex) when (ex is HttpListenerException or ObjectDisposedException)
+        {
+            // The connection is already gone, which is all aborting it would achieve.
         }
     }
 
@@ -203,7 +225,10 @@ public class LocalOverlayServer : IAsyncDisposable
             {
                 context.Response.Close();
             }
-            catch (Exception ex) { _ = ex; }
+            catch (Exception ex) when (ex is HttpListenerException or ObjectDisposedException)
+            {
+                // The overlay disconnected first, so the stream cannot be ended cleanly and needs no ending.
+            }
         }
     }
 

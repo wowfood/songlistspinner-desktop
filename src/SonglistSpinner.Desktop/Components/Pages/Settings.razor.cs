@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.AspNetCore.Components.Forms;
 using Microsoft.AspNetCore.Components.Routing;
+using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using MudBlazor;
 using MudBlazor.Utilities;
@@ -356,7 +357,7 @@ public partial class Settings
         _previewRefreshCts?.Dispose();
         _previewRefreshCts = new CancellationTokenSource();
         PushPreviewAfterDelayAsync(_previewRefreshCts.Token)
-            .ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Settings preview refresh failed: {ex}"));
+            .ObserveFaults(ex => Logger.LogError(ex, "Refreshing the settings preview failed"));
     }
 
     private async Task PushPreviewAfterDelayAsync(CancellationToken cancellationToken)
@@ -402,7 +403,8 @@ public partial class Settings
         }
         catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
         {
-            Trace.WriteLine($"[SonglistSpinner] Settings preview is unavailable: {ex.Message}");
+            // The preview frame goes away when the user leaves the page, so a missed update is expected.
+            Logger.LogDebug(ex, "Settings preview is unavailable");
         }
     }
 
@@ -447,7 +449,7 @@ public partial class Settings
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
             RefreshSeparatorChoices();
-            DiagnosticLog.Configure(_dto.DebugMode);
+            DiagnosticLog.SetEnabled(_dto.DebugMode);
             await StreamerSession.UpdateConfigAsync(LocalSettings.ToSpinnerConfig(_dto));
 
             var submittedToken = _credentialToken.Trim();
@@ -473,6 +475,7 @@ public partial class Settings
         }
         catch (Exception ex)
         {
+            Logger.LogError(ex, "Saving settings failed");
             _vm.SaveError = ex.Message;
             return false;
         }
@@ -752,6 +755,7 @@ public partial class Settings
                 }
                 catch (Exception restoreException)
                 {
+                    Logger.LogError(restoreException, "Restoring the previous API credential failed");
                     rollbackError = $" The previous credential could not be restored: {restoreException.Message}";
                 }
             }
@@ -760,7 +764,7 @@ public partial class Settings
                                     (credentialWasChanged && rollbackError is null
                                         ? " The previous credential was restored."
                                         : rollbackError);
-            Trace.WriteLine($"[SonglistSpinner] API connection test failed: {ex}");
+            Logger.LogError(ex, "API connection test failed");
         }
         finally
         {

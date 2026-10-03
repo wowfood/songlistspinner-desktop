@@ -17,6 +17,7 @@ public static class MauiProgram
             .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
 
         builder.Services.AddSingleton<ILocalSettingsService, PreferencesSettingsService>();
+        AddDiagnosticLog(builder);
 
         builder.Services.AddMauiBlazorWebView();
         builder.Services.AddMudServices();
@@ -46,6 +47,22 @@ public static class MauiProgram
 #endif
 
         return builder.Build();
+    }
+
+    // One provider instance serves both the logging pipeline and the Settings debug-mode toggle, which
+    // switches the file on and off. App enables it from the saved settings at startup.
+    private static void AddDiagnosticLog(MauiAppBuilder builder)
+    {
+        var logDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "SonglistSpinner",
+            "logs");
+        var diagnosticLog = new DiagnosticFileLoggerProvider(logDirectory, TimeProvider.System);
+        builder.Services.AddSingleton(diagnosticLog);
+        builder.Logging.AddProvider(diagnosticLog);
+        // The file keeps the app's own debug detail but only warnings and errors from the frameworks.
+        builder.Logging.AddFilter<DiagnosticFileLoggerProvider>("SonglistSpinner", LogLevel.Debug);
+        builder.Logging.AddFilter<DiagnosticFileLoggerProvider>(null, LogLevel.Warning);
     }
 
     private static StreamerSongListApiOptions CreateStreamerSongListApiOptions()

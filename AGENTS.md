@@ -58,6 +58,11 @@ rejects a bare directory.
   `DateTime.Now`/`UtcNow` or a bare `Task.Delay`, and the injected `Random` for winner picks. Tests use
   `FakeTimeProvider` and advance it; they never wait on the wall clock. When a background task owns the
   delay, wait for its timer first (`TimerTrackingTimeProvider` in each test project), then advance.
+- Log through an injected `ILogger<T>` with message templates (never `$"..."` or `Trace`), and pass the
+  exception rather than `ex.Message`. Log transitions and failures, not UI status text. Never log
+  tokens, request URIs with their query, or whole request objects. With Settings debug mode on,
+  `DiagnosticFileLoggerProvider` writes app entries from `Debug` and framework entries from `Warning`
+  to `%LOCALAPPDATA%\SonglistSpinner\logs\songlistspinner.log`.
 - Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
   renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
   migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step.
