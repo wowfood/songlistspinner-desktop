@@ -1,6 +1,6 @@
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.StreamerSongList;
 
 namespace SonglistSpinner.Services;
 

@@ -1,4 +1,5 @@
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.PlayedSongs;
+using SonglistSpinner.Core.Settings;
 
 namespace SonglistSpinner.Services;
 

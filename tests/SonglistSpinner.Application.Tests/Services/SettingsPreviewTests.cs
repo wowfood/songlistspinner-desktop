@@ -1,4 +1,4 @@
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
 using SonglistSpinner.Services;
 using Xunit;
 

@@ -1,5 +1,5 @@
 using System.Text.Json;
-using SonglistSpinner.Core.Data;
+using SonglistSpinner.Core.Settings;
 
 namespace SonglistSpinner.Services;
 

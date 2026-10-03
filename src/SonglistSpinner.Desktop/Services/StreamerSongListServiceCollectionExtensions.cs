@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using SonglistSpinner.Core.Api.V2;
-using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.StreamerSongList;
+using SonglistSpinner.Core.StreamerSongList.Api.V2;
 
 namespace SonglistSpinner.Services;
 

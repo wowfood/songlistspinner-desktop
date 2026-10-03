@@ -1,6 +1,8 @@
 using System.Text.Json;
 using Microsoft.Extensions.Time.Testing;
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.StreamerSongList;
+using SonglistSpinner.Core.Winner;
 using SonglistSpinner.Services;
 using Xunit;
 

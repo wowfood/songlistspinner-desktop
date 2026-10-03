@@ -1,4 +1,4 @@
-using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.StreamerSongList;
 using SonglistSpinner.Services;
 using Xunit;
 

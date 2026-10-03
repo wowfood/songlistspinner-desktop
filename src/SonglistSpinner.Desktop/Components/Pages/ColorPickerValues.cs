@@ -1,5 +1,5 @@
 using MudBlazor.Utilities;
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
 
 namespace SonglistSpinner.Components.Pages;
 

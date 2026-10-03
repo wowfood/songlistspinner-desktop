@@ -6,9 +6,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using MudBlazor;
 using MudBlazor.Utilities;
-using SonglistSpinner.Core.Contracts;
-using SonglistSpinner.Core.Data;
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.StreamerSongList;
 using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;

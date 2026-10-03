@@ -8,7 +8,7 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 
 | Path | What lives there |
 | --- | --- |
-| `src/SonglistSpinner.Core` | MAUI-free domain: StreamerSongList API v2 and Centrifugo client (`Api/V2`), settings DTO and normaliser (`Data`), models, services |
+| `src/SonglistSpinner.Core` | MAUI-free domain, one folder (and namespace) per feature: `StreamerSongList` (client contract, channel, ids, queue and history models; the API v2 and Centrifugo implementation in `StreamerSongList/Api/V2`), `Settings` (persisted `SettingsDto`, its normaliser and converter, `SpinnerConfig` and defaults), `Songs` (song fields and display text), `PlayedSongs` (played-song list, played-song exclusion), `Winner` (winner dialog content, Now Playing promotion), `Updates` (GitHub release check) |
 | `src/SonglistSpinner.Application` | MAUI-free app services: `StreamerSessionService` (queue session, realtime refresh), `WheelSpinService` and `WinnerActionService` (a spin and the winner's outcome), `ApiCredentialTest` (test a credential, restore the previous one on failure), `OverlayStateService` (overlay state and SSE) |
 | `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` composing the feature registrations |
 | `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
@@ -40,7 +40,7 @@ an option and filters with MTP flags, not VSTest's `--filter`. Narrow while iter
 
 ```powershell
 dotnet test --project tests/SonglistSpinner.Core.Tests
-dotnet test --project tests/SonglistSpinner.Core.Tests --filter-class SonglistSpinner.Core.Tests.Services.NowPlayingTransitionServiceTests
+dotnet test --project tests/SonglistSpinner.Core.Tests --filter-class SonglistSpinner.Core.Tests.Winner.NowPlayingTransitionServiceTests
 ```
 
 `--filter-method` narrows to one test. Run `dotnet format SonglistSpinner.Desktop.sln` without
@@ -53,6 +53,8 @@ rejects a bare directory.
   `Directory.Build.props`, which treats warnings as errors.
 - Test methods are named `Given_X_When_Y_Then_Z`, with Arrange, Act and Assert separated by blank
   lines. A test class is `<TypeUnderTest>Tests`, in the folder that mirrors the type's `src` path.
+  Core is organised by feature, not by layer: put a new Core type in the feature folder it belongs to
+  (Application and Desktop keep their `Services` and `Components` folders).
 - Test projects need `<OutputType>Exe</OutputType>` (xunit.v3 on Microsoft.Testing.Platform).
 - Production code takes the clock and randomness as dependencies: `TimeProvider` instead of
   `DateTime.Now`/`UtcNow` or a bare `Task.Delay`, and the injected `Random` for winner picks. Tests use
@@ -65,7 +67,9 @@ rejects a bare directory.
   to `%LOCALAPPDATA%\SonglistSpinner\logs\songlistspinner.log`.
 - Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
   renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
-  migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step.
+  migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step. The
+  JSON a released version saved is embedded under `tests/SonglistSpinner.Core.Tests/Settings/Fixtures`
+  and must keep loading; add a fixture for a new release's format, never regenerate an old one.
 - Default settings live once, in `SpinnerDefaults` (Core). `SettingsDto` and the `Spinner*Config` models
   both start from it, and `SettingsDtoTests` locks the values a user with no saved settings gets.
 - JavaScript contracts are guarded by tests that read `wwwroot` from the source tree, so they need the

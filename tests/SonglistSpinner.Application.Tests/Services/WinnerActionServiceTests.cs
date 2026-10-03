@@ -1,5 +1,6 @@
-using SonglistSpinner.Core.Models;
-using SonglistSpinner.Core.Services;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.StreamerSongList;
+using SonglistSpinner.Core.Winner;
 using SonglistSpinner.Services;
 using Xunit;
 using static SonglistSpinner.Application.Tests.ScriptedStreamerSongListClient;

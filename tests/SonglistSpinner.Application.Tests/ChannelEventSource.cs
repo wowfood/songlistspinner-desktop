@@ -1,6 +1,5 @@
 using System.Threading.Channels;
-using SonglistSpinner.Core.Contracts;
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.StreamerSongList;
 
 namespace SonglistSpinner.Application.Tests;
 

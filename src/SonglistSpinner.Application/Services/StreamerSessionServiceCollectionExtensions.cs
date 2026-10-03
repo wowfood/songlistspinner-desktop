@@ -1,6 +1,6 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
-using SonglistSpinner.Core.Services;
+using SonglistSpinner.Core.Winner;
 
 namespace SonglistSpinner.Services;
 

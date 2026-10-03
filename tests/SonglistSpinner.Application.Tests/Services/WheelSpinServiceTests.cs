@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.StreamerSongList;
 using SonglistSpinner.Services;
 using Xunit;
 using static SonglistSpinner.Application.Tests.ScriptedStreamerSongListClient;

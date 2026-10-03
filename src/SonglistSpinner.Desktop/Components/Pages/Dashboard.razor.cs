@@ -2,10 +2,11 @@ using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
-using SonglistSpinner.Core.Contracts;
-using SonglistSpinner.Core.Data;
-using SonglistSpinner.Core.Models;
-using SonglistSpinner.Core.Services;
+using SonglistSpinner.Core.PlayedSongs;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.Songs;
+using SonglistSpinner.Core.StreamerSongList;
+using SonglistSpinner.Core.Winner;
 using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;

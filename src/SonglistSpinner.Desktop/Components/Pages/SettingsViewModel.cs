@@ -1,6 +1,6 @@
 using System.Text.Json;
-using SonglistSpinner.Core.Data;
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.Songs;
 
 namespace SonglistSpinner.Components.Pages;
 
