@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
 using Xunit;
@@ -7,6 +8,8 @@ namespace SonglistSpinner.Core.Tests.Data;
 
 public class SettingsDtoTests
 {
+    private static readonly JsonSerializerOptions IndentedJsonOptions = new() { WriteIndented = true };
+
     [Fact]
     public void Given_LegacySettingsWithoutNumbering_When_Deserialized_Then_UsesSafeDefaults()
     {
@@ -46,6 +49,65 @@ public class SettingsDtoTests
         Assert.True(root.GetProperty(nameof(SettingsDto.PlayedListShowLabels)).GetBoolean());
         Assert.True(root.GetProperty(nameof(SettingsDto.NowPlayingShowLabels)).GetBoolean());
         Assert.False(root.GetProperty(nameof(SettingsDto.PlayedListShowFieldHeaders)).GetBoolean());
+    }
+
+    [Fact]
+    public void Given_NoSavedSettings_When_DefaultsSerialized_Then_MatchThePreviouslyPersistedDefaults()
+    {
+        // A user with no saved settings gets these values; they must not change by accident.
+        const string expected = """
+            {
+              "WheelColors": "[\"#ff6b6b\",\"#4ecdc4\",\"#45b7d1\",\"#f9ca24\",\"#6c5ce7\",\"#a29bfe\",\"#fd79a8\",\"#fdcb6e\"]",
+              "BackgroundMode": "color",
+              "BackgroundColor": "#111111",
+              "BackgroundImage": "",
+              "DefaultStreamerName": "",
+              "StreamerPlatform": "twitch",
+              "HideChangeOptionWhenDefault": true,
+              "SongListFields": "[\"artist\",\"title\"]",
+              "PlayedListSeparator": " | ",
+              "PlayedListShowLabels": true,
+              "PlayedListShowFieldHeaders": false,
+              "ExcludePlayedSongs": false,
+              "PlayedListPosition": "right",
+              "PlayHistoryPeriod": "week",
+              "AutoPlay": false,
+              "DisplayNowPlaying": false,
+              "NowPlayingFields": "[\"artist\",\"title\"]",
+              "NowPlayingSeparator": " | ",
+              "NowPlayingShowLabels": true,
+              "NowPlayingFontFamily": "sans-serif",
+              "NowPlayingFontSize": "1.125rem",
+              "NowPlayingWidth": "28rem",
+              "NowPlayingPosition": "bottom-left",
+              "NowPlayingBackgroundOpacity": null,
+              "WinnerDialogFields": null,
+              "WinnerDialogFontFamily": "sans-serif",
+              "WinnerDialogFontSize": "1rem",
+              "WinnerDialogWidth": "36rem",
+              "WinnerDialogShowQueuePosition": true,
+              "DebugMode": false,
+              "ColorText": "#ffffff",
+              "ColorStatusBackground": "rgba(0, 0, 0, 0.7)",
+              "ColorPlayedListBackground": "rgba(0, 0, 0, 0.7)",
+              "ColorPlayedItemBackground": "#222222",
+              "ColorResizeHandleBackground": "#333333",
+              "ColorResizeHandleHoverBackground": "#555555",
+              "ColorToggleBackground": "#222222",
+              "ColorButtonBackground": "#555555",
+              "ColorButtonText": "#CCCCCC",
+              "ColorPointer": "wheat",
+              "PlayedListFontFamily": "sans-serif",
+              "PlayedListFontSize": "0.875rem",
+              "PlayedListMaxLines": 2,
+              "PlayedListShowNumbers": false,
+              "PlayedListNumberingStart": "bottom"
+            }
+            """;
+
+        var json = JsonSerializer.Serialize(new SettingsDto());
+
+        Assert.Equal(ToComparableJson(expected), ToComparableJson(json));
     }
 
     [Fact]
@@ -116,4 +178,7 @@ public class SettingsDtoTests
         Assert.Equal(SongTextFormatting.DefaultSeparator, settings.PlayedListSeparator);
         Assert.Equal(" • ", settings.NowPlayingSeparator);
     }
+
+    private static string ToComparableJson(string json) =>
+        JsonNode.Parse(json)!.ToJsonString(IndentedJsonOptions);
 }
