@@ -1,0 +1,69 @@
+# AGENTS.md
+
+Songlist Spinner is a Windows desktop app (.NET 10 MAUI Blazor Hybrid) that loads a
+StreamerSongList queue, spins a wheel to pick the next song, and serves an OBS browser-source
+overlay from a local HTTP server. User-facing documentation is in `README.md`.
+
+## Project map
+
+| Path | What lives there |
+| --- | --- |
+| `src/SonglistSpinner.Core` | MAUI-free domain: StreamerSongList API v2 and Centrifugo client (`Api/V2`), settings DTO and normaliser (`Data`), models, services |
+| `src/SonglistSpinner.Application` | MAUI-free app services: `StreamerSessionService` (queue session, realtime refresh), `OverlayStateService` (overlay state and SSE) |
+| `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` DI |
+| `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
+| `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
+| `tests/JavaScript` | `node:test` tests for the wheel scripts |
+| `scripts/` | Single-file publish, smoke test, release checks (used by CI) |
+| `docs/` | API v2 notes, release process, single-file distribution |
+
+## Prerequisites
+
+- The .NET SDK pinned by `global.json`, plus the `maui-windows` workload
+  (`dotnet workload install maui-windows`). The Desktop project builds only on Windows.
+- Node.js 24 for the JavaScript tests.
+
+## Commands
+
+Run from the repository root. CI (`.github/workflows/ci.yml`) runs the same sequence.
+
+```powershell
+dotnet restore SonglistSpinner.Desktop.sln
+dotnet format SonglistSpinner.Desktop.sln --verify-no-changes --severity warn --no-restore
+dotnet test --solution SonglistSpinner.Desktop.sln -c Release
+node --test "tests/JavaScript/**/*.test.cjs"
+dotnet build SonglistSpinner.Desktop.sln -c Release
+```
+
+`dotnet test` runs on Microsoft.Testing.Platform (set in `global.json`), so it takes the target as
+an option and filters with MTP flags, not VSTest's `--filter`. Narrow while iterating:
+
+```powershell
+dotnet test --project tests/SonglistSpinner.Core.Tests
+dotnet test --project tests/SonglistSpinner.Core.Tests --filter-class SonglistSpinner.Core.Tests.Services.NowPlayingTransitionServiceTests
+```
+
+`--filter-method` narrows to one test. Run `dotnet format SonglistSpinner.Desktop.sln` without
+`--verify-no-changes` to apply fixes. The JavaScript command needs the quoted glob; Node 24
+rejects a bare directory.
+
+## Conventions
+
+- Code style is in `.editorconfig`; shared build settings and analyzers are in
+  `Directory.Build.props`.
+- Test methods are named `Given_X_When_Y_Then_Z`, with Arrange, Act and Assert separated by blank
+  lines. A test class is `<TypeUnderTest>Tests`, in the folder that mirrors the type's `src` path.
+- Test projects need `<OutputType>Exe</OutputType>` (xunit.v3 on Microsoft.Testing.Platform).
+- Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
+  renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
+  migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step.
+- Fix defects test-first.
+
+## Branches and releases
+
+Feature branches merge into `develop`; `develop` is promoted to `main` by pull request, and only
+that promotion publishes a release. Before a release merge, bump `VersionPrefix` and
+`ApplicationVersion` in `src/SonglistSpinner.Desktop/SonglistSpinner.Desktop.csproj`. The full
+process is in `docs/RELEASING.md`.
+
+Don't commit `bin/`, `obj/`, `artifacts/`, `TestResults/`, logs, IDE state or credentials.

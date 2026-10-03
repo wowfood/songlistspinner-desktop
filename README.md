@@ -391,19 +391,8 @@ the permanent **Releases** navigation link to check manually.
 
 ## Development
 
-Source builds require:
-
-- .NET 10 SDK, selected by `global.json`
-- .NET MAUI Windows workload
-- Windows development prerequisites for MAUI
-
-From the repository root:
-
-```powershell
-dotnet restore SonglistSpinner.Desktop.sln
-dotnet test SonglistSpinner.Desktop.sln
-dotnet build SonglistSpinner.Desktop.sln -c Release
-```
+The prerequisites, the restore, format, test and build commands, the project map
+and the contribution conventions are in [AGENTS.md](AGENTS.md).
 
 Run the desktop project during development with:
 

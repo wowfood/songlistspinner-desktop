@@ -52,7 +52,7 @@ streamer:{streamerId}-queue
 streamer:{streamerId}-play_history
 ```
 
-`now_playing_update`, `queue_add`, `queue_clear`, `queue_remove`, `queue_reorder`, `queue_update`, and `play_history_add` are treated as invalidation signals. Closely spaced events are debounced into one queue-and-history REST refresh so a queue transition cannot produce competing UI updates. A successful initial connection or reconnection also triggers a complete refresh to cover changes that could have occurred while disconnected.
+The queue and play-history event types listed in `StreamerSongListEventTypes.QueueChanges` and `StreamerSongListEventTypes.PlayHistoryChanges` (`src/SonglistSpinner.Core/Api/V2/StreamerSongListProtocolValues.cs`) are treated as invalidation signals. Closely spaced events are debounced into one queue-and-history REST refresh so a queue transition cannot produce competing UI updates. A successful initial connection or reconnection also triggers a complete refresh to cover changes that could have occurred while disconnected.
 
 ## Now Playing workflow
 
