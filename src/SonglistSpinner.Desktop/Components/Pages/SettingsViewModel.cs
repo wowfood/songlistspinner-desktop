@@ -6,16 +6,20 @@ namespace SonglistSpinner.Components.Pages;
 
 public sealed class SettingsViewModel
 {
+    // The pointer colour picker needs hex; an unrecognised saved value falls back to the default pointer.
+    private static readonly string DefaultPointerHex =
+        CssNamedColors.ToHex(SpinnerDefaults.Colors.Pointer, PanelBackgroundColor.DefaultHex);
+
     public string WheelColorsRaw { get; set; } = "";
     public bool SaveSuccess { get; set; }
     public string? SaveError { get; set; }
     public List<DisplayField> DisplayFields { get; private set; } = new();
     public List<DisplayField> NowPlayingDisplayFields { get; private set; } = new();
     public List<DisplayField> WinnerDialogDisplayFields { get; private set; } = new();
-    public string PlayedListBgHex { get; set; } = "#000000";
-    public double PlayedListBgAlpha { get; set; } = 0.7;
+    public string PlayedListBgHex { get; set; } = PanelBackgroundColor.DefaultHex;
+    public double PlayedListBgAlpha { get; set; } = PanelBackgroundColor.DefaultOpacity;
     public bool UseIndependentNowPlayingBgAlpha { get; set; }
-    public double NowPlayingBgAlpha { get; set; } = 0.7;
+    public double NowPlayingBgAlpha { get; set; } = PanelBackgroundColor.DefaultOpacity;
 
     public void Initialize(SettingsDto dto)
     {
@@ -27,7 +31,7 @@ public sealed class SettingsViewModel
         }
         catch
         {
-            WheelColorsRaw = "#ff6b6b\n#4ecdc4\n#45b7d1\n#f9ca24\n#6c5ce7\n#a29bfe\n#fd79a8\n#fdcb6e";
+            WheelColorsRaw = string.Join("\n", SpinnerDefaults.CreateWheelColors());
         }
 
         InitDisplayFields(dto.SongListFields);
@@ -37,7 +41,7 @@ public sealed class SettingsViewModel
         UseIndependentNowPlayingBgAlpha = dto.NowPlayingBackgroundOpacity.HasValue;
         NowPlayingBgAlpha = PanelBackgroundColor.ClampOpacity(
             dto.NowPlayingBackgroundOpacity ?? PlayedListBgAlpha);
-        dto.ColorPointer = NormalizeHexColor(dto.ColorPointer);
+        dto.ColorPointer = CssNamedColors.ToHex(dto.ColorPointer, DefaultPointerHex);
     }
 
     public void InitDisplayFields(string json)
@@ -145,25 +149,6 @@ public sealed class SettingsViewModel
     {
         var opacity = UseIndependentNowPlayingBgAlpha ? NowPlayingBgAlpha : PlayedListBgAlpha;
         return new PanelBackgroundColor(PlayedListBgHex, opacity).ToCss();
-    }
-
-    public static string NormalizeHexColor(string color)
-    {
-        return color.ToLowerInvariant() switch
-        {
-            "wheat" => "#f5deb3",
-            "white" => "#ffffff",
-            "black" => "#000000",
-            "red" => "#ff0000",
-            "green" => "#008000",
-            "blue" => "#0000ff",
-            "yellow" => "#ffff00",
-            "orange" => "#ffa500",
-            "purple" => "#800080",
-            "pink" => "#ffc0cb",
-            "gray" or "grey" => "#808080",
-            _ => color.StartsWith('#') ? color : "#f5deb3"
-        };
     }
 
     public void ApplyToDto(SettingsDto dto)

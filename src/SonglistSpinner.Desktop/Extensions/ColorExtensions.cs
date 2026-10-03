@@ -1,19 +1,22 @@
 using MudBlazor.Utilities;
+using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Extensions;
 
 public static class ColorExtensions
 {
+    private const string FallbackHex = "#000000";
+
     public static MudColor ToMudColor(this string? color)
     {
-        if (string.IsNullOrWhiteSpace(color)) return new MudColor("#000000");
+        if (string.IsNullOrWhiteSpace(color)) return new MudColor(FallbackHex);
         try
         {
-            return new MudColor(NormalizeHex(color));
+            return new MudColor(CssNamedColors.ToHex(color, FallbackHex));
         }
         catch
         {
-            return new MudColor("#000000");
+            return new MudColor(FallbackHex);
         }
     }
 
@@ -26,24 +29,5 @@ public static class ColorExtensions
     public static string ToHexString(this MudColor color)
     {
         return $"#{color.R:X2}{color.G:X2}{color.B:X2}";
-    }
-
-    private static string NormalizeHex(string color)
-    {
-        return color.ToLowerInvariant() switch
-        {
-            "wheat" => "#f5deb3",
-            "white" => "#ffffff",
-            "black" => "#000000",
-            "red" => "#ff0000",
-            "green" => "#008000",
-            "blue" => "#0000ff",
-            "yellow" => "#ffff00",
-            "orange" => "#ffa500",
-            "purple" => "#800080",
-            "pink" => "#ffc0cb",
-            "gray" or "grey" => "#808080",
-            _ => color.StartsWith('#') ? color : "#000000"
-        };
     }
 }

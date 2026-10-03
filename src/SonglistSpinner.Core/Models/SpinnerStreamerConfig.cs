@@ -4,5 +4,5 @@ public class SpinnerStreamerConfig
 {
     public string DefaultName { get; set; } = "";
     public string Platform { get; set; } = StreamerSongListPlatformNames.Default;
-    public bool HideChangeOptionWhenDefault { get; set; } = true;
+    public bool HideChangeOptionWhenDefault { get; set; } = SpinnerDefaults.Streamer.HideChangeOptionWhenDefault;
 }
