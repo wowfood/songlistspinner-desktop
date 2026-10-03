@@ -1,9 +1,9 @@
-using System.Threading.Channels;
 using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Services;
 using Xunit;
+using static SonglistSpinner.Application.Tests.ScriptedSpinnerApi;
 
 namespace SonglistSpinner.Application.Tests.Services;
 
@@ -18,8 +18,8 @@ public class StreamerSessionServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new TimerTrackingTimeProvider();
         var api = new ScriptedSpinnerApi();
-        api.QueueResponses.Enqueue(() => throw new IOException("Simulated transient API failure"));
-        api.QueueResponses.Enqueue(() => Task.FromResult(QueueWith(41)));
+        api.QueueResponses.Enqueue(_ => throw new IOException("Simulated transient API failure"));
+        api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41)));
         var events = new ChannelEventSource();
         await using var session = new StreamerSessionService(api, events, new OverlayStateService(), time);
         var recovered = WaitForRecoveryAfterFailure(session);
@@ -42,7 +42,7 @@ public class StreamerSessionServiceTests
         var time = new TimerTrackingTimeProvider();
         var api = new ScriptedSpinnerApi();
         for (var i = 0; i < 6; i++)
-            api.QueueResponses.Enqueue(() => throw new IOException("Simulated transient API failure"));
+            api.QueueResponses.Enqueue(_ => throw new IOException("Simulated transient API failure"));
         var events = new ChannelEventSource();
         await using var session = new StreamerSessionService(api, events, new OverlayStateService(), time);
         var recovered = WaitForRecoveryAfterFailure(session);
@@ -105,7 +105,7 @@ public class StreamerSessionServiceTests
         var api = new ScriptedSpinnerApi();
         var pendingQueue = new TaskCompletionSource<SpinnerQueueSnapshot>(
             TaskCreationOptions.RunContinuationsAsynchronously);
-        api.QueueResponses.Enqueue(() => pendingQueue.Task);
+        api.QueueResponses.Enqueue(_ => pendingQueue.Task);
         var overlay = new OverlayStateService();
         await using var session = new StreamerSessionService(api, new ChannelEventSource(), overlay);
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
@@ -164,80 +164,5 @@ public class StreamerSessionServiceTests
                 recovered.TrySetResult(e.Snapshot);
         };
         return recovered.Task;
-    }
-
-    private static SpinnerQueueItem Song(int queueId) => new() { QueueId = queueId };
-
-    private static SpinnerQueueSnapshot QueueWith(params int[] queueIds) =>
-        new() { Items = [.. queueIds.Select(Song)] };
-
-    private sealed class ScriptedSpinnerApi : ISpinnerApiService
-    {
-        private int _queueFetches;
-
-        /// <summary>Responses for successive queue fetches; an empty queue is returned once these run out.</summary>
-        public Queue<Func<Task<SpinnerQueueSnapshot>>> QueueResponses { get; } = new();
-
-        public TaskCompletionSource QueueFetchStarted { get; } =
-            new(TaskCreationOptions.RunContinuationsAsynchronously);
-
-        public int QueueFetches => Volatile.Read(ref _queueFetches);
-
-        public Task<SpinnerQueueSnapshot> FetchQueueSnapshotAsync(
-            StreamerSongListChannel channel,
-            CancellationToken cancellationToken = default)
-        {
-            Interlocked.Increment(ref _queueFetches);
-            QueueFetchStarted.TrySetResult();
-            Func<Task<SpinnerQueueSnapshot>> respond;
-            lock (QueueResponses)
-            {
-                if (!QueueResponses.TryDequeue(out respond!))
-                    return Task.FromResult(new SpinnerQueueSnapshot());
-            }
-
-            return respond();
-        }
-
-        public Task<PlayHistoryItem[]> FetchPlayHistoryAsync(
-            StreamerSongListChannel channel,
-            string period = "week",
-            CancellationToken cancellationToken = default) => Task.FromResult(Array.Empty<PlayHistoryItem>());
-
-        public Task<StreamerSongListStreamer> ResolveStreamerAsync(
-            StreamerSongListChannel channel,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<int> ResolveStreamerIdAsync(
-            StreamerSongListChannel channel,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<SpinnerQueueItem[]> FetchQueueAsync(
-            StreamerSongListChannel channel,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task MarkQueueItemAsPlayedAsync(
-            int queueId,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task MarkNowPlayingAsPlayedAsync(
-            int streamerId,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task PromoteQueueItemToNowPlayingAsync(
-            int queueId,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-    }
-
-    private sealed class ChannelEventSource : IStreamerSongListEventSource
-    {
-        private readonly Channel<StreamerSongListEvent> _events = Channel.CreateUnbounded<StreamerSongListEvent>();
-
-        public void Publish(StreamerSongListEventKind kind) =>
-            _events.Writer.TryWrite(new StreamerSongListEvent(kind));
-
-        public IAsyncEnumerable<StreamerSongListEvent> SubscribeAsync(
-            int streamerId,
-            CancellationToken cancellationToken = default) => _events.Reader.ReadAllAsync(cancellationToken);
     }
 }

@@ -172,7 +172,7 @@ public class OverlayStateServiceTests
         return ParseEventData(events.Current, OverlayEventNames.InitialState);
     }
 
-    private static JsonDocument ParseEventData(string message, string eventName)
+    internal static JsonDocument ParseEventData(string message, string eventName)
     {
         const string dataPrefix = "\ndata: ";
         Assert.StartsWith("event: " + eventName + dataPrefix, message);
