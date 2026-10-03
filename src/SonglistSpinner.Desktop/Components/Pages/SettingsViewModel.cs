@@ -23,7 +23,7 @@ public sealed class SettingsViewModel
 
     public void Initialize(SettingsDto dto)
     {
-        SettingsDtoNormalizer.Normalize(dto);
+        SettingsDtoNormalizer.NormalizeInPlace(dto);
 
         try
         {

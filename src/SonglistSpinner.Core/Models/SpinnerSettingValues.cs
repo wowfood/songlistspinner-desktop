@@ -6,6 +6,10 @@ public static class SpinnerSettingValues
     {
         public const string Color = "color";
         public const string Transparent = "transparent";
+        /// <summary>
+        /// A misspelling of <see cref="Transparent"/> that older releases saved. It is still read, and normalised
+        /// to <see cref="Transparent"/>, so those settings keep a transparent background. Never write it.
+        /// </summary>
         public const string LegacyTransparent = "transparant";
         public const string Default = Color;
 

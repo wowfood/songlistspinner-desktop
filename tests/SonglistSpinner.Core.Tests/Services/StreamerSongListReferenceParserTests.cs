@@ -24,6 +24,7 @@ public class StreamerSongListReferenceParserTests
             out var error);
 
         Assert.True(parsed, error);
+        Assert.NotNull(channel);
         Assert.Equal(expectedName, channel.Name);
         Assert.Equal(expectedPlatform, channel.Platform);
     }

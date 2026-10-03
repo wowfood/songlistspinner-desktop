@@ -8,7 +8,7 @@ public static class SettingsDtoConverter
     // Normalizes the settings in place first, so the caller's SettingsDto holds canonical values afterwards.
     public static SpinnerConfig ToSpinnerConfig(SettingsDto settings)
     {
-        SettingsDtoNormalizer.Normalize(settings);
+        SettingsDtoNormalizer.NormalizeInPlace(settings);
 
         var fields = SettingsDtoNormalizer.ParseFields(settings.SongListFields);
         var nowPlayingFields = SettingsDtoNormalizer.ParseFields(settings.NowPlayingFields);

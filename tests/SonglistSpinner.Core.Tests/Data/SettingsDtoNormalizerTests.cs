@@ -19,7 +19,7 @@ public class SettingsDtoNormalizerTests
             PlayedListNumberingStart = "unknown"
         };
 
-        SettingsDtoNormalizer.Normalize(settings);
+        SettingsDtoNormalizer.NormalizeInPlace(settings);
 
         Assert.Equal("color", settings.BackgroundMode);
         Assert.Equal("twitch", settings.StreamerPlatform);
@@ -41,7 +41,7 @@ public class SettingsDtoNormalizerTests
             WinnerDialogFields = """["REQUESTER","unknown","Title","requester"]"""
         };
 
-        SettingsDtoNormalizer.Normalize(settings);
+        SettingsDtoNormalizer.NormalizeInPlace(settings);
 
         Assert.Equal("transparent", settings.BackgroundMode);
         Assert.Equal("youtube", settings.StreamerPlatform);
@@ -55,7 +55,7 @@ public class SettingsDtoNormalizerTests
     {
         var settings = new SettingsDto { WinnerDialogFields = null };
 
-        SettingsDtoNormalizer.Normalize(settings);
+        SettingsDtoNormalizer.NormalizeInPlace(settings);
 
         Assert.Null(settings.WinnerDialogFields);
     }
@@ -69,7 +69,7 @@ public class SettingsDtoNormalizerTests
             NowPlayingSeparator = " • "
         };
 
-        SettingsDtoNormalizer.Normalize(settings);
+        SettingsDtoNormalizer.NormalizeInPlace(settings);
 
         Assert.Equal(SongTextFormatting.DefaultSeparator, settings.PlayedListSeparator);
         Assert.Equal(" • ", settings.NowPlayingSeparator);

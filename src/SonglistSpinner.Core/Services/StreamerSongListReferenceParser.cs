@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Core.Services;
@@ -21,10 +22,10 @@ public static class StreamerSongListReferenceParser
     public static bool TryParse(
         string? value,
         string fallbackPlatform,
-        out StreamerSongListChannel channel,
+        [NotNullWhen(true)] out StreamerSongListChannel? channel,
         out string? error)
     {
-        channel = new StreamerSongListChannel("");
+        channel = null;
         error = null;
 
         var input = value?.Trim() ?? "";

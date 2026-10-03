@@ -2,12 +2,12 @@ namespace SonglistSpinner.Core.Models;
 
 public class SpinnerPlayedListConfig
 {
-    public string FontFamily { get; set; } = SpinnerDefaults.FontFamily;
-    public string FontSize { get; set; } = SpinnerDefaults.PlayedList.FontSize;
-    public int MaxLines { get; set; } = SpinnerDefaults.PlayedList.MaxLines;
-    public bool ShowNumbers { get; set; }
-    public string NumberingStart { get; set; } = SpinnerSettingValues.PlayedListNumberingStarts.Default;
-    public string Separator { get; set; } = SongTextFormatting.DefaultSeparator;
-    public bool ShowLabels { get; set; } = SpinnerDefaults.PlayedList.ShowLabels;
-    public bool ShowFieldHeaders { get; set; }
+    public string FontFamily { get; init; } = SpinnerDefaults.FontFamily;
+    public string FontSize { get; init; } = SpinnerDefaults.PlayedList.FontSize;
+    public int MaxLines { get; init; } = SpinnerDefaults.PlayedList.MaxLines;
+    public bool ShowNumbers { get; init; }
+    public string NumberingStart { get; init; } = SpinnerSettingValues.PlayedListNumberingStarts.Default;
+    public string Separator { get; init; } = SongTextFormatting.DefaultSeparator;
+    public bool ShowLabels { get; init; } = SpinnerDefaults.PlayedList.ShowLabels;
+    public bool ShowFieldHeaders { get; init; }
 }

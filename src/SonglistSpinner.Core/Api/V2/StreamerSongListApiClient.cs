@@ -200,8 +200,6 @@ public sealed class StreamerSongListApiClient : IStreamerSongListClient
     private static string BuildChannelQuery(StreamerSongListChannel channel)
     {
         var name = channel.Name.Trim();
-        if (string.IsNullOrWhiteSpace(name))
-            throw new ArgumentException("A streamer name is required.", nameof(channel));
         if (!StreamerSongListPlatformNames.TryNormalize(channel.Platform, out var platform))
             throw new ArgumentException($"Unsupported StreamerSongList platform '{channel.Platform}'.", nameof(channel));
 

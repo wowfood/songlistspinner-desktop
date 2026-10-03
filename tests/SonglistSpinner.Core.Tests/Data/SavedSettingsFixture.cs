@@ -24,9 +24,9 @@ internal static class SavedSettingsFixture
     }
 
     public static SettingsDto Load(string fixtureName) =>
-        SettingsDtoNormalizer.Normalize(
+        SettingsDtoNormalizer.NormalizeInPlace(
             JsonSerializer.Deserialize<SettingsDto>(ReadJson(fixtureName), PreferencesJsonOptions)!);
 
     public static string Save(SettingsDto settings) =>
-        JsonSerializer.Serialize(SettingsDtoNormalizer.Normalize(settings), PreferencesJsonOptions);
+        JsonSerializer.Serialize(SettingsDtoNormalizer.NormalizeInPlace(settings), PreferencesJsonOptions);
 }

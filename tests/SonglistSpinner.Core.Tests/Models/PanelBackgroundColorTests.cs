@@ -23,6 +23,30 @@ public class PanelBackgroundColorTests
         Assert.Equal(1.0, color.Opacity);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("black")]
+    [InlineData("#12345")]
+    [InlineData("rgba(0,0,0,1)")]
+    public void Given_ValueThatIsNotAHexColour_When_Constructed_Then_RejectsIt(string hex)
+    {
+        var exception = Assert.Throws<ArgumentException>(() => new PanelBackgroundColor(hex, 1.0));
+
+        Assert.Equal("hex", exception.ParamName);
+    }
+
+    [Theory]
+    [InlineData(-0.5, 0.0)]
+    [InlineData(1.5, 1.0)]
+    [InlineData(double.NaN, PanelBackgroundColor.DefaultOpacity)]
+    public void Given_OpacityOutsideZeroToOne_When_Constructed_Then_ClampsIt(double opacity, double expected)
+    {
+        var color = new PanelBackgroundColor("#abcdef", opacity);
+
+        Assert.Equal("#ABCDEF", color.Hex);
+        Assert.Equal(expected, color.Opacity);
+    }
+
     [Fact]
     public void Given_NoOverride_When_Resolved_Then_PreservesInheritedBackground()
     {

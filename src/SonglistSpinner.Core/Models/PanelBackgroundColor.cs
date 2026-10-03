@@ -2,10 +2,27 @@ using System.Globalization;
 
 namespace SonglistSpinner.Core.Models;
 
-public readonly record struct PanelBackgroundColor(string Hex, double Opacity)
+/// <summary>A panel background: an opaque colour plus the opacity the panel is drawn with.</summary>
+public readonly record struct PanelBackgroundColor
 {
     public const string DefaultHex = "#000000";
     public const double DefaultOpacity = 0.7;
+
+    /// <param name="hex">A <c>#RRGGBB</c> colour, in either case; it is stored in upper case.</param>
+    /// <param name="opacity">Clamped to 0..1; <see cref="double.NaN"/> becomes <see cref="DefaultOpacity"/>.</param>
+    /// <exception cref="ArgumentException"><paramref name="hex"/> is not a <c>#RRGGBB</c> colour.</exception>
+    public PanelBackgroundColor(string hex, double opacity)
+    {
+        if (!TryParseHex(hex, out var canonicalHex, out _, out _, out _))
+            throw new ArgumentException($"'{hex}' is not a #RRGGBB colour.", nameof(hex));
+
+        Hex = canonicalHex;
+        Opacity = ClampOpacity(opacity);
+    }
+
+    public string Hex { get; }
+
+    public double Opacity { get; }
 
     public static PanelBackgroundColor Parse(string? value)
     {
@@ -23,12 +40,13 @@ public readonly record struct PanelBackgroundColor(string Hex, double Opacity)
 
     public PanelBackgroundColor WithOpacity(double opacity)
     {
-        return this with { Opacity = ClampOpacity(opacity) };
+        return new PanelBackgroundColor(Hex ?? DefaultHex, opacity);
     }
 
     public string ToCss()
     {
-        if (!TryParseHex(Hex, out _, out var red, out var green, out var blue)) return Hex;
+        // Only default(PanelBackgroundColor) has no Hex; the constructor guarantees a parsable one otherwise.
+        _ = TryParseHex(Hex ?? DefaultHex, out _, out var red, out var green, out var blue);
         var opacity = ClampOpacity(Opacity).ToString("F2", CultureInfo.InvariantCulture);
         return $"rgba({red},{green},{blue},{opacity})";
     }

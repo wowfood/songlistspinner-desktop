@@ -18,7 +18,7 @@ public sealed class PreferencesSettingsService(IPreferences preferences)
         if (string.IsNullOrEmpty(json)) return new SettingsDto();
         try
         {
-            return SettingsDtoNormalizer.Normalize(
+            return SettingsDtoNormalizer.NormalizeInPlace(
                 JsonSerializer.Deserialize<SettingsDto>(json, JsonOpts) ?? new SettingsDto());
         }
         catch
@@ -29,6 +29,6 @@ public sealed class PreferencesSettingsService(IPreferences preferences)
 
     public void SaveSettings(SettingsDto dto)
     {
-        preferences.Set(SettingsKey, JsonSerializer.Serialize(SettingsDtoNormalizer.Normalize(dto), JsonOpts));
+        preferences.Set(SettingsKey, JsonSerializer.Serialize(SettingsDtoNormalizer.NormalizeInPlace(dto), JsonOpts));
     }
 }

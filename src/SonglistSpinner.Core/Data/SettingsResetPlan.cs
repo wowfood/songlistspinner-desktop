@@ -1,18 +1,5 @@
 namespace SonglistSpinner.Core.Data;
 
-public enum SettingsResetScope
-{
-    All,
-    PlayedSongsPanel,
-    NowPlayingPanel,
-    WinnerDialog,
-    Background,
-    WheelPalette,
-    OverlayColors
-}
-
-public sealed record SettingsResetField(string PropertyName, string Section, string Label);
-
 public static class SettingsResetPlan
 {
     private const string ConnectionSection = "Connection";
