@@ -18,7 +18,32 @@ internal static class DevToolsPort
             File.Delete(file);
     }
 
-    public static async Task<int> WaitAsync(Process app, string profileDirectory, CancellationToken cancellationToken)
+    /// <exception cref="TimeoutException">
+    /// The port was not written within <paramref name="limit"/>; the usual cause is that the app started its
+    /// browser without the test arguments (it then logs "The WebView2 test environment was not ready").
+    /// </exception>
+    public static async Task<int> WaitAsync(
+        Process app,
+        string profileDirectory,
+        TimeSpan limit,
+        CancellationToken cancellationToken)
+    {
+        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        bounded.CancelAfter(limit);
+        try
+        {
+            return await WaitAsync(app, profileDirectory, bounded.Token);
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"The app's WebView did not open its DevTools port within {limit.TotalSeconds} s. It may have " +
+                "started without --remote-debugging-port; the app logs \"The WebView2 test environment was not " +
+                "ready\" when it does.", ex);
+        }
+    }
+
+    private static async Task<int> WaitAsync(Process app, string profileDirectory, CancellationToken cancellationToken)
     {
         using var changed = new SemaphoreSlim(0);
         using var watcher = new FileSystemWatcher(profileDirectory, FileName);

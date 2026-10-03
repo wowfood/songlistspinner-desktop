@@ -145,14 +145,16 @@ public class StreamerSongListApiClientTests
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var simulator = await StreamerSongListSimulator.StartAsync(cancellationToken: cancellationToken);
         simulator.AddChannel("wowfood");
-        var hold = simulator.HoldNextRequest(HttpMethod.Get, "/queue");
-        // The response is held until the test ends, so the timeout always expires first.
+        // The response is held until the test ends, so the timeout always expires first. The test does not wait
+        // for the request to arrive: on a cold first connection the 200 ms can expire before it does, and that is
+        // the same HttpClient timeout.
+        simulator.HoldNextRequest(HttpMethod.Get, "/queue");
         using var http = new HttpClient { Timeout = TimeSpan.FromMilliseconds(200) };
         var client = CreateApiClient(simulator, http, new FakeTimeProvider(Now));
 
         var fetch = client.FetchQueueSnapshotAsync(new StreamerSongListChannel("wowfood"), cancellationToken);
 
-        await hold.Arrived.WaitAsync(WaitLimit, cancellationToken);
-        await Assert.ThrowsAsync<TaskCanceledException>(() => fetch.WaitAsync(WaitLimit, cancellationToken));
+        var exception = await Assert.ThrowsAsync<TaskCanceledException>(() => fetch.WaitAsync(WaitLimit, cancellationToken));
+        Assert.IsType<TimeoutException>(exception.InnerException);
     }
 }

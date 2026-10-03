@@ -157,6 +157,10 @@ public class LocalOverlayServerTests
         new(new SocketsHttpHandler { AllowAutoRedirect = false }) { Timeout = WaitLimit };
 
     /// <summary>A port nothing is listening on now; the server binds it straight after.</summary>
+    /// <remarks>
+    /// HttpListener cannot bind port 0, so the port is probed and released first. Another process can take it in
+    /// between; that window is accepted as a low-probability setup failure (StartServer reports it), not retried.
+    /// </remarks>
     private static int FreeLoopbackPort()
     {
         using var probe = new TcpListener(IPAddress.Loopback, 0);

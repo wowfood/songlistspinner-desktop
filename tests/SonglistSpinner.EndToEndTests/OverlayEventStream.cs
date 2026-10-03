@@ -57,39 +57,44 @@ internal sealed class OverlayEventStream : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         await _stop.CancelAsync();
-        try
-        {
-            await _reading;
-        }
-        catch (Exception ex) when (ex is OperationCanceledException or IOException or HttpRequestException)
-        {
-            // Stopping the read ends the stream.
-        }
-
+        await _reading;
         _response.Dispose();
         _http.Dispose();
         _stop.Dispose();
     }
 
+    /// <summary>
+    /// Never throws: a failure (a reset stream, an event that is not JSON) completes the channel with it, so a
+    /// test waiting in <see cref="NextAsync(string, Func{JsonElement, bool}, CancellationToken)"/> fails at once
+    /// with the cause as the inner exception instead of waiting out its timeout.
+    /// </summary>
     private async Task ReadAsync(Stream stream, CancellationToken cancellationToken)
     {
-        using var reader = new StreamReader(stream);
-        string? name = null;
-        while (await reader.ReadLineAsync(cancellationToken) is { } line)
+        Exception? failure = null;
+        try
         {
-            if (line.StartsWith("event: ", StringComparison.Ordinal))
+            using var reader = new StreamReader(stream);
+            string? name = null;
+            while (await reader.ReadLineAsync(cancellationToken) is { } line)
             {
-                name = line["event: ".Length..];
-            }
-            else if (line.StartsWith("data: ", StringComparison.Ordinal) && name is not null)
-            {
-                using var data = JsonDocument.Parse(line["data: ".Length..]);
-                await _events.Writer.WriteAsync(new OverlayEvent(name, data.RootElement.Clone()), cancellationToken);
-                name = null;
+                if (line.StartsWith("event: ", StringComparison.Ordinal))
+                {
+                    name = line["event: ".Length..];
+                }
+                else if (line.StartsWith("data: ", StringComparison.Ordinal) && name is not null)
+                {
+                    using var data = JsonDocument.Parse(line["data: ".Length..]);
+                    await _events.Writer.WriteAsync(new OverlayEvent(name, data.RootElement.Clone()), cancellationToken);
+                    name = null;
+                }
             }
         }
+        catch (Exception ex)
+        {
+            failure = ex;
+        }
 
-        _events.Writer.TryComplete();
+        _events.Writer.TryComplete(failure);
     }
 
     private sealed record OverlayEvent(string Name, JsonElement Data);

@@ -41,6 +41,12 @@ Console.WriteLine($"""
       $env:SONGLISTSPINNER_SSL_EVENTS_URL = "{simulator.EventsEndpoint}"
       $env:SONGLISTSPINNER_SSL_ACCESS_TOKEN = "{token}"
       $env:SONGLISTSPINNER_SSL_TOKEN_TYPE = "streamer"
+    and keep your own settings, saved token and overlay port out of it with a test profile:
+      $env:SONGLISTSPINNER_PROFILE_DIR = "$env:TEMP\songlistspinner-sim"
+      $env:SONGLISTSPINNER_OVERLAY_PORT = "5151"
+      $env:SONGLISTSPINNER_UPDATE_RELEASE_URL = "{simulator.ApiBaseAddress}_simulator/no-releases"
+    Without the profile, a token saved in Settings is sent instead (and rejected), and Settings saves into
+    your real profile.
     {(seed == "demo" ? $"Seeded channel: '{DemoSeed.ChannelName}' on twitch (streamer {DemoSeed.StreamerId})." : "No channels seeded.")}
     Add a request:  POST {simulator.ApiBaseAddress}_simulator/requests?streamer_id=<id>&artist=<a>&title=<t>&requester=<r>
     Drop events:    POST {simulator.ApiBaseAddress}_simulator/events/drop

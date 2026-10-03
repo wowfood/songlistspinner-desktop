@@ -18,6 +18,10 @@ internal sealed class DesktopApp : IAsyncDisposable
 
     private const string WebView2ArgumentsVariable = "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS";
     private const string AppWebViewArgumentsVariable = "SONGLISTSPINNER_WEBVIEW_ARGS";
+    private const string AppUrl = "https://0.0.0.1/";
+
+    /// <summary>How long each launch step (the DevTools port, the app page) may take before the launch fails.</summary>
+    private static readonly TimeSpan LaunchLimit = TimeSpan.FromSeconds(60);
 
     private readonly Process _process;
     private readonly IPlaywright _playwright;
@@ -54,14 +58,12 @@ internal sealed class DesktopApp : IAsyncDisposable
         var process = Process.Start(startInfo) ?? throw new InvalidOperationException("The app did not start.");
         try
         {
-            var devToolsPort = await DevToolsPort.WaitAsync(process, profile.Directory, cancellationToken);
+            var devToolsPort = await DevToolsPort.WaitAsync(process, profile.Directory, LaunchLimit, cancellationToken);
             var playwright = await Playwright.CreateAsync();
             try
             {
                 var browser = await playwright.Chromium.ConnectOverCDPAsync($"http://127.0.0.1:{devToolsPort}");
-                var context = browser.Contexts[0];
-                var page = context.Pages.FirstOrDefault(IsAppPage) ??
-                           await context.WaitForPageAsync(new BrowserContextWaitForPageOptions { Predicate = IsAppPage });
+                var page = await WaitForAppPageAsync(browser.Contexts[0]);
                 return new DesktopApp(process, playwright, browser, page, overlayPort);
             }
             catch
@@ -133,7 +135,30 @@ internal sealed class DesktopApp : IAsyncDisposable
         }
     }
 
-    private static bool IsAppPage(IPage page) => page.Url.StartsWith("https://0.0.0.1/", StringComparison.Ordinal);
+    /// <summary>
+    /// The WebView's one page, once it shows the app. WebView2 opens that page at about:blank and Blazor navigates
+    /// it to the app afterwards, so the page can already exist, at the wrong URL, when the DevTools connection
+    /// opens: wait for its navigation, not for a new page.
+    /// </summary>
+    private static async Task<IPage> WaitForAppPageAsync(IBrowserContext context)
+    {
+        var page = context.Pages.Count > 0
+            ? context.Pages[0]
+            : await context.WaitForPageAsync(new BrowserContextWaitForPageOptions { Timeout = (float)LaunchLimit.TotalMilliseconds });
+        try
+        {
+            await page.WaitForURLAsync(IsAppUrl, new PageWaitForURLOptions { Timeout = (float)LaunchLimit.TotalMilliseconds });
+        }
+        catch (TimeoutException ex)
+        {
+            throw new TimeoutException(
+                $"The WebView did not navigate to {AppUrl} within {LaunchLimit.TotalSeconds} s; it is at {page.Url}.", ex);
+        }
+
+        return page;
+    }
+
+    private static bool IsAppUrl(string url) => url.StartsWith(AppUrl, StringComparison.Ordinal);
 
     private static int FindFreePort()
     {
