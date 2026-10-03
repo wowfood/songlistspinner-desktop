@@ -170,3 +170,34 @@ test('Overlay: Now Playing uses the configured position, width and font', () => 
     assert.equal(elements.get('nowPlayingText').style.fontFamily, 'serif');
     assert.equal(elements.get('nowPlayingText').style.fontSize, '2rem');
 });
+
+test('Overlay: a hidden wheel on connect stays hidden', () => {
+    const { elements, send } = loadOverlayPage();
+
+    send('init_state', initialState({ wheelVisible: false }));
+
+    assert.equal(elements.get('wheelContents').style.display, 'none');
+});
+
+test('Overlay: a winner shown on connect is replayed with its fields and queue position', () => {
+    const { elements, send } = loadOverlayPage();
+
+    send('init_state', initialState({
+        winner: { fields: [{ label: 'Title', value: 'Song One' }, { label: 'Requester', value: 'Viewer' }], queuePosition: 3 }
+    }));
+
+    assert.equal(elements.get('winnerModal').style.display, 'block');
+    assert.deepEqual(
+        elements.get('winnerFields').children.map(child => child.textContent),
+        ['Title', 'Song One', '|', 'Requester', 'Viewer']);
+    assert.equal(elements.get('winnerQueuePositionValue').textContent, '#3');
+    assert.equal(elements.get('winnerQueuePosition').hidden, false);
+});
+
+test('Overlay: no winner on connect keeps the winner dialog closed', () => {
+    const { elements, send } = loadOverlayPage();
+
+    send('init_state', initialState({ winner: null }));
+
+    assert.equal(elements.get('winnerModal').style.display, 'none');
+});
