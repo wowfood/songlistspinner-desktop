@@ -16,6 +16,7 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | `tests/SonglistSpinner.Testing` | Helpers the test projects share (a fake clock that reports its timers, `wwwroot` reader). Holds no tests |
 | `tests/SonglistSpinner.StreamerSongListSimulator` | In-memory StreamerSongList API v2 and Centrifugo event service, for integration tests and manual runs. Holds no tests |
 | `tests/SonglistSpinner.IntegrationTests` | xUnit v3 tests of the real API client, event source and session services against the simulator over loopback HTTP and WebSocket, and of `LocalOverlayServer` on a free localhost port (never 5150). Folders mirror `src`; `Simulator/` tests the simulator itself |
+| `tests/SonglistSpinner.EndToEndTests` | Opt-in Playwright tests that start the built Desktop app against the simulator on a test profile and drive its user workflows. They skip unless `SONGLISTSPINNER_E2E=1` |
 | `tests/JavaScript` | `node:test` tests for the wheel, overlay and Settings scripts |
 | `scripts/` | Single-file publish, smoke test, release checks (used by CI) |
 | `docs/` | API v2 notes, release process, single-file distribution |
@@ -56,6 +57,24 @@ seconds), so CI runs them with everything else. On their own:
 ```powershell
 dotnet test --project tests/SonglistSpinner.IntegrationTests
 ```
+
+### End-to-end tests
+
+The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run (and CI) every
+one reports as skipped. Run them from a desktop session and leave the windows alone until they finish (about a
+minute):
+
+```powershell
+./scripts/run-e2e.ps1
+./scripts/run-e2e.ps1 -Filter SonglistSpinner.EndToEndTests.WinnerActionTests
+```
+
+The script builds the Desktop app (Release unless `-Configuration Debug`) and runs the tests with
+`SONGLISTSPINNER_E2E=1`. Each test starts the in-process simulator with the demo channel, launches the built
+executable on a fresh temporary test profile (see below), a free overlay port and an update URL on the simulator,
+and connects Playwright to the WebView with `ConnectOverCDPAsync`; no Playwright browser download is needed. When
+a test ends, pass or fail, the app and its WebView2 processes are killed and the profile is deleted. Select
+elements by their existing ids and accessible names.
 
 ### Coverage
 
@@ -102,7 +121,21 @@ $env:SONGLISTSPINNER_SSL_TOKEN_TYPE = "streamer"
 
 The two URLs replace the production endpoints. The token is only a fallback: a token saved in Settings
 (Windows secure storage) takes precedence and would be sent to the simulator, which rejects it, so clear
-the saved token first. The app still reads and writes your normal settings and logs.
+the saved token first, or keep your own profile out of it with a test profile:
+
+```powershell
+$env:SONGLISTSPINNER_PROFILE_DIR = "$env:TEMP\songlistspinner-test"   # a full path
+$env:SONGLISTSPINNER_OVERLAY_PORT = "5151"                           # leaves 5150 to a running app
+$env:SONGLISTSPINNER_UPDATE_RELEASE_URL = "http://127.0.0.1:5199/_simulator/no-releases"
+```
+
+With `SONGLISTSPINNER_PROFILE_DIR` set, the app keeps its settings (`preferences.json`), API credential
+(`secrets.json`, plain text: test credentials only), logs and WebView2 data in that folder instead of MAUI
+preferences, Windows secure storage and `%LOCALAPPDATA%\SonglistSpinner`; `MauiProgram` holds the one switch.
+`SONGLISTSPINNER_WEBVIEW_ARGS` passes extra browser arguments to the WebView, but only with a test profile; the
+end-to-end tests open the DevTools port with it, because the WebView ignores WebView2's own
+`WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in this app. Windows' shared Direct3D shader cache
+(`%LOCALAPPDATA%\D3DSCache`) is still written, as by any app that draws with the GPU.
 
 ## Conventions
 

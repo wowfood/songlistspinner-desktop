@@ -421,6 +421,10 @@ Development and automation can override connection values with:
 | `SONGLISTSPINNER_SSL_ACCESS_TOKEN` | Credential fallback when Windows secure storage is empty |
 | `SONGLISTSPINNER_SSL_TOKEN_TYPE` | `streamer`, `user`, or `bearer` |
 | `SONGLISTSPINNER_SSL_CLIENT_ID` | Client ID used with an OAuth bearer token |
+| `SONGLISTSPINNER_PROFILE_DIR` | Test only: a full folder path that holds the settings, the credential (in plain text), the logs and the WebView data instead of your profile |
+| `SONGLISTSPINNER_OVERLAY_PORT` | Overlay server port instead of 5150, for a second instance |
+| `SONGLISTSPINNER_UPDATE_RELEASE_URL` | Where the update check asks for the latest release instead of GitHub |
+| `SONGLISTSPINNER_WEBVIEW_ARGS` | Extra WebView2 browser arguments; used only with `SONGLISTSPINNER_PROFILE_DIR` |
 
 Do not commit tokens, local environment files, or screenshots containing
 credentials.
