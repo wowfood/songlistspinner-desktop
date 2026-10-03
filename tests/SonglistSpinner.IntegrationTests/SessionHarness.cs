@@ -20,14 +20,19 @@ internal sealed class SessionHarness : IAsyncDisposable
     public SessionHarness(StreamerSongListSimulator simulator, TimeProvider apiTime, TimeProvider sessionTime)
     {
         Client = SimulatorClients.CreateApiClient(simulator, _http, apiTime);
+        var overlay = new OverlayStateService();
         Session = new StreamerSessionService(
             Client,
             SimulatorClients.CreateEventSource(simulator, apiTime),
-            new OverlayStateService(),
+            overlay,
             sessionTime);
         Loader = new ChannelLoader(Client, Session);
+        // Seeded, so a test with more than one eligible song still gets the same winner every run.
+        Spins = new WheelSpinService(Client, Session, overlay, new Random(1), sessionTime);
         WinnerActions = new WinnerActionService(Client, new NowPlayingTransitionService(Client), Session);
     }
+
+    public WheelSpinService Spins { get; }
 
     public StreamerSongListApiClient Client { get; }
 
