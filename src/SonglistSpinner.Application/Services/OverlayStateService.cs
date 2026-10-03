@@ -18,6 +18,12 @@ public class OverlayStateService
 
     private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
     private readonly object _healthGate = new();
+
+    // Every change to the overlay snapshot is recorded and broadcast while holding this lock, and
+    // SubscribeAsync takes it to build a client's initial state and register the client. So clients
+    // receive changes in the order the snapshot recorded them, and a connecting client sees either the
+    // old state followed by the change, or the new state. Broadcasting only queues messages on bounded
+    // channels and never blocks.
     private readonly object _stateGate = new();
     private OverlaySnapshot _snapshot = OverlaySnapshot.Empty;
     private string? _serverError;
@@ -54,10 +60,9 @@ public class OverlayStateService
         SpinnerQueueItem? nowPlaying,
         string streamer)
     {
-        OverlaySnapshot snapshot;
         lock (_stateGate)
         {
-            snapshot = _snapshot = _snapshot with
+            _snapshot = _snapshot with
             {
                 Config = config,
                 AvailableSongs = [.. available],
@@ -65,18 +70,17 @@ public class OverlayStateService
                 NowPlaying = nowPlaying,
                 CurrentStreamer = streamer
             };
+            return BroadcastStateAsync(_snapshot);
         }
-
-        return BroadcastStateAsync(snapshot);
     }
 
     public Task UpdateConfigAsync(SpinnerConfig config)
     {
-        OverlaySnapshot snapshot;
         lock (_stateGate)
-            snapshot = _snapshot = _snapshot with { Config = config };
-
-        return BroadcastStateAsync(snapshot);
+        {
+            _snapshot = _snapshot with { Config = config };
+            return BroadcastStateAsync(_snapshot);
+        }
     }
 
     private Task BroadcastStateAsync(OverlaySnapshot snapshot)
@@ -104,9 +108,7 @@ public class OverlayStateService
         return BroadcastAsync(OverlayEventNames.SpinCommand, new { winnerIndex, winnerQueueId, duration });
     }
 
-    // Winner and wheel visibility are recorded so a reconnecting overlay replays them in its initial
-    // state. Recording and broadcasting share the lock that SubscribeAsync takes to register a client
-    // and build its initial state, so a client sees either the old state plus the event, or the new state.
+    // Winner and wheel visibility are recorded so a reconnecting overlay replays them in its initial state.
     public Task BroadcastWinnerRevealAsync(
         IReadOnlyList<WinnerDialogField> fields,
         int? queuePosition)
@@ -139,15 +141,19 @@ public class OverlayStateService
     public Task UpdatePlayedListCollapsedAsync(bool collapsed)
     {
         lock (_stateGate)
+        {
             _snapshot = _snapshot with { PlayedListCollapsed = collapsed };
-        return BroadcastAsync(OverlayEventNames.SetCollapse, new { collapsed });
+            return BroadcastAsync(OverlayEventNames.SetCollapse, new { collapsed });
+        }
     }
 
     public Task UpdatePlayedListWidthAsync(string width, string minWidth)
     {
         lock (_stateGate)
+        {
             _snapshot = _snapshot with { PlayedListWidth = width, PlayedListMinWidth = minWidth };
-        return BroadcastAsync(OverlayEventNames.SetPlayedListWidth, new { width, minWidth });
+            return BroadcastAsync(OverlayEventNames.SetPlayedListWidth, new { width, minWidth });
+        }
     }
 
     private Task BroadcastAsync(string eventName, object payload)

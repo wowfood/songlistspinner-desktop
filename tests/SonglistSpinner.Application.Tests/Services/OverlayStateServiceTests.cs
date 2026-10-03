@@ -47,6 +47,54 @@ public class OverlayStateServiceTests
         Assert.Equal(JsonValueKind.Null, state.RootElement.GetProperty("winner").ValueKind);
     }
 
+    [Fact]
+    public async Task Given_CollapsedPlayedListWithCustomWidth_When_OverlayReconnects_Then_InitialStateReplaysLayout()
+    {
+        var overlay = new OverlayStateService();
+        await overlay.UpdatePlayedListCollapsedAsync(true);
+        await overlay.UpdatePlayedListWidthAsync("320px", "200px");
+
+        using var state = await ReadInitialStateAsync(overlay);
+
+        Assert.True(state.RootElement.GetProperty("playedListCollapsed").GetBoolean());
+        Assert.Equal("320px", state.RootElement.GetProperty("playedListWidth").GetString());
+        Assert.Equal("200px", state.RootElement.GetProperty("playedListMinWidth").GetString());
+    }
+
+    [Fact]
+    public async Task Given_ConnectedOverlay_When_OverlayStateChanges_Then_OverlayReceivesEachChangeInCallOrder()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var overlay = new OverlayStateService();
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await events.MoveNextAsync());
+
+        await overlay.UpdateConfigAsync(new SpinnerConfig());
+        await overlay.UpdatePlayedListCollapsedAsync(true);
+        await overlay.UpdatePlayedListWidthAsync("320px", "200px");
+        await overlay.BroadcastWheelVisibilityAsync(false);
+        await overlay.BroadcastWinnerRevealAsync([new WinnerDialogField("Title", "Winner")], 7);
+        await overlay.BroadcastCloseWinnerAsync();
+
+        var received = new List<string>();
+        for (var i = 0; i < 6; i++)
+        {
+            Assert.True(await events.MoveNextAsync());
+            received.Add(events.Current[..events.Current.IndexOf('\n', StringComparison.Ordinal)]);
+        }
+
+        Assert.Equal(
+            [
+                "event: " + OverlayEventNames.UpdateSongs,
+                "event: " + OverlayEventNames.SetCollapse,
+                "event: " + OverlayEventNames.SetPlayedListWidth,
+                "event: " + OverlayEventNames.SetWheelVisible,
+                "event: " + OverlayEventNames.WinnerReveal,
+                "event: " + OverlayEventNames.CloseWinner
+            ],
+            received);
+    }
+
     internal static async Task<JsonDocument> ReadInitialStateAsync(OverlayStateService overlay)
     {
         await using var events = overlay.SubscribeAsync(TestContext.Current.CancellationToken).GetAsyncEnumerator();
