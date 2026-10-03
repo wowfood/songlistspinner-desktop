@@ -57,7 +57,7 @@ rejects a bare directory.
 - Production code takes the clock and randomness as dependencies: `TimeProvider` instead of
   `DateTime.Now`/`UtcNow` or a bare `Task.Delay`, and the injected `Random` for winner picks. Tests use
   `FakeTimeProvider` and advance it; they never wait on the wall clock. When a background task owns the
-  delay, wait for its timer first (`TimerTrackingTimeProvider` in Application.Tests), then advance.
+  delay, wait for its timer first (`TimerTrackingTimeProvider` in each test project), then advance.
 - Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
   renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
   migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step.

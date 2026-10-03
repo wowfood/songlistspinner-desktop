@@ -13,13 +13,25 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     private const int ReceiveBufferBytes = 16 * 1024;
     private readonly StreamerSongListEventsOptions _options;
     private readonly TimeProvider _timeProvider;
+    private readonly Func<Uri, CancellationToken, Task<WebSocket>> _connectAsync;
 
     public CentrifugoStreamerSongListEventSource(
         StreamerSongListEventsOptions options,
         TimeProvider? timeProvider = null)
+        : this(options, timeProvider, ConnectClientWebSocketAsync)
+    {
+    }
+
+    // connectAsync opens a connected socket for each connection attempt, and the event source disposes it.
+    // Tests pass a scripted socket here instead of connecting to a server.
+    internal CentrifugoStreamerSongListEventSource(
+        StreamerSongListEventsOptions options,
+        TimeProvider? timeProvider,
+        Func<Uri, CancellationToken, Task<WebSocket>> connectAsync)
     {
         _options = options;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _connectAsync = connectAsync;
 
         if (!_options.Endpoint.IsAbsoluteUri ||
             _options.Endpoint.Scheme is not ("ws" or "wss"))
@@ -102,8 +114,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         int streamerId,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
-        using var socket = new ClientWebSocket();
-        await socket.ConnectAsync(_options.Endpoint, cancellationToken);
+        using var socket = await _connectAsync(_options.Endpoint, cancellationToken);
 
         var pending = new List<StreamerSongListEvent>();
         await SendCommandAsync(socket, CentrifugoProtocol.CreateConnectCommand(1), cancellationToken);
@@ -144,7 +155,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     }
 
     private async Task AwaitCommandReplyAsync(
-        ClientWebSocket socket,
+        WebSocket socket,
         int commandId,
         ICollection<StreamerSongListEvent> pending,
         CancellationToken cancellationToken)
@@ -176,7 +187,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     }
 
     private static Task SendCommandAsync(
-        ClientWebSocket socket,
+        WebSocket socket,
         string command,
         CancellationToken cancellationToken)
     {
@@ -189,7 +200,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     }
 
     private async Task<string?> ReceiveTextAsync(
-        ClientWebSocket socket,
+        WebSocket socket,
         CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(ReceiveBufferBytes);
@@ -223,6 +234,21 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         finally
         {
             ArrayPool<byte>.Shared.Return(buffer);
+        }
+    }
+
+    private static async Task<WebSocket> ConnectClientWebSocketAsync(Uri endpoint, CancellationToken cancellationToken)
+    {
+        var socket = new ClientWebSocket();
+        try
+        {
+            await socket.ConnectAsync(endpoint, cancellationToken);
+            return socket;
+        }
+        catch
+        {
+            socket.Dispose();
+            throw;
         }
     }
 
