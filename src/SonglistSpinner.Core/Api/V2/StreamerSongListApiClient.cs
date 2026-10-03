@@ -10,7 +10,7 @@ using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Core.Api.V2;
 
-public sealed class StreamerSongListApiClient : ISpinnerApiService
+public sealed class StreamerSongListApiClient : IStreamerSongListClient
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -51,21 +51,7 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         if (dto.Id <= 0)
             throw new StreamerSongListApiException("StreamerSongList returned an invalid streamer ID.");
 
-        return new StreamerSongListStreamer(dto.Id, MapPlatforms(dto.Platforms));
-    }
-
-    public async Task<int> ResolveStreamerIdAsync(
-        StreamerSongListChannel channel,
-        CancellationToken cancellationToken = default)
-    {
-        return (await ResolveStreamerAsync(channel, cancellationToken)).Id;
-    }
-
-    public async Task<SpinnerQueueItem[]> FetchQueueAsync(
-        StreamerSongListChannel channel,
-        CancellationToken cancellationToken = default)
-    {
-        return (await FetchQueueSnapshotAsync(channel, cancellationToken)).Items;
+        return new StreamerSongListStreamer(new StreamerId(dto.Id), MapPlatforms(dto.Platforms));
     }
 
     public async Task<SpinnerQueueSnapshot> FetchQueueSnapshotAsync(
@@ -98,13 +84,16 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         return (dto.Items ?? []).Select(MapPlayHistoryItem).ToArray();
     }
 
-    public Task MarkQueueItemAsPlayedAsync(int queueId, CancellationToken cancellationToken = default)
+    public Task MarkQueueItemAsPlayedAsync(QueueEntryId queueEntryId, CancellationToken cancellationToken = default)
     {
-        ValidateQueueId(queueId);
-        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/played?queue_id={queueId}", cancellationToken);
+        ValidateQueueEntryId(queueEntryId);
+        return SendWithoutResponseAsync(
+            HttpMethod.Post,
+            $"queue/played?queue_id={queueEntryId}",
+            cancellationToken);
     }
 
-    public Task MarkNowPlayingAsPlayedAsync(int streamerId, CancellationToken cancellationToken = default)
+    public Task MarkNowPlayingAsPlayedAsync(StreamerId streamerId, CancellationToken cancellationToken = default)
     {
         ValidateStreamerId(streamerId);
         return SendWithoutResponseAsync(
@@ -113,10 +102,10 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
             cancellationToken);
     }
 
-    public Task PromoteQueueItemToNowPlayingAsync(int queueId, CancellationToken cancellationToken = default)
+    public Task PromoteQueueItemToNowPlayingAsync(QueueEntryId queueEntryId, CancellationToken cancellationToken = default)
     {
-        ValidateQueueId(queueId);
-        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/{queueId}/play", cancellationToken);
+        ValidateQueueEntryId(queueEntryId);
+        return SendWithoutResponseAsync(HttpMethod.Post, $"queue/{queueEntryId}/play", cancellationToken);
     }
 
     private async Task<T> GetAsync<T>(string relativeUrl, CancellationToken cancellationToken)
@@ -219,18 +208,25 @@ public sealed class StreamerSongListApiClient : ISpinnerApiService
         return $"streamer_name={Uri.EscapeDataString(name)}&platform={Uri.EscapeDataString(platform)}";
     }
 
-    private static void ValidateQueueId(int queueId)
+    // The id types reject non-positive values, but default(...) still holds 0.
+    private static void ValidateQueueEntryId(QueueEntryId queueEntryId)
     {
-        if (queueId <= 0)
-            throw new ArgumentOutOfRangeException(nameof(queueId), "A positive queue entry ID is required.");
+        if (queueEntryId.Value <= 0)
+            throw new ArgumentOutOfRangeException(nameof(queueEntryId), "A positive queue entry ID is required.");
     }
 
-    private static void ValidateStreamerId(int streamerId)
+    private static void ValidateStreamerId(StreamerId streamerId)
     {
-        if (streamerId <= 0)
+        if (streamerId.Value <= 0)
             throw new ArgumentOutOfRangeException(nameof(streamerId), "A positive streamer ID is required.");
     }
 
+    /// <summary>Maps a play-history period to the API's <c>played_after</c> filter.</summary>
+    /// <remarks>
+    /// <c>stream</c> sends no filter, the same as <c>all</c>: API v2 has no stream-scoped filter and does not
+    /// expose the legacy <c>period=stream</c> parameter (see <c>docs/API_V2.md</c>). Both therefore return
+    /// the most recent page of history. Kept deliberately so saved settings using <c>stream</c> keep working.
+    /// </remarks>
     private DateTimeOffset? GetPlayedAfter(string period)
     {
         if (!SpinnerSettingValues.PlayHistoryPeriods.TryNormalize(period, out var normalizedPeriod))

@@ -2,7 +2,7 @@ using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
 using SonglistSpinner.Services;
 using Xunit;
-using static SonglistSpinner.Application.Tests.ScriptedSpinnerApi;
+using static SonglistSpinner.Application.Tests.ScriptedStreamerSongListClient;
 
 namespace SonglistSpinner.Application.Tests.Services;
 
@@ -12,7 +12,7 @@ public class WinnerActionServiceTests
     public async Task Given_RevealedWinner_When_MarkingItPlayed_Then_ThatQueueEntryIsMarkedPlayed()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var session = new StreamerSessionService(api, new ChannelEventSource(), new OverlayStateService());
         using var winnerActions = new WinnerActionService(api, new NowPlayingTransitionService(api), session);
 
@@ -25,7 +25,7 @@ public class WinnerActionServiceTests
     public async Task Given_NoChannelLoaded_When_PromotingTheWinner_Then_FailsAskingForAReload()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var session = new StreamerSessionService(api, new ChannelEventSource(), new OverlayStateService());
         using var winnerActions = new WinnerActionService(api, new NowPlayingTransitionService(api), session);
 
@@ -40,7 +40,7 @@ public class WinnerActionServiceTests
     public async Task Given_ChannelLoadedWithASongPlaying_When_PromotingTheWinner_Then_CurrentSongIsCompletedAndWinnerPromoted()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         var queueWithSongPlaying = new SpinnerQueueSnapshot { Items = [Song(42)], Playing = Song(40) };
         api.QueueResponses.Enqueue(_ => Task.FromResult(queueWithSongPlaying));
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(42)));

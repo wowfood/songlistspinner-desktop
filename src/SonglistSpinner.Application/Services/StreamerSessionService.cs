@@ -19,7 +19,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
     /// <summary>Events often arrive in bursts, so a refresh waits this long and then covers the whole burst.</summary>
     private static readonly TimeSpan RefreshDebounceDelay = TimeSpan.FromMilliseconds(300);
 
-    private readonly ISpinnerApiService _apiService;
+    private readonly IStreamerSongListClient _songListClient;
     private readonly IStreamerSongListEventSource _eventSource;
     private readonly OverlayStateService _overlayService;
     private readonly TimeProvider _timeProvider;
@@ -36,13 +36,13 @@ public sealed class StreamerSessionService : IAsyncDisposable
     private bool _refreshSuspended;
 
     public StreamerSessionService(
-        ISpinnerApiService apiService,
+        IStreamerSongListClient songListClient,
         IStreamerSongListEventSource eventSource,
         OverlayStateService overlayService,
         TimeProvider? timeProvider = null,
         ILogger<StreamerSessionService>? logger = null)
     {
-        _apiService = apiService;
+        _songListClient = songListClient;
         _eventSource = eventSource;
         _overlayService = overlayService;
         _timeProvider = timeProvider ?? TimeProvider.System;
@@ -130,8 +130,8 @@ public sealed class StreamerSessionService : IAsyncDisposable
             try
             {
                 var channel = new StreamerSongListChannel(expectedStreamer, before.Config.Streamer.Platform);
-                var queueTask = _apiService.FetchQueueSnapshotAsync(channel, cancellationToken);
-                var historyTask = _apiService.FetchPlayHistoryAsync(
+                var queueTask = _songListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
+                var historyTask = _songListClient.FetchPlayHistoryAsync(
                     channel,
                     before.Config.SongList.PlayHistoryPeriod,
                     cancellationToken);
@@ -261,7 +261,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         var wasDisconnected = false;
         try
         {
-            await foreach (var notification in _eventSource.SubscribeAsync(streamerId, cancellationToken))
+            await foreach (var notification in _eventSource.SubscribeAsync(new StreamerId(streamerId), cancellationToken))
             {
                 if (notification.Kind == StreamerSongListEventKind.Connected)
                 {

@@ -129,14 +129,14 @@ public partial class Setup
                     if (credentialWasReplaced)
                         await CredentialStore.SaveCredentialAsync(candidateCredential, cancellationToken);
 
-                    _resolvedStreamer = await ApiService.ResolveStreamerAsync(channel, cancellationToken);
-                    var queueTask = ApiService.FetchQueueAsync(channel, cancellationToken);
-                    var historyTask = ApiService.FetchPlayHistoryAsync(
+                    _resolvedStreamer = await SongListClient.ResolveStreamerAsync(channel, cancellationToken);
+                    var queueTask = SongListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
+                    var historyTask = SongListClient.FetchPlayHistoryAsync(
                         channel,
                         _settings.PlayHistoryPeriod,
                         cancellationToken);
                     await Task.WhenAll(queueTask, historyTask);
-                    _queueCount = (await queueTask).Length;
+                    _queueCount = (await queueTask).Items.Length;
                     _historyCount = (await historyTask).Length;
 
                     _settings.DefaultStreamerName = channel.Name;
@@ -181,7 +181,7 @@ public partial class Setup
         }
     }
 
-    private async Task VerifyRealtimeAsync(int streamerId)
+    private async Task VerifyRealtimeAsync(StreamerId streamerId)
     {
         _eventsState = VerificationState.Running;
         _eventsMessage = "Connecting to StreamerSongList events...";

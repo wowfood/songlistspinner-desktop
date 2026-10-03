@@ -27,7 +27,7 @@ public static class StreamerSongListServiceCollectionExtensions
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());
         services.AddSingleton<ApiCredentialTest>();
 
-        services.AddHttpClient<ISpinnerApiService, StreamerSongListApiClient>();
+        services.AddHttpClient<IStreamerSongListClient, StreamerSongListApiClient>();
         services.AddSingleton<IStreamerSongListEventSource, CentrifugoStreamerSongListEventSource>();
         return services;
     }

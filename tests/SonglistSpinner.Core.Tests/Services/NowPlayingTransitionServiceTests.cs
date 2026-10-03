@@ -10,13 +10,13 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_NoCurrentSong_When_PromotingWinner_Then_PromotesWinnerDirectly()
     {
-        var api = new RecordingSpinnerApiService(new SpinnerQueueSnapshot { Items = [new() { QueueId = 91 }] });
+        var api = new RecordingStreamerSongListClient(new SpinnerQueueSnapshot { Items = [new() { QueueId = 91 }] });
         var service = new NowPlayingTransitionService(api);
 
         await service.PromoteWinnerAsync(
             new StreamerSongListChannel("wowfood"),
-            314,
-            91,
+            new StreamerId(314),
+            new QueueEntryId(91),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["fetch", "promote:91"], api.Calls);
@@ -25,15 +25,15 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_CurrentSong_When_PromotingWinner_Then_CompletesCurrentBeforePromotion()
     {
-        var api = new RecordingSpinnerApiService(
+        var api = new RecordingStreamerSongListClient(
             Snapshot(77),
             Snapshot(42));
         var service = new NowPlayingTransitionService(api);
 
         await service.PromoteWinnerAsync(
             new StreamerSongListChannel("wowfood"),
-            314,
-            91,
+            new StreamerId(314),
+            new QueueEntryId(91),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["fetch", "complete:314", "fetch", "promote:91"], api.Calls);
@@ -42,15 +42,15 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_WinnerWasAutoPromoted_When_CompletingCurrent_Then_DoesNotPromoteTwice()
     {
-        var api = new RecordingSpinnerApiService(
+        var api = new RecordingStreamerSongListClient(
             Snapshot(77),
             Snapshot(91));
         var service = new NowPlayingTransitionService(api);
 
         await service.PromoteWinnerAsync(
             new StreamerSongListChannel("wowfood"),
-            314,
-            91,
+            new StreamerId(314),
+            new QueueEntryId(91),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["fetch", "complete:314", "fetch"], api.Calls);
@@ -59,13 +59,13 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_WinnerIsAlreadyPlaying_When_PromotingWinner_Then_PerformsNoWrite()
     {
-        var api = new RecordingSpinnerApiService(Snapshot(91));
+        var api = new RecordingStreamerSongListClient(Snapshot(91));
         var service = new NowPlayingTransitionService(api);
 
         await service.PromoteWinnerAsync(
             new StreamerSongListChannel("wowfood"),
-            314,
-            91,
+            new StreamerId(314),
+            new QueueEntryId(91),
             TestContext.Current.CancellationToken);
 
         Assert.Equal(["fetch"], api.Calls);
@@ -74,7 +74,7 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_WinnerMissingFromQueue_When_PromotingWinner_Then_LeavesCurrentSongPlaying()
     {
-        var api = new RecordingSpinnerApiService(new SpinnerQueueSnapshot
+        var api = new RecordingStreamerSongListClient(new SpinnerQueueSnapshot
         {
             Playing = new SpinnerQueueItem { QueueId = 77 }
         });
@@ -83,8 +83,8 @@ public class NowPlayingTransitionServiceTests
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.PromoteWinnerAsync(
                 new StreamerSongListChannel("wowfood"),
-                314,
-                91,
+                new StreamerId(314),
+                new QueueEntryId(91),
                 TestContext.Current.CancellationToken));
 
         Assert.Equal(WinnerMissingMessage, error.Message);
@@ -94,14 +94,14 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_WinnerRemovedAfterCompletingCurrent_When_PromotingWinner_Then_ReportsPartialTransition()
     {
-        var api = new RecordingSpinnerApiService(Snapshot(77), new SpinnerQueueSnapshot());
+        var api = new RecordingStreamerSongListClient(Snapshot(77), new SpinnerQueueSnapshot());
         var service = new NowPlayingTransitionService(api);
 
         var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             service.PromoteWinnerAsync(
                 new StreamerSongListChannel("wowfood"),
-                314,
-                91,
+                new StreamerId(314),
+                new QueueEntryId(91),
                 TestContext.Current.CancellationToken));
 
         Assert.Equal(
@@ -124,8 +124,8 @@ public class NowPlayingTransitionServiceTests
         };
     }
 
-    private sealed class RecordingSpinnerApiService(params SpinnerQueueSnapshot[] snapshots)
-        : ISpinnerApiService
+    private sealed class RecordingStreamerSongListClient(params SpinnerQueueSnapshot[] snapshots)
+        : IStreamerSongListClient
     {
         private readonly Queue<SpinnerQueueSnapshot> _snapshots = new(snapshots);
         public List<string> Calls { get; } = [];
@@ -139,7 +139,7 @@ public class NowPlayingTransitionServiceTests
         }
 
         public Task MarkNowPlayingAsPlayedAsync(
-            int streamerId,
+            StreamerId streamerId,
             CancellationToken cancellationToken = default)
         {
             Calls.Add($"complete:{streamerId}");
@@ -147,22 +147,14 @@ public class NowPlayingTransitionServiceTests
         }
 
         public Task PromoteQueueItemToNowPlayingAsync(
-            int queueId,
+            QueueEntryId queueEntryId,
             CancellationToken cancellationToken = default)
         {
-            Calls.Add($"promote:{queueId}");
+            Calls.Add($"promote:{queueEntryId}");
             return Task.CompletedTask;
         }
 
-        public Task<int> ResolveStreamerIdAsync(
-            StreamerSongListChannel channel,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
         public Task<StreamerSongListStreamer> ResolveStreamerAsync(
-            StreamerSongListChannel channel,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public Task<SpinnerQueueItem[]> FetchQueueAsync(
             StreamerSongListChannel channel,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
@@ -172,7 +164,7 @@ public class NowPlayingTransitionServiceTests
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public Task MarkQueueItemAsPlayedAsync(
-            int queueId,
+            QueueEntryId queueEntryId,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
     }
 }

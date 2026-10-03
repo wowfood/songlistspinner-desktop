@@ -12,7 +12,7 @@ namespace SonglistSpinner.Services;
 /// </summary>
 public sealed class WinnerActionService : IDisposable
 {
-    private readonly ISpinnerApiService _apiService;
+    private readonly IStreamerSongListClient _songListClient;
     private readonly NowPlayingTransitionService _nowPlayingTransitions;
     private readonly StreamerSessionService _session;
     private readonly ILogger<WinnerActionService> _logger;
@@ -22,12 +22,12 @@ public sealed class WinnerActionService : IDisposable
     private readonly SemaphoreSlim _promotionGate = new(1, 1);
 
     public WinnerActionService(
-        ISpinnerApiService apiService,
+        IStreamerSongListClient songListClient,
         NowPlayingTransitionService nowPlayingTransitions,
         StreamerSessionService session,
         ILogger<WinnerActionService>? logger = null)
     {
-        _apiService = apiService;
+        _songListClient = songListClient;
         _nowPlayingTransitions = nowPlayingTransitions;
         _session = session;
         _logger = logger ?? NullLogger<WinnerActionService>.Instance;
@@ -37,7 +37,7 @@ public sealed class WinnerActionService : IDisposable
     {
         try
         {
-            await _apiService.MarkQueueItemAsPlayedAsync(queueId, cancellationToken);
+            await _songListClient.MarkQueueItemAsPlayedAsync(new QueueEntryId(queueId), cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
@@ -69,8 +69,8 @@ public sealed class WinnerActionService : IDisposable
             {
                 await _nowPlayingTransitions.PromoteWinnerAsync(
                     channel,
-                    session.StreamerId,
-                    queueId,
+                    new StreamerId(session.StreamerId),
+                    new QueueEntryId(queueId),
                     cancellationToken);
             }
             finally

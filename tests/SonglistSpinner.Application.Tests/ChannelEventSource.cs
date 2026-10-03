@@ -1,5 +1,6 @@
 using System.Threading.Channels;
 using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Application.Tests;
 
@@ -12,6 +13,6 @@ internal sealed class ChannelEventSource : IStreamerSongListEventSource
         _events.Writer.TryWrite(new StreamerSongListEvent(kind));
 
     public IAsyncEnumerable<StreamerSongListEvent> SubscribeAsync(
-        int streamerId,
+        StreamerId streamerId,
         CancellationToken cancellationToken = default) => _events.Reader.ReadAllAsync(cancellationToken);
 }

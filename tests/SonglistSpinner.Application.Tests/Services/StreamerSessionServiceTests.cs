@@ -3,7 +3,7 @@ using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Services;
 using Xunit;
-using static SonglistSpinner.Application.Tests.ScriptedSpinnerApi;
+using static SonglistSpinner.Application.Tests.ScriptedStreamerSongListClient;
 
 namespace SonglistSpinner.Application.Tests.Services;
 
@@ -17,7 +17,7 @@ public class StreamerSessionServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new TimerTrackingTimeProvider();
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         api.QueueResponses.Enqueue(_ => throw new IOException("Simulated transient API failure"));
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41)));
         var events = new ChannelEventSource();
@@ -40,7 +40,7 @@ public class StreamerSessionServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new TimerTrackingTimeProvider();
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         for (var i = 0; i < 6; i++)
             api.QueueResponses.Enqueue(_ => throw new IOException("Simulated transient API failure"));
         var events = new ChannelEventSource();
@@ -70,7 +70,7 @@ public class StreamerSessionServiceTests
         var startTime = new DateTimeOffset(2026, 10, 3, 14, 5, 0, TimeSpan.Zero);
         var time = new FakeTimeProvider(startTime);
         await using var session = new StreamerSessionService(
-            new ScriptedSpinnerApi(),
+            new ScriptedStreamerSongListClient(),
             new ChannelEventSource(),
             new OverlayStateService(),
             time);
@@ -86,7 +86,7 @@ public class StreamerSessionServiceTests
     public async Task Given_RefreshSuspended_When_Refreshing_Then_SkipsTheApiAndKeepsTheSnapshot()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var session = new StreamerSessionService(api, new ChannelEventSource(), new OverlayStateService());
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
         session.SetRefreshSuspended(true);
@@ -102,7 +102,7 @@ public class StreamerSessionServiceTests
     public async Task Given_RefreshInFlight_When_SpinSuspendsRefresh_Then_FetchedQueueIsNotPublished()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         var pendingQueue = new TaskCompletionSource<SpinnerQueueSnapshot>(
             TaskCreationOptions.RunContinuationsAsynchronously);
         api.QueueResponses.Enqueue(_ => pendingQueue.Task);
@@ -128,7 +128,7 @@ public class StreamerSessionServiceTests
         var cancellationToken = TestContext.Current.CancellationToken;
         var overlay = new OverlayStateService();
         await using var session = new StreamerSessionService(
-            new ScriptedSpinnerApi(),
+            new ScriptedStreamerSongListClient(),
             new ChannelEventSource(),
             overlay);
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);

@@ -27,7 +27,7 @@ public sealed class WheelSpinService
     /// <summary>How long the winner's current queue position is looked up before it is shown without it.</summary>
     public static readonly TimeSpan QueuePositionLookupTimeout = TimeSpan.FromSeconds(2);
 
-    private readonly ISpinnerApiService _apiService;
+    private readonly IStreamerSongListClient _songListClient;
     private readonly StreamerSessionService _session;
     private readonly OverlayStateService _overlay;
     private readonly Random _winnerPicker;
@@ -36,14 +36,14 @@ public sealed class WheelSpinService
     private DateTimeOffset _lastDrawAt = DateTimeOffset.MinValue;
 
     public WheelSpinService(
-        ISpinnerApiService apiService,
+        IStreamerSongListClient songListClient,
         StreamerSessionService session,
         OverlayStateService overlay,
         Random winnerPicker,
         TimeProvider? timeProvider = null,
         ILogger<WheelSpinService>? logger = null)
     {
-        _apiService = apiService;
+        _songListClient = songListClient;
         _session = session;
         _overlay = overlay;
         _winnerPicker = winnerPicker;
@@ -63,8 +63,8 @@ public sealed class WheelSpinService
         _session.SetRefreshSuspended(true);
 
         var channel = new StreamerSongListChannel(streamer, config.Streamer.Platform);
-        var queueTask = _apiService.FetchQueueSnapshotAsync(channel, cancellationToken);
-        var historyTask = _apiService.FetchPlayHistoryAsync(channel, config.SongList.PlayHistoryPeriod, cancellationToken);
+        var queueTask = _songListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
+        var historyTask = _songListClient.FetchPlayHistoryAsync(channel, config.SongList.PlayHistoryPeriod, cancellationToken);
         await Task.WhenAll(queueTask, historyTask);
         var queue = await queueTask;
         var played = await historyTask;
@@ -130,7 +130,7 @@ public sealed class WheelSpinService
                 cancellationToken,
                 lookupTimeout.Token);
             var channel = new StreamerSongListChannel(draw.Streamer, draw.Config.Streamer.Platform);
-            var queue = await _apiService.FetchQueueSnapshotAsync(channel, lookupCts.Token);
+            var queue = await _songListClient.FetchQueueSnapshotAsync(channel, lookupCts.Token);
             if (!IsChannelStillLoaded(draw.Streamer)) return null;
             return SpinnerDataService.FindQueuePosition(queue.Items, queueId);
         }

@@ -2,7 +2,7 @@ using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Services;
 using Xunit;
-using static SonglistSpinner.Application.Tests.ScriptedSpinnerApi;
+using static SonglistSpinner.Application.Tests.ScriptedStreamerSongListClient;
 
 namespace SonglistSpinner.Application.Tests.Services;
 
@@ -15,7 +15,7 @@ public class WheelSpinServiceTests
     public async Task Given_QueueHasSongs_When_Drawing_Then_WinnerIsTheSongThePickerChooses()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41, 42, 43)));
         await using var session = await StartSessionAsync(api, new OverlayStateService(), Streamer);
         var spins = new WheelSpinService(api, session, new OverlayStateService(), new FixedRandom(1));
@@ -31,7 +31,7 @@ public class WheelSpinServiceTests
     public async Task Given_QueueIsEmpty_When_Drawing_Then_ThereIsNoWinner()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var session = await StartSessionAsync(api, new OverlayStateService(), Streamer);
         var spins = new WheelSpinService(api, session, new OverlayStateService(), new FixedRandom(0));
 
@@ -46,7 +46,7 @@ public class WheelSpinServiceTests
     public async Task Given_DrawWithAWinner_When_Starting_Then_OverlayReceivesTheQueueThenTheSpinToTheWinner()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41, 42, 43)));
         var overlay = new OverlayStateService();
         await using var session = await StartSessionAsync(api, overlay, Streamer);
@@ -69,7 +69,7 @@ public class WheelSpinServiceTests
     public async Task Given_DrawWithNoWinner_When_Starting_Then_OverlayReceivesTheEmptyQueueWithoutASpin()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         var overlay = new OverlayStateService();
         await using var session = await StartSessionAsync(api, overlay, Streamer, Song(7));
         var spins = new WheelSpinService(api, session, overlay, new FixedRandom(0));
@@ -93,7 +93,7 @@ public class WheelSpinServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new FakeTimeProvider();
-        await using var spin = await DrawWinnerAsync(new ScriptedSpinnerApi(), time, showQueuePosition: false);
+        await using var spin = await DrawWinnerAsync(new ScriptedStreamerSongListClient(), time, showQueuePosition: false);
 
         var reveal = spin.Spins.RevealWinnerAsync(spin.Draw, cancellationToken);
         time.Advance(WheelSpinService.SpinDuration + WheelSpinService.WinnerRevealDelay - TimeSpan.FromTicks(1));
@@ -106,7 +106,7 @@ public class WheelSpinServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new FakeTimeProvider();
-        await using var spin = await DrawWinnerAsync(new ScriptedSpinnerApi(), time, showQueuePosition: false);
+        await using var spin = await DrawWinnerAsync(new ScriptedStreamerSongListClient(), time, showQueuePosition: false);
 
         var reveal = spin.Spins.RevealWinnerAsync(spin.Draw, cancellationToken);
         time.Advance(WheelSpinService.SpinDuration + WheelSpinService.WinnerRevealDelay);
@@ -121,7 +121,7 @@ public class WheelSpinServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new FakeTimeProvider();
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var spin = await DrawWinnerAsync(api, time, showQueuePosition: true);
         api.QueueResponses.Enqueue(_ => Task.FromResult(new SpinnerQueueSnapshot { Items = [Song(42, position: 5)] }));
 
@@ -137,7 +137,7 @@ public class WheelSpinServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new TimerTrackingTimeProvider();
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var spin = await DrawWinnerAsync(api, time, showQueuePosition: true);
         api.QueueResponses.Enqueue(lookupToken => HangUntilCancelledAsync(lookupToken));
 
@@ -157,7 +157,7 @@ public class WheelSpinServiceTests
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var time = new FakeTimeProvider();
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var spin = await DrawWinnerAsync(api, time, showQueuePosition: true);
         await spin.Session.StartAsync(2, "another-channel", new SpinnerConfig(), [], [], null, cancellationToken);
 
@@ -173,7 +173,7 @@ public class WheelSpinServiceTests
     public async Task Given_SpinDrawn_When_LessThanTheCooldownHasPassed_Then_SpinsAreCoolingDown()
     {
         var time = new FakeTimeProvider();
-        await using var spin = await DrawWinnerAsync(new ScriptedSpinnerApi(), time, showQueuePosition: false);
+        await using var spin = await DrawWinnerAsync(new ScriptedStreamerSongListClient(), time, showQueuePosition: false);
 
         time.Advance(WheelSpinService.Cooldown - TimeSpan.FromTicks(1));
 
@@ -184,7 +184,7 @@ public class WheelSpinServiceTests
     public async Task Given_SpinDrawn_When_TheCooldownHasPassed_Then_SpinsAreNoLongerCoolingDown()
     {
         var time = new FakeTimeProvider();
-        await using var spin = await DrawWinnerAsync(new ScriptedSpinnerApi(), time, showQueuePosition: false);
+        await using var spin = await DrawWinnerAsync(new ScriptedStreamerSongListClient(), time, showQueuePosition: false);
 
         time.Advance(WheelSpinService.Cooldown);
 
@@ -195,7 +195,7 @@ public class WheelSpinServiceTests
     public async Task Given_SpinDrawn_When_TheSessionRefreshes_Then_TheRefreshIsSkipped()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var spin = await DrawWinnerAsync(api, new FakeTimeProvider(), showQueuePosition: false);
 
         var refreshed = await spin.Session.RefreshAsync(Streamer, cancellationToken);
@@ -208,7 +208,7 @@ public class WheelSpinServiceTests
     public async Task Given_SpinFinished_When_TheSessionRefreshes_Then_TheRefreshIsPublished()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        var api = new ScriptedSpinnerApi();
+        var api = new ScriptedStreamerSongListClient();
         await using var spin = await DrawWinnerAsync(api, new FakeTimeProvider(), showQueuePosition: false);
         spin.Spins.Finish();
 
@@ -218,7 +218,7 @@ public class WheelSpinServiceTests
     }
 
     private static async Task<StreamerSessionService> StartSessionAsync(
-        ScriptedSpinnerApi api,
+        ScriptedStreamerSongListClient api,
         OverlayStateService overlay,
         string streamer,
         params SpinnerQueueItem[] availableSongs)
@@ -237,7 +237,7 @@ public class WheelSpinServiceTests
 
     /// <summary>Loads <see cref="Streamer"/> and draws queue entry 42 from a queue of 41 and 42.</summary>
     private static async Task<SpinScenario> DrawWinnerAsync(
-        ScriptedSpinnerApi api,
+        ScriptedStreamerSongListClient api,
         TimeProvider time,
         bool showQueuePosition)
     {

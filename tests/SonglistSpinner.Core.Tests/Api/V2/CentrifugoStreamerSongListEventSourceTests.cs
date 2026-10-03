@@ -2,13 +2,14 @@ using System.Net.WebSockets;
 using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Api.V2;
 using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.Models;
 using Xunit;
 
 namespace SonglistSpinner.Core.Tests.Api.V2;
 
 public class CentrifugoStreamerSongListEventSourceTests
 {
-    private const int StreamerId = 314;
+    private static readonly StreamerId StreamerId = new(314);
     private static readonly TimeSpan WaitLimit = TimeSpan.FromSeconds(15);
 
     private static readonly StreamerSongListEventsOptions Options = new()

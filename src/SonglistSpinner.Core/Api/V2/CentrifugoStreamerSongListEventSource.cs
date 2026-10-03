@@ -6,6 +6,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SonglistSpinner.Core.Contracts;
+using SonglistSpinner.Core.Models;
 
 namespace SonglistSpinner.Core.Api.V2;
 
@@ -58,10 +59,11 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     }
 
     public async IAsyncEnumerable<StreamerSongListEvent> SubscribeAsync(
-        int streamerId,
+        StreamerId streamerId,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        if (streamerId <= 0)
+        // The id type rejects non-positive values, but default(StreamerId) still holds 0.
+        if (streamerId.Value <= 0)
             throw new ArgumentOutOfRangeException(nameof(streamerId), "A positive streamer ID is required.");
 
         var reconnectAttempt = 0;
@@ -127,7 +129,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     }
 
     private async IAsyncEnumerable<StreamerSongListEvent> SubscribeOnceAsync(
-        int streamerId,
+        StreamerId streamerId,
         [EnumeratorCancellation] CancellationToken cancellationToken)
     {
         using var socket = await _connectAsync(_options.Endpoint, cancellationToken);

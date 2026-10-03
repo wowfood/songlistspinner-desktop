@@ -263,7 +263,7 @@ public partial class Dashboard
         try
         {
             var channel = new StreamerSongListChannel(name, _config.Streamer.Platform);
-            var streamerId = await ApiService.ResolveStreamerIdAsync(channel, _lifetimeCts.Token);
+            var streamerId = (await SongListClient.ResolveStreamerAsync(channel, _lifetimeCts.Token)).Id.Value;
             var (queue, played) = await FetchQueueAndHistory(name, _lifetimeCts.Token);
             _streamerId = streamerId;
             _nowPlaying = queue.Playing;
@@ -438,7 +438,7 @@ public partial class Dashboard
 
         try
         {
-            await ApiService.MarkNowPlayingAsPlayedAsync(streamerId, _lifetimeCts.Token);
+            await SongListClient.MarkNowPlayingAsPlayedAsync(new StreamerId(streamerId), _lifetimeCts.Token);
             markedPlayed = true;
             SetStatus("Now Playing marked as played.");
             await RefreshSnapshotAsync(streamer, _lifetimeCts.Token);
@@ -598,8 +598,8 @@ public partial class Dashboard
         {
             var period = _config.SongList.PlayHistoryPeriod;
             var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
-            var queueTask = ApiService.FetchQueueSnapshotAsync(channel, cancellationToken);
-            var historyTask = ApiService.FetchPlayHistoryAsync(channel, period, cancellationToken);
+            var queueTask = SongListClient.FetchQueueSnapshotAsync(channel, cancellationToken);
+            var historyTask = SongListClient.FetchPlayHistoryAsync(channel, period, cancellationToken);
             await Task.WhenAll(queueTask, historyTask);
             return (await queueTask, await historyTask);
         }

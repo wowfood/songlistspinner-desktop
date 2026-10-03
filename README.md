@@ -256,10 +256,10 @@ connection wizard will open the next time the Dashboard needs a credential.
 | Exclude already-played songs | Removes queue entries matching the selected history range from the wheel. |
 | Play History Period | Supplies the played panel and the optional wheel-exclusion filter. |
 
-History choices are Recent, Last 24 hours, Last 7 days, Last month, and All
-time. With the current API v2 contract, **Recent** means the latest API page,
-not a distinct streaming session. The current client loads at most the first
-100 history entries.
+History choices are Most recent plays, Last 24 hours, Last 7 days, Last month,
+and All time. API v2 has no stream-scoped filter, so **Most recent plays** means
+the latest API page, not a distinct streaming session. The current client loads
+at most the first 100 history entries, so exclusion only considers those.
 
 ### Overlay Layout
 

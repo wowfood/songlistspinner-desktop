@@ -7,7 +7,7 @@ namespace SonglistSpinner.Application.Tests;
 /// A StreamerSongList API whose queue fetches follow a script and whose queue changes are recorded.
 /// Calls that no test in this project needs throw <see cref="NotSupportedException"/>.
 /// </summary>
-internal sealed class ScriptedSpinnerApi : ISpinnerApiService
+internal sealed class ScriptedStreamerSongListClient : IStreamerSongListClient
 {
     private int _queueFetches;
 
@@ -52,29 +52,23 @@ internal sealed class ScriptedSpinnerApi : ISpinnerApiService
         StreamerSongListChannel channel,
         CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-    public Task<int> ResolveStreamerIdAsync(
-        StreamerSongListChannel channel,
-        CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-    public Task<SpinnerQueueItem[]> FetchQueueAsync(
-        StreamerSongListChannel channel,
-        CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-    public Task MarkQueueItemAsPlayedAsync(int queueId, CancellationToken cancellationToken = default)
+    public Task MarkQueueItemAsPlayedAsync(QueueEntryId queueEntryId, CancellationToken cancellationToken = default)
     {
-        MarkedPlayed.Add(queueId);
+        MarkedPlayed.Add(queueEntryId.Value);
         return Task.CompletedTask;
     }
 
-    public Task MarkNowPlayingAsPlayedAsync(int streamerId, CancellationToken cancellationToken = default)
+    public Task MarkNowPlayingAsPlayedAsync(StreamerId streamerId, CancellationToken cancellationToken = default)
     {
-        NowPlayingMarkedPlayedFor.Add(streamerId);
+        NowPlayingMarkedPlayedFor.Add(streamerId.Value);
         return Task.CompletedTask;
     }
 
-    public Task PromoteQueueItemToNowPlayingAsync(int queueId, CancellationToken cancellationToken = default)
+    public Task PromoteQueueItemToNowPlayingAsync(
+        QueueEntryId queueEntryId,
+        CancellationToken cancellationToken = default)
     {
-        PromotedToNowPlaying.Add(queueId);
+        PromotedToNowPlaying.Add(queueEntryId.Value);
         return Task.CompletedTask;
     }
 
