@@ -1,8 +1,9 @@
 using System.Collections.Concurrent;
-using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
 
@@ -20,6 +21,7 @@ public class OverlayStateService
     private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
     private readonly object _healthGate = new();
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<OverlayStateService> _logger;
 
     // Every change to the overlay snapshot is recorded and broadcast while holding this lock, and
     // SubscribeAsync takes it to build a client's initial state and register the client. So clients
@@ -31,9 +33,10 @@ public class OverlayStateService
     private string? _serverError;
     private LocalOverlayServerState _serverState = LocalOverlayServerState.Stopped;
 
-    public OverlayStateService(TimeProvider? timeProvider = null)
+    public OverlayStateService(TimeProvider? timeProvider = null, ILogger<OverlayStateService>? logger = null)
     {
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _logger = logger ?? NullLogger<OverlayStateService>.Instance;
     }
 
     public event EventHandler? HealthChanged;
@@ -270,7 +273,7 @@ public class OverlayStateService
             }
             catch (Exception ex)
             {
-                Trace.WriteLine($"[OverlayState] A health observer failed: {ex}");
+                _logger.LogError(ex, "An overlay health observer failed");
             }
         }
     }

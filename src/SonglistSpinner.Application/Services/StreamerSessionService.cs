@@ -1,5 +1,6 @@
-using System.Diagnostics;
 using System.Threading.Channels;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Core.Services;
@@ -22,6 +23,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
     private readonly IStreamerSongListEventSource _eventSource;
     private readonly OverlayStateService _overlayService;
     private readonly TimeProvider _timeProvider;
+    private readonly ILogger<StreamerSessionService> _logger;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly object _stateGate = new();
@@ -37,12 +39,14 @@ public sealed class StreamerSessionService : IAsyncDisposable
         ISpinnerApiService apiService,
         IStreamerSongListEventSource eventSource,
         OverlayStateService overlayService,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ILogger<StreamerSessionService>? logger = null)
     {
         _apiService = apiService;
         _eventSource = eventSource;
         _overlayService = overlayService;
         _timeProvider = timeProvider ?? TimeProvider.System;
+        _logger = logger ?? NullLogger<StreamerSessionService>.Instance;
     }
 
     public event EventHandler<StreamerSessionChangedEventArgs>? Changed;
@@ -301,7 +305,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 StreamerSessionHealth.Failed,
                 ex.Message,
                 $"Realtime updates stopped: {ex.Message}");
-            Trace.WriteLine($"[SonglistSpinner] Realtime updates stopped: {ex}");
+            _logger.LogError(ex, "Realtime updates for streamer {StreamerId} stopped", streamerId);
         }
         finally
         {
@@ -336,7 +340,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         catch (Exception ex)
         {
             UpdateApiHealth(StreamerSessionHealth.Failed, ex.Message, $"Realtime refresh failed: {ex.Message}");
-            Trace.WriteLine($"[SonglistSpinner] Realtime refresh failed: {ex}");
+            _logger.LogError(ex, "Realtime refreshes for {Streamer} stopped", streamer);
         }
     }
 
@@ -357,7 +361,12 @@ public sealed class StreamerSessionService : IAsyncDisposable
             try
             {
                 await RefreshAsync(streamer, cancellationToken);
-                if (failed) RaiseChanged("Realtime refresh recovered.");
+                if (failed)
+                {
+                    _logger.LogInformation("Realtime refresh for {Streamer} recovered", streamer);
+                    RaiseChanged("Realtime refresh recovered.");
+                }
+
                 return;
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -366,9 +375,15 @@ public sealed class StreamerSessionService : IAsyncDisposable
             }
             catch (Exception ex)
             {
+                // Retries never give up, so the first failure is the degradation worth a warning and the
+                // attempts after it are retry detail.
+                _logger.Log(
+                    failed ? LogLevel.Debug : LogLevel.Warning,
+                    ex,
+                    "Realtime refresh for {Streamer} failed; retrying in {RetryDelay}",
+                    streamer,
+                    retryDelay);
                 failed = true;
-                Trace.WriteLine(
-                    $"[SonglistSpinner] Realtime refresh failed; retrying in {retryDelay.TotalSeconds:0}s: {ex}");
             }
 
             await Task.Delay(retryDelay, _timeProvider, cancellationToken);
@@ -418,7 +433,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
             }
             catch (Exception ex)
             {
-                Trace.WriteLine($"[SonglistSpinner] A streamer session observer failed: {ex}");
+                _logger.LogError(ex, "A streamer session observer failed");
             }
         }
     }

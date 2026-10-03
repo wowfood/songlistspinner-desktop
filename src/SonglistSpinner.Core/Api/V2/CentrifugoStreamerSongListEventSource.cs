@@ -1,9 +1,10 @@
 using System.Buffers;
-using System.Diagnostics;
 using System.Net.WebSockets;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using SonglistSpinner.Core.Contracts;
 
 namespace SonglistSpinner.Core.Api.V2;
@@ -14,11 +15,13 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     private readonly StreamerSongListEventsOptions _options;
     private readonly TimeProvider _timeProvider;
     private readonly Func<Uri, CancellationToken, Task<WebSocket>> _connectAsync;
+    private readonly ILogger<CentrifugoStreamerSongListEventSource> _logger;
 
     public CentrifugoStreamerSongListEventSource(
         StreamerSongListEventsOptions options,
-        TimeProvider? timeProvider = null)
-        : this(options, timeProvider, ConnectClientWebSocketAsync)
+        TimeProvider? timeProvider = null,
+        ILogger<CentrifugoStreamerSongListEventSource>? logger = null)
+        : this(options, timeProvider, ConnectClientWebSocketAsync, logger)
     {
     }
 
@@ -27,11 +30,13 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     internal CentrifugoStreamerSongListEventSource(
         StreamerSongListEventsOptions options,
         TimeProvider? timeProvider,
-        Func<Uri, CancellationToken, Task<WebSocket>> connectAsync)
+        Func<Uri, CancellationToken, Task<WebSocket>> connectAsync,
+        ILogger<CentrifugoStreamerSongListEventSource>? logger = null)
     {
         _options = options;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _connectAsync = connectAsync;
+        _logger = logger ?? NullLogger<CentrifugoStreamerSongListEventSource>.Instance;
 
         if (!_options.Endpoint.IsAbsoluteUri ||
             _options.Endpoint.Scheme is not ("ws" or "wss"))
@@ -102,10 +107,21 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
 
             cancellationToken.ThrowIfCancellationRequested();
             var error = failure?.Message ?? "The StreamerSongList event connection closed.";
-            Trace.WriteLine($"[SonglistSpinner Events] {error} Reconnecting...");
+            var reconnectDelay = GetReconnectDelay(reconnectAttempt);
+            // Reconnecting never gives up, so only losing a working connection is a warning; each further
+            // failed attempt is retry detail.
+            var level = reconnectAttempt == 0 ? LogLevel.Warning : LogLevel.Debug;
+            reconnectAttempt++;
+            _logger.Log(
+                level,
+                failure,
+                "StreamerSongList events for streamer {StreamerId} disconnected; " +
+                "reconnect attempt {ReconnectAttempt} in {ReconnectDelay}",
+                streamerId,
+                reconnectAttempt,
+                reconnectDelay);
             yield return new StreamerSongListEvent(StreamerSongListEventKind.Reconnecting, Error: error);
 
-            var reconnectDelay = GetReconnectDelay(reconnectAttempt++);
             await Task.Delay(reconnectDelay, _timeProvider, cancellationToken);
         }
     }

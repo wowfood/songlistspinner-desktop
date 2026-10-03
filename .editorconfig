@@ -72,6 +72,12 @@ dotnet_naming_rule.private_fields_are_underscore_camel_case.severity = warning
 # passes read-only abstractions, and the gain is immaterial in this app.
 dotnet_diagnostic.CA1859.severity = suggestion
 
+# CA1848 asks for [LoggerMessage] delegates on every log call, and CA1873 for an IsEnabled guard around
+# every Debug/Information call with arguments. The structured-logging standard keeps both for hot paths
+# and expensive arguments; this app logs at boundaries and failures with cheap arguments.
+dotnet_diagnostic.CA1848.severity = suggestion
+dotnet_diagnostic.CA1873.severity = suggestion
+
 [tests/**.cs]
 # Test methods are named Given_X_When_Y_Then_Z (see AGENTS.md), so underscores are intended.
 dotnet_diagnostic.CA1707.severity = none

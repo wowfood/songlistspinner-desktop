@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Api.V2;
 using SonglistSpinner.Core.Contracts;
@@ -461,18 +462,36 @@ public class StreamerSongListApiClientTests
         Assert.Equal(0, handler.RequestCount);
     }
 
+    [Fact]
+    public async Task Given_RequestWithQueryAndToken_When_Sent_Then_LogsOnlyMethodPathAndStatus()
+    {
+        var handler = new RecordingHandler(_ => JsonResponse("""{"id":314}"""));
+        var logger = new RecordingLogger();
+        var client = CreateClient(handler, logger: logger);
+
+        await client.ResolveStreamerAsync(
+            new StreamerSongListChannel("Foo Bar", "twitch"),
+            TestContext.Current.CancellationToken);
+
+        var entry = Assert.Single(logger.Entries);
+        Assert.Equal(LogLevel.Debug, entry.Level);
+        Assert.Equal("StreamerSongList GET /streamers returned 200", entry.Message);
+    }
+
     private static StreamerSongListApiClient CreateClient(
         RecordingHandler handler,
         StreamerSongListCredentialKind kind = StreamerSongListCredentialKind.Streamer,
         string? clientId = null,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        ILogger<StreamerSongListApiClient>? logger = null)
     {
         var credential = new StreamerSongListCredential(kind, "test-token", clientId);
         return new StreamerSongListApiClient(
             new HttpClient(handler),
             new StubCredentialProvider(credential),
             Options(),
-            timeProvider);
+            timeProvider,
+            logger);
     }
 
     private static StreamerSongListApiOptions Options()
@@ -519,6 +538,25 @@ public class StreamerSongListApiClientTests
                 ? values.Single()
                 : null;
             return Task.FromResult(responseFactory(request));
+        }
+    }
+
+    private sealed class RecordingLogger : ILogger<StreamerSongListApiClient>
+    {
+        public List<(LogLevel Level, string Message)> Entries { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            Entries.Add((logLevel, formatter(state, exception)));
         }
     }
 }
