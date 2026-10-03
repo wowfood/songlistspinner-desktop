@@ -5,10 +5,10 @@ using Microsoft.Playwright;
 namespace SonglistSpinner.EndToEndTests.Infrastructure;
 
 /// <summary>
-/// Records the labels the page gives its wheel. The wheel is drawn on a canvas, so its labels are in no element;
-/// the probe wraps <c>SpinnerInterop.createWheel</c> (which the app and the overlay both draw through) and writes
-/// the labels it receives, before any are shortened to fit, as JSON to <see cref="AttributeName"/> on the
-/// document element, where a retrying Playwright expectation can read them. The app's own code is not changed.
+/// Records the labels a page gives its wheel. The wheel is drawn on a canvas, so its labels are in no element; the
+/// probe writes the labels passed to <c>SpinnerInterop.createWheel</c> (which the app and the overlay both draw
+/// through), before the wheel shortens any to fit, as JSON to <see cref="AttributeName"/> on the document
+/// element, where a retrying Playwright expectation can read them. Neither page's code is changed.
 /// </summary>
 internal static class WheelProbe
 {
@@ -21,64 +21,65 @@ internal static class WheelProbe
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
-    // Blazor and the overlay resolve SpinnerInterop.createWheel when they call it, so the replacement is used from
-    // the next call on.
-    private const string WrapFunction = """
-        function wrapSpinnerInterop(interop) {
-            if (!interop || interop.__e2eWheelProbe) return
-            const createWheel = interop.createWheel
-            interop.createWheel = function (items) {
+    // Blazor WebView sends each JavaScript call from .NET as a WebView2 web message,
+    // __bwv:["BeginInvokeJS",callId,"identifier","[args as JSON]",...]; every message listener receives it.
+    // Wrapping SpinnerInterop.createWheel instead would miss the app's calls, because Blazor caches the function
+    // it first resolved for an identifier, and the app has drawn its first wheel before the DevTools connection
+    // opens. This relies on that message format, an implementation detail of Blazor WebView (seen on MAUI 10).
+    private const string AppTap = """
+        () => {
+            if (window.__e2eWheelProbe) return
+            window.__e2eWheelProbe = true
+            window.chrome.webview.addEventListener('message', event => {
+                const data = event.data
+                if (typeof data !== 'string' || !data.startsWith('__bwv:')) return
+                let message
+                try { message = JSON.parse(data.slice('__bwv:'.length)) } catch { return }
+                if (message[0] !== 'BeginInvokeJS' || message[2] !== 'SpinnerInterop.createWheel') return
+                const items = JSON.parse(message[3])[0]
                 const labels = Array.isArray(items) ? items.map(item => item && item.label) : []
                 document.documentElement.setAttribute('ATTRIBUTE', JSON.stringify(labels))
-                return createWheel.apply(this, arguments)
-            }
-            interop.__e2eWheelProbe = true
+            })
         }
         """;
 
-    /// <summary>
-    /// Wraps the wheel of the app's page. Blazor caches each JavaScript function it has called, so wrapping after
-    /// the app drew its first wheel would never be seen: the probe is registered for every load and, when the page
-    /// had already loaded without it, the page is reloaded (at launch, before any test acts).
-    /// </summary>
-    public static async Task InstallInAppAsync(IPage page, Func<Task> waitForApp)
-    {
-        await InstallBeforeLoadAsync(page.Context);
-        if (await IsInstalledAsync(page)) return;
+    // The overlay calls SpinnerInterop.createWheel from its own script, which looks the function up on each call.
+    private const string OverlayWrap = """
+        (() => {
+            function wrapSpinnerInterop(interop) {
+                if (!interop || interop.__e2eWheelProbe) return
+                const createWheel = interop.createWheel
+                interop.createWheel = function (items) {
+                    const labels = Array.isArray(items) ? items.map(item => item && item.label) : []
+                    document.documentElement.setAttribute('ATTRIBUTE', JSON.stringify(labels))
+                    return createWheel.apply(this, arguments)
+                }
+                interop.__e2eWheelProbe = true
+            }
+            let interop
+            Object.defineProperty(window, 'SpinnerInterop', {
+                configurable: true,
+                get() { return interop },
+                set(value) { interop = value; wrapSpinnerInterop(value) }
+            })
+        })()
+        """;
 
-        await page.ReloadAsync();
-        await waitForApp();
-        if (!await IsInstalledAsync(page))
-            throw new InvalidOperationException("The wheel probe was not installed after reloading the app's page.");
-    }
+    /// <summary>Records the app's wheel from now on: the next channel load, refresh or spin redraws it.</summary>
+    public static Task InstallInAppAsync(IPage page) => page.EvaluateAsync(WithAttribute(AppTap));
 
     /// <summary>
-    /// Wraps the wheel of every page the context loads from now on, as soon as its script defines
-    /// <c>window.SpinnerInterop</c>, so the first wheel the page draws is recorded too.
+    /// Records the wheel of every page the context loads from now on, from the first wheel the page draws. Use it
+    /// for the overlay page, before navigating to it.
     /// </summary>
     public static Task InstallBeforeLoadAsync(IBrowserContext context) =>
-        context.AddInitScriptAsync($$"""
-            (() => {
-                {{Script}}
-                let interop
-                Object.defineProperty(window, 'SpinnerInterop', {
-                    configurable: true,
-                    get() { return interop },
-                    set(value) { interop = value; wrapSpinnerInterop(value) }
-                })
-            })()
-            """);
+        context.AddInitScriptAsync(WithAttribute(OverlayWrap));
 
     /// <summary>Waits until the page's wheel was last drawn with exactly <paramref name="labels"/>, in order.</summary>
     public static Task ExpectLabelsAsync(IPage page, IReadOnlyList<string> labels) =>
         Assertions.Expect(page.Locator("html"))
             .ToHaveAttributeAsync(AttributeName, JsonSerializer.Serialize(labels, ScriptJson));
 
-    private static async Task<bool> IsInstalledAsync(IPage page)
-    {
-        await page.WaitForFunctionAsync("() => Boolean(window.SpinnerInterop)");
-        return await page.EvaluateAsync<bool>("() => window.SpinnerInterop.__e2eWheelProbe === true");
-    }
-
-    private static string Script => WrapFunction.Replace("ATTRIBUTE", AttributeName, StringComparison.Ordinal);
+    private static string WithAttribute(string script) =>
+        script.Replace("ATTRIBUTE", AttributeName, StringComparison.Ordinal);
 }

@@ -9,7 +9,7 @@ namespace SonglistSpinner.EndToEndTests.Pages;
 /// while the field is shown, with buttons to move it earlier or later. Field names are the stored values
 /// (<c>artist</c>, <c>title</c>, <c>requester</c>, <c>donation</c>).
 /// </summary>
-internal sealed class FieldOrderEditor(ILocator root)
+internal sealed partial class FieldOrderEditor(ILocator root)
 {
     private ILocator Chips => root.Locator(".ss-chip");
 

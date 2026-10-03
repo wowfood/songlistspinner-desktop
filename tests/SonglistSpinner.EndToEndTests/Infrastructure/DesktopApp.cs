@@ -102,7 +102,7 @@ internal sealed class DesktopApp : IAsyncDisposable
             {
                 var browser = await playwright.Chromium.ConnectOverCDPAsync($"http://127.0.0.1:{devToolsPort}");
                 var page = await WaitForAppPageAsync(browser.Contexts[0]);
-                await WheelProbe.InstallInAppAsync(page, () => WaitForAppUrlAsync(page));
+                await WheelProbe.InstallInAppAsync(page);
                 return new DesktopApp(process, playwright, browser, page, overlayPort);
             }
             catch

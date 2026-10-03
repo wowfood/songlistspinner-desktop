@@ -7,7 +7,7 @@ namespace SonglistSpinner.EndToEndTests.Pages;
 /// A MudBlazor dialog the Settings page opens: the unsaved-changes prompt, "Clear API credential?", a reset
 /// review ("Review Played Songs Panel reset") or "... already uses defaults".
 /// </summary>
-internal sealed class SettingsMessageBox(IPage page, string title)
+internal sealed partial class SettingsMessageBox(IPage page, string title)
 {
     public ILocator Root => page.Locator(".mud-dialog").Filter(new() { HasText = title });
 

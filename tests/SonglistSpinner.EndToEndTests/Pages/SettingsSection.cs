@@ -6,7 +6,7 @@ namespace SonglistSpinner.EndToEndTests.Pages;
 /// <summary>What every Settings section page object shares: opening it and finding its subsections.</summary>
 /// <param name="page">The app's page.</param>
 /// <param name="name">The section's name in the navigation and above its heading, such as "Spinner &amp; Queue".</param>
-internal abstract class SettingsSection(IPage page, string name)
+internal abstract partial class SettingsSection(IPage page, string name)
 {
     protected IPage Page { get; } = page;
 
