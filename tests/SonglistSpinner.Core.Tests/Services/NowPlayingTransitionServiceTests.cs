@@ -10,7 +10,7 @@ public class NowPlayingTransitionServiceTests
     [Fact]
     public async Task Given_NoCurrentSong_When_PromotingWinner_Then_PromotesWinnerDirectly()
     {
-        var api = new RecordingSpinnerApiService(new SpinnerQueueSnapshot());
+        var api = new RecordingSpinnerApiService(new SpinnerQueueSnapshot { Items = [new() { QueueId = 91 }] });
         var service = new NowPlayingTransitionService(api);
 
         await service.PromoteWinnerAsync(
@@ -71,11 +71,56 @@ public class NowPlayingTransitionServiceTests
         Assert.Equal(["fetch"], api.Calls);
     }
 
+    [Fact]
+    public async Task Given_WinnerMissingFromQueue_When_PromotingWinner_Then_LeavesCurrentSongPlaying()
+    {
+        var api = new RecordingSpinnerApiService(new SpinnerQueueSnapshot
+        {
+            Playing = new SpinnerQueueItem { QueueId = 77 }
+        });
+        var service = new NowPlayingTransitionService(api);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PromoteWinnerAsync(
+                new StreamerSongListChannel("wowfood"),
+                314,
+                91,
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(WinnerMissingMessage, error.Message);
+        Assert.Equal(["fetch"], api.Calls);
+    }
+
+    [Fact]
+    public async Task Given_WinnerRemovedAfterCompletingCurrent_When_PromotingWinner_Then_ReportsPartialTransition()
+    {
+        var api = new RecordingSpinnerApiService(Snapshot(77), new SpinnerQueueSnapshot());
+        var service = new NowPlayingTransitionService(api);
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            service.PromoteWinnerAsync(
+                new StreamerSongListChannel("wowfood"),
+                314,
+                91,
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "The previous Now Playing song was marked as played, but the winner could not be promoted. " +
+            "Refresh the queue before trying again. " + WinnerMissingMessage,
+            error.Message);
+        Assert.Equal(WinnerMissingMessage, error.InnerException?.Message);
+        Assert.Equal(["fetch", "complete:314", "fetch"], api.Calls);
+    }
+
+    private const string WinnerMissingMessage =
+        "The selected winner is no longer in the queue. Leave this selection and spin again.";
+
     private static SpinnerQueueSnapshot Snapshot(int playingId)
     {
         return new SpinnerQueueSnapshot
         {
-            Playing = new SpinnerQueueItem { QueueId = playingId }
+            Playing = new SpinnerQueueItem { QueueId = playingId },
+            Items = [new() { QueueId = 91 }]
         };
     }
 
