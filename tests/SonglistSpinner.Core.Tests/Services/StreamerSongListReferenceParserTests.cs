@@ -29,10 +29,12 @@ public class StreamerSongListReferenceParserTests
     }
 
     [Theory]
-    [InlineData("")]
-    [InlineData("https://streamersonglist.com/not-a-channel")]
-    [InlineData("ftp://streamersonglist.com/t/wowfood")]
-    public void Given_InvalidReference_When_Parsing_Then_ReturnsHelpfulError(string reference)
+    [InlineData("", "Enter a StreamerSongList URL or streamer name.")]
+    [InlineData(
+        "https://streamersonglist.com/not-a-channel",
+        "Use a streamer name or a URL ending in /t/name, /s/name, /k/name, or /y/name.")]
+    [InlineData("ftp://streamersonglist.com/t/wowfood", "The streamer URL must use http or https.")]
+    public void Given_InvalidReference_When_Parsing_Then_ReturnsHelpfulError(string reference, string expectedError)
     {
         var parsed = StreamerSongListReferenceParser.TryParse(
             reference,
@@ -41,6 +43,6 @@ public class StreamerSongListReferenceParserTests
             out var error);
 
         Assert.False(parsed);
-        Assert.False(string.IsNullOrWhiteSpace(error));
+        Assert.Equal(expectedError, error);
     }
 }

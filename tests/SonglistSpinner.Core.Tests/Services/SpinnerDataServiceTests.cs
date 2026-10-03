@@ -88,27 +88,27 @@ public class SpinnerDataServiceTests
     }
 
     [Fact]
-    public void Given_SongsWithNoIds_And_MatchingArtistAndTitle_When_SongMatchesPlayed_Then_ReturnsTrue()
+    public void Given_SongsWithNoIdsAndMatchingArtistAndTitle_When_SongMatchesPlayed_Then_ReturnsTrue()
     {
         Assert.True(SpinnerDataService.SongMatchesPlayed(Q(), H()));
     }
 
     [Fact]
-    public void Given_SongsWithNoIds_And_DifferentArtist_When_SongMatchesPlayed_Then_ReturnsFalse()
+    public void Given_SongsWithNoIdsAndDifferentArtist_When_SongMatchesPlayed_Then_ReturnsFalse()
     {
         Assert.False(SpinnerDataService.SongMatchesPlayed(
             Q(artist: "Artist A"), H(artist: "Artist B")));
     }
 
     [Fact]
-    public void Given_SongsWithNoIds_And_DifferentTitle_When_SongMatchesPlayed_Then_ReturnsFalse()
+    public void Given_SongsWithNoIdsAndDifferentTitle_When_SongMatchesPlayed_Then_ReturnsFalse()
     {
         Assert.False(SpinnerDataService.SongMatchesPlayed(
             Q(title: "Song One"), H(title: "Song Two")));
     }
 
     [Fact]
-    public void Given_SongsWithNoIds_And_ArtistTitleDifferByCase_When_SongMatchesPlayed_Then_ReturnsTrue()
+    public void Given_SongsWithNoIdsAndArtistTitleDifferByCase_When_SongMatchesPlayed_Then_ReturnsTrue()
     {
         Assert.True(SpinnerDataService.SongMatchesPlayed(
             Q(artist: "ARTIST A", title: "SONG ONE"),
@@ -396,7 +396,8 @@ public class SpinnerDataServiceTests
     public void Given_SingleField_When_CreateSongTextForFields_Then_CapitalizesFieldLabel()
     {
         var result = SpinnerDataService.CreateSongTextForFields(Q(), ["requester"]);
-        Assert.StartsWith("Requester:", result);
+
+        Assert.Equal("Requester: User1", result);
     }
 
     [Fact]
@@ -660,7 +661,8 @@ public class SpinnerDataServiceTests
     public void Given_ConfiguredWinnerFieldsWithoutRequester_When_GetWinnerFields_Then_DoesNotAddRequester()
     {
         var fields = SpinnerDataService.GetWinnerFields(Cfg(winnerFields: ["artist", "title"]));
-        Assert.DoesNotContain("requester", fields);
+
+        Assert.Equal(["artist", "title"], fields);
     }
 
     [Fact]
@@ -676,27 +678,26 @@ public class SpinnerDataServiceTests
     {
         var fields = SpinnerDataService.GetWinnerFields(
             Cfg(winnerFields: ["donation", "title", "artist"]));
+
         Assert.Equal(["donation", "title", "artist"], fields);
-        Assert.Contains("artist", fields);
-        Assert.Contains("title", fields);
     }
 
     [Fact]
     public void Given_ConfigWithEmptyFields_When_GetWinnerFields_Then_DefaultsToArtistTitleAndRequester()
     {
         var cfg = new SpinnerConfig { WinnerDialog = new SpinnerWinnerDialogConfig { Fields = [] } };
+
         var fields = SpinnerDataService.GetWinnerFields(cfg);
-        Assert.Contains("artist", fields);
-        Assert.Contains("title", fields);
-        Assert.Contains("requester", fields);
+
+        Assert.Equal(["artist", "title", "requester"], fields);
     }
 
     [Fact]
     public void Given_FieldsInMixedCase_When_GetWinnerFields_Then_ReturnsLowercaseFields()
     {
         var fields = SpinnerDataService.GetWinnerFields(Cfg(winnerFields: ["ARTIST", "Title"]));
-        Assert.Contains("artist", fields);
-        Assert.Contains("title", fields);
+
+        Assert.Equal(["artist", "title"], fields);
     }
 
     // ── CreateWinnerDialogFields ─────────────────────────────────────────────
@@ -771,7 +772,7 @@ public class SpinnerDataServiceTests
     }
 
     [Fact]
-    public void Given_ExcludeEnabled_And_SomePlayedById_When_FilterAvailableSongs_Then_ExcludesPlayedSongs()
+    public void Given_ExcludeEnabledAndSomePlayedById_When_FilterAvailableSongs_Then_ExcludesPlayedSongs()
     {
         var all = new List<SpinnerQueueItem> { Q(1), Q(2) };
         var played = new List<PlayHistoryItem> { H(1) };
@@ -781,7 +782,7 @@ public class SpinnerDataServiceTests
     }
 
     [Fact]
-    public void Given_ExcludeEnabled_And_NoPlayedSongs_When_FilterAvailableSongs_Then_ReturnsAll()
+    public void Given_ExcludeEnabledAndNoPlayedSongs_When_FilterAvailableSongs_Then_ReturnsAll()
     {
         var all = new List<SpinnerQueueItem> { Q(1), Q(2) };
         var result = SpinnerDataService.FilterAvailableSongs(all, [], Cfg(exclude: true));
@@ -789,7 +790,7 @@ public class SpinnerDataServiceTests
     }
 
     [Fact]
-    public void Given_ExcludeEnabled_And_AllSongsPlayed_When_FilterAvailableSongs_Then_ReturnsEmpty()
+    public void Given_ExcludeEnabledAndAllSongsPlayed_When_FilterAvailableSongs_Then_ReturnsEmpty()
     {
         var all = new List<SpinnerQueueItem> { Q(1), Q(2) };
         var played = new List<PlayHistoryItem> { H(1), H(2) };
@@ -798,7 +799,7 @@ public class SpinnerDataServiceTests
     }
 
     [Fact]
-    public void Given_ExcludeEnabled_And_MatchByArtistTitle_When_FilterAvailableSongs_Then_ExcludesMatch()
+    public void Given_ExcludeEnabledAndMatchByArtistTitle_When_FilterAvailableSongs_Then_ExcludesMatch()
     {
         var all = new List<SpinnerQueueItem>
         {

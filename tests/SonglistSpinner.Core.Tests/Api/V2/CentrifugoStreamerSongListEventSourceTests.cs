@@ -25,7 +25,12 @@ public class CentrifugoStreamerSongListEventSourceTests
             Endpoint = new Uri("https://events.example.test/connection/websocket")
         };
 
-        Assert.Throws<ArgumentException>(() => new CentrifugoStreamerSongListEventSource(options));
+        var exception = Assert.Throws<ArgumentException>(() => new CentrifugoStreamerSongListEventSource(options));
+
+        Assert.Equal("options", exception.ParamName);
+        Assert.Equal(
+            "The StreamerSongList event endpoint must be an absolute WebSocket URI. (Parameter 'options')",
+            exception.Message);
     }
 
     [Fact]
@@ -33,6 +38,10 @@ public class CentrifugoStreamerSongListEventSourceTests
     {
         var options = new StreamerSongListEventsOptions { ReceiveIdleTimeout = TimeSpan.Zero };
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => new CentrifugoStreamerSongListEventSource(options));
+        var exception = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new CentrifugoStreamerSongListEventSource(options));
+
+        Assert.Equal("options", exception.ParamName);
+        Assert.Equal("The receive idle timeout must be positive. (Parameter 'options')", exception.Message);
     }
 }

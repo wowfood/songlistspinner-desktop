@@ -258,8 +258,10 @@ public class StreamerSongListApiClientTests
         var handler = new RecordingHandler(_ => JsonResponse("{}"));
         var client = CreateClient(handler);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             client.MarkQueueItemAsPlayedAsync(0, TestContext.Current.CancellationToken));
+
+        Assert.Equal("queueId", exception.ParamName);
         Assert.Equal(0, handler.RequestCount);
     }
 
@@ -295,8 +297,10 @@ public class StreamerSongListApiClientTests
         var handler = new RecordingHandler(_ => JsonResponse("{}"));
         var client = CreateClient(handler);
 
-        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() =>
             client.MarkNowPlayingAsPlayedAsync(0, TestContext.Current.CancellationToken));
+
+        Assert.Equal("streamerId", exception.ParamName);
         Assert.Equal(0, handler.RequestCount);
     }
 
@@ -437,7 +441,8 @@ public class StreamerSongListApiClientTests
             new StubCredentialProvider(credential),
             options));
 
-        Assert.Contains("between 1 and 100", exception.Message);
+        Assert.Equal("options", exception.ParamName);
+        Assert.Equal("Page size must be between 1 and 100. (Parameter 'options')", exception.Message);
     }
 
     [Fact]
@@ -446,10 +451,12 @@ public class StreamerSongListApiClientTests
         var handler = new RecordingHandler(_ => JsonResponse("{}"));
         var client = CreateClient(handler);
 
-        await Assert.ThrowsAsync<ArgumentException>(() =>
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
             client.FetchQueueAsync(
                 new StreamerSongListChannel("wowfood", "unsupported"),
                 TestContext.Current.CancellationToken));
+
+        Assert.Equal("channel", exception.ParamName);
         Assert.Equal(0, handler.RequestCount);
     }
 
