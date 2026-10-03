@@ -34,7 +34,10 @@ public class LocalOverlayServer : IAsyncDisposable
     private LocalOverlayServerState _state = LocalOverlayServerState.Stopped;
     private string? _error;
 
-    /// <param name="port">The app always uses <see cref="DefaultPort"/>; tests pass a free port.</param>
+    /// <param name="port">
+    /// <see cref="DefaultPort"/> unless <see cref="EnvironmentOverrides.OverlayPort"/> moves an app under test; tests
+    /// pass a free port.
+    /// </param>
     public LocalOverlayServer(OverlayStateService overlay, ILogger<LocalOverlayServer> logger, int port = DefaultPort)
     {
         _overlay = overlay;

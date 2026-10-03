@@ -14,10 +14,6 @@ public partial class App
         ILogger<App> logger)
     {
         _overlayServer = overlayServer;
-        var localAppData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-        var webViewData = Path.Combine(localAppData, "SonglistSpinner", "WebView2");
-        Environment.SetEnvironmentVariable("WEBVIEW2_USER_DATA_FOLDER", webViewData);
-
         diagnosticLog.SetEnabled(localSettings.LoadSettings().DebugMode);
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             logger.LogCritical(
