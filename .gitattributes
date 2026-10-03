@@ -1,0 +1,6 @@
+# Normalise line endings in the repository; checkouts follow core.autocrlf.
+* text=auto
+
+# Third-party scripts kept as published. Excluded from language stats and collapsed in diffs.
+src/SonglistSpinner.Desktop/wwwroot/lib/** linguist-vendored
+src/SonglistSpinner.Desktop/wwwroot/spinner/spin-wheel-iife.js linguist-vendored
