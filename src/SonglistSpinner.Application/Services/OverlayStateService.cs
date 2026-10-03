@@ -18,7 +18,7 @@ public class OverlayStateService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
+    private readonly ConcurrentDictionary<Guid, Channel<OverlayEvent>> _clients = new();
     private readonly TimeProvider _timeProvider;
     private readonly ILogger<OverlayStateService> _logger;
 
@@ -135,15 +135,19 @@ public class OverlayStateService
 
     private void Broadcast(string eventName, object payload)
     {
-        var json = JsonSerializer.Serialize(payload, JsonOpts);
-        var message = $"event: {eventName}\ndata: {json}\n\n";
+        var message = OverlayEvent.Named(eventName, JsonSerializer.Serialize(payload, JsonOpts));
         foreach (var (_, channel) in _clients)
             channel.Writer.TryWrite(message);
     }
 
-    public async IAsyncEnumerable<string> SubscribeAsync([EnumeratorCancellation] CancellationToken ct = default)
+    /// <summary>
+    /// Streams the overlay's events to one connected overlay: the initial state first, then each change, with a
+    /// keep-alive after every quiet heartbeat interval. A client that falls a full buffer
+    /// of events behind loses the oldest.
+    /// </summary>
+    public async IAsyncEnumerable<OverlayEvent> SubscribeAsync([EnumeratorCancellation] CancellationToken ct = default)
     {
-        var channel = Channel.CreateBounded<string>(new BoundedChannelOptions(ClientBufferCapacity)
+        var channel = Channel.CreateBounded<OverlayEvent>(new BoundedChannelOptions(ClientBufferCapacity)
         {
             SingleReader = true,
             SingleWriter = false,
@@ -151,7 +155,7 @@ public class OverlayStateService
             AllowSynchronousContinuations = false
         });
         var key = Guid.NewGuid();
-        string initialState;
+        OverlayEvent initialState;
         lock (_stateGate)
         {
             initialState = BuildInitStateEvent();
@@ -175,8 +179,7 @@ public class OverlayStateService
                 if (completed == heartbeatDue)
                 {
                     ct.ThrowIfCancellationRequested();
-                    // SSE comments keep quiet browser sources alive and make disconnects observable.
-                    yield return ": keep-alive\n\n";
+                    yield return OverlayEvent.KeepAlive;
                     continue;
                 }
 
@@ -194,7 +197,7 @@ public class OverlayStateService
         }
     }
 
-    private string BuildInitStateEvent()
+    private OverlayEvent BuildInitStateEvent()
     {
         OverlaySnapshot snapshot;
         lock (_stateGate)
@@ -209,8 +212,7 @@ public class OverlayStateService
             Winner = snapshot.Winner
         };
 
-        var json = JsonSerializer.Serialize(payload, JsonOpts);
-        return $"event: {OverlayEventNames.InitialState}\ndata: {json}\n\n";
+        return OverlayEvent.Named(OverlayEventNames.InitialState, JsonSerializer.Serialize(payload, JsonOpts));
     }
 
     private static OverlayStatePayload CreateStatePayload(OverlaySnapshot snapshot)

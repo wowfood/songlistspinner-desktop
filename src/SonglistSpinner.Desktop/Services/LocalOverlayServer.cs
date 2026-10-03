@@ -265,8 +265,8 @@ public class LocalOverlayServer : IAsyncDisposable
         writer.AutoFlush = true;
         try
         {
-            await foreach (var msg in _overlay.SubscribeAsync(ct))
-                await writer.WriteAsync(msg);
+            await foreach (var overlayEvent in _overlay.SubscribeAsync(ct))
+                await writer.WriteAsync(OverlayServerSentEvents.Frame(overlayEvent));
         }
         catch (OperationCanceledException)
         {

@@ -85,7 +85,7 @@ public class WheelSpinServiceTests
         using var queue = OverlayStateServiceTests.ParseEventData(events.Current, OverlayEventNames.UpdateSongs);
         Assert.Equal(0, queue.RootElement.GetProperty("availableCount").GetInt32());
         Assert.True(await events.MoveNextAsync());
-        Assert.StartsWith("event: " + OverlayEventNames.CloseWinner + "\n", events.Current);
+        Assert.Equal(OverlayEventNames.CloseWinner, events.Current.Name);
     }
 
     [Fact]

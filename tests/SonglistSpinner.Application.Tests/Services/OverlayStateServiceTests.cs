@@ -77,21 +77,21 @@ public class OverlayStateServiceTests
         overlay.BroadcastWinnerReveal([new WinnerDialogField("Title", "Winner")], 7);
         overlay.BroadcastCloseWinner();
 
-        var received = new List<string>();
+        var received = new List<string?>();
         for (var i = 0; i < 6; i++)
         {
             Assert.True(await events.MoveNextAsync());
-            received.Add(events.Current[..events.Current.IndexOf('\n', StringComparison.Ordinal)]);
+            received.Add(events.Current.Name);
         }
 
         Assert.Equal(
             [
-                "event: " + OverlayEventNames.UpdateSongs,
-                "event: " + OverlayEventNames.SetCollapse,
-                "event: " + OverlayEventNames.SetPlayedListWidth,
-                "event: " + OverlayEventNames.SetWheelVisible,
-                "event: " + OverlayEventNames.WinnerReveal,
-                "event: " + OverlayEventNames.CloseWinner
+                OverlayEventNames.UpdateSongs,
+                OverlayEventNames.SetCollapse,
+                OverlayEventNames.SetPlayedListWidth,
+                OverlayEventNames.SetWheelVisible,
+                OverlayEventNames.WinnerReveal,
+                OverlayEventNames.CloseWinner
             ],
             received);
     }
@@ -161,7 +161,7 @@ public class OverlayStateServiceTests
         time.Advance(TimeSpan.FromSeconds(15));
 
         Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken));
-        Assert.Equal(": keep-alive\n\n", events.Current);
+        Assert.True(events.Current.IsKeepAlive);
     }
 
     [Fact]
@@ -186,11 +186,11 @@ public class OverlayStateServiceTests
         return ParseEventData(events.Current, OverlayEventNames.InitialState);
     }
 
-    internal static JsonDocument ParseEventData(string message, string eventName)
+    internal static JsonDocument ParseEventData(OverlayEvent overlayEvent, string eventName)
     {
-        const string dataPrefix = "\ndata: ";
-        Assert.StartsWith("event: " + eventName + dataPrefix, message);
-        return JsonDocument.Parse(message[(message.IndexOf(dataPrefix, StringComparison.Ordinal) + dataPrefix.Length)..]);
+        Assert.Equal(eventName, overlayEvent.Name);
+        Assert.NotNull(overlayEvent.Data);
+        return JsonDocument.Parse(overlayEvent.Data);
     }
 
     private static string[] PropertyNames(JsonElement element) =>
