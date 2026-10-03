@@ -9,7 +9,6 @@ using MudBlazor.Utilities;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Data;
 using SonglistSpinner.Core.Models;
-using SonglistSpinner.Core.Services;
 using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
@@ -29,13 +28,6 @@ public partial class Settings
         ("'Courier New'", "Courier New")
     ];
 
-    private static readonly SpinnerQueueItem[] PreviewSongs =
-    [
-        CreatePreviewSong(1, "The Midnight", "Sunset", "mod_jane", 10),
-        CreatePreviewSong(2, "CHVRCHES", "Clearest Blue", "musicfan"),
-        CreatePreviewSong(3, "Daft Punk", "Digital Love", "alex"),
-        CreatePreviewSong(4, "Florence + The Machine", "Dog Days Are Over", "streamviewer")
-    ];
 
     private readonly SettingsViewModel _vm = new();
     private SettingsSection _activeSection = SettingsSection.Connection;
@@ -380,20 +372,9 @@ public partial class Settings
             var previewDto = JsonSerializer.Deserialize<SettingsDto>(JsonSerializer.Serialize(_dto))
                              ?? new SettingsDto();
             _vm.ApplyToDto(previewDto);
-            var config = SettingsDtoConverter.ToSpinnerConfig(previewDto);
-            var previewPlayedSongs = PreviewSongs.Take(3).ToArray();
-
-            var payload = new OverlayStatePayload(
-                config,
-                string.IsNullOrWhiteSpace(previewDto.DefaultStreamerName)
-                    ? "your-channel"
-                    : previewDto.DefaultStreamerName.Trim(),
-                PreviewSongs.Select(song => new OverlayWheelItem(SpinnerDataService.BuildWheelLabel(song))).ToArray(),
-                SpinnerDataService.CreatePlayedSongTexts(previewPlayedSongs, config),
-                SpinnerDataService.CreatePlayedSongFieldTable(previewPlayedSongs, config),
-                SpinnerDataService.CreateNowPlayingText(PreviewSongs[3], config.NowPlaying),
-                previewPlayedSongs.Length,
-                PreviewSongs.Length);
+            var payload = SettingsPreview.CreatePayload(
+                SettingsDtoConverter.ToSpinnerConfig(previewDto),
+                previewDto.DefaultStreamerName);
 
             await JS.InvokeVoidAsync(
                 SpinnerInteropMethods.UpdateSettingsPreview,
@@ -407,21 +388,6 @@ public partial class Settings
         }
     }
 
-    private static SpinnerQueueItem CreatePreviewSong(
-        int id,
-        string artist,
-        string title,
-        string requester,
-        decimal? donation = null)
-    {
-        return new SpinnerQueueItem
-        {
-            QueueId = id,
-            Position = id,
-            Song = new SpinnerSong { Id = id, Artist = artist, Title = title },
-            Requests = [new SpinnerRequest { Name = requester, DonationAmount = donation }]
-        };
-    }
 
     private Task Save()
     {
