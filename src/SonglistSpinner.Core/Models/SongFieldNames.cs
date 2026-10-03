@@ -18,19 +18,8 @@ public static class SongFieldNames
 
     public static string[] CreateWinnerDefaultSelection() => [Artist, Title, Requester];
 
-    public static bool TryNormalize(string? value, out string normalized)
-    {
-        var candidate = value?.Trim();
-        foreach (var supported in SupportedValues)
-        {
-            if (!string.Equals(candidate, supported, StringComparison.OrdinalIgnoreCase)) continue;
-            normalized = supported;
-            return true;
-        }
-
-        normalized = "";
-        return false;
-    }
+    public static bool TryNormalize(string? value, out string normalized) =>
+        CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
 
     public static string[] NormalizeSelection(
         IEnumerable<string>? values,

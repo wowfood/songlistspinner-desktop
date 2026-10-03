@@ -5,6 +5,10 @@ namespace SonglistSpinner.Core.Services;
 
 public static class SpinnerDataService
 {
+    // Shown in place of a missing artist, title or requester name.
+    private const string UnknownValue = "Unknown";
+    private const string NoDonation = "None";
+
     public static bool SongMatchesPlayed(SpinnerQueueItem queueItem, PlayHistoryItem playedItem)
     {
         var q = queueItem.Song;
@@ -17,33 +21,22 @@ public static class SpinnerDataService
 
     public static string GetPrimaryRequester(SpinnerQueueItem song)
     {
-        return song.Requests.FirstOrDefault()?.Name is { Length: > 0 } n ? n : "Unknown";
+        return ValueOrUnknown(song.Requests.FirstOrDefault()?.Name);
     }
 
     public static string BuildWheelLabel(SpinnerQueueItem song)
     {
-        var artist = song.Song.Artist is { Length: > 0 } a ? a : "Unknown";
-        var title = song.Song.Title is { Length: > 0 } t ? t : "Unknown";
-        return $"{artist} - {title} ({GetPrimaryRequester(song)})";
+        return $"{ValueOrUnknown(song.Song.Artist)} - {ValueOrUnknown(song.Song.Title)} ({GetPrimaryRequester(song)})";
     }
 
     public static string FormatDonation(SpinnerQueueItem song)
     {
-        return FormatDonationFromRequest(song.Requests.FirstOrDefault(), "None");
+        return FormatDonationFromRequest(song.Requests.FirstOrDefault(), NoDonation);
     }
 
     public static string GetSongFieldValue(SpinnerQueueItem song, string field)
     {
-        if (!SongFieldNames.TryNormalize(field, out var normalizedField)) return "";
-
-        return normalizedField switch
-        {
-            SongFieldNames.Artist => song.Song.Artist is { Length: > 0 } a ? a : "Unknown",
-            SongFieldNames.Title => song.Song.Title is { Length: > 0 } t ? t : "Unknown",
-            SongFieldNames.Requester => GetPrimaryRequester(song),
-            SongFieldNames.Donation => FormatDonation(song),
-            _ => ""
-        };
+        return GetFieldValue(song.Song, song.Requests, field, NoDonation);
     }
 
     public static string CreateSongTextForFields(
@@ -59,6 +52,14 @@ public static class SpinnerDataService
             .Where(x => !string.IsNullOrEmpty(x.value))
             .Select(x => FormatSongField(x.field, x.value, showLabels));
         return string.Join(SongTextFormatting.NormalizeSeparator(separator), parts);
+    }
+
+    public static string CreateNowPlayingText(SpinnerQueueItem song, SpinnerNowPlayingConfig nowPlaying)
+    {
+        var fields = nowPlaying.Fields is { Length: > 0 }
+            ? nowPlaying.Fields
+            : SongFieldNames.CreateDefaultSelection();
+        return CreateSongTextForFields(song, fields, nowPlaying.Separator, nowPlaying.ShowLabels);
     }
 
     public static string CreatePlayedSongText(SpinnerQueueItem song, SpinnerConfig config)
@@ -190,18 +191,29 @@ public static class SpinnerDataService
 
     private static string GetHistoryFieldValue(PlayHistoryItem item, string field)
     {
+        return GetFieldValue(item.Song, item.Requests, field, donationFallback: "");
+    }
+
+    private static string GetFieldValue(
+        SpinnerSong? song,
+        List<SpinnerRequest> requests,
+        string field,
+        string donationFallback)
+    {
         if (!SongFieldNames.TryNormalize(field, out var normalizedField)) return "";
 
+        var request = requests.FirstOrDefault();
         return normalizedField switch
         {
-            SongFieldNames.Artist => item.Song?.Artist is { Length: > 0 } a ? a : "Unknown",
-            SongFieldNames.Title => item.Song?.Title is { Length: > 0 } t ? t : "Unknown",
-            SongFieldNames.Requester =>
-                item.Requests.FirstOrDefault()?.Name is { Length: > 0 } n ? n : "Unknown",
-            SongFieldNames.Donation => FormatDonationFromRequest(item.Requests.FirstOrDefault(), ""),
+            SongFieldNames.Artist => ValueOrUnknown(song?.Artist),
+            SongFieldNames.Title => ValueOrUnknown(song?.Title),
+            SongFieldNames.Requester => ValueOrUnknown(request?.Name),
+            SongFieldNames.Donation => FormatDonationFromRequest(request, donationFallback),
             _ => ""
         };
     }
+
+    private static string ValueOrUnknown(string? value) => value is { Length: > 0 } ? value : UnknownValue;
 
     private static string FormatSongField(string field, string value, bool showLabels)
     {

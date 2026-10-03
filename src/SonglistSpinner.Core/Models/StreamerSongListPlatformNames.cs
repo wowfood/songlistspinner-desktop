@@ -12,19 +12,8 @@ public static class StreamerSongListPlatformNames
 
     public static IReadOnlyList<string> Values { get; } = Array.AsReadOnly(SupportedValues);
 
-    public static bool TryNormalize(string? value, out string normalized)
-    {
-        var candidate = value?.Trim();
-        foreach (var supported in SupportedValues)
-        {
-            if (!string.Equals(candidate, supported, StringComparison.OrdinalIgnoreCase)) continue;
-            normalized = supported;
-            return true;
-        }
-
-        normalized = "";
-        return false;
-    }
+    public static bool TryNormalize(string? value, out string normalized) =>
+        CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
 
     public static string NormalizeOrDefault(string? value)
     {

@@ -88,13 +88,7 @@ public partial class Dashboard
 
     private string NowPlayingDisplayText => _nowPlaying is null
         ? ""
-        : SpinnerDataService.CreateSongTextForFields(
-            _nowPlaying,
-            _config.NowPlaying?.Fields is { Length: > 0 } fields
-                ? fields
-                : SongFieldNames.CreateDefaultSelection(),
-            _config.NowPlaying?.Separator,
-            _config.NowPlaying?.ShowLabels ?? true);
+        : SpinnerDataService.CreateNowPlayingText(_nowPlaying, _config.NowPlaying);
     private string ApiEnvironmentLabel => GetApiEnvironment().label;
     private string ApiEnvironmentClass => GetApiEnvironment().cssClass;
     private string OverlayHealthClass => _overlayHealth.ServerState switch

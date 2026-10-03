@@ -21,7 +21,7 @@ public static class SpinnerSettingValues
                 return true;
             }
 
-            return SpinnerSettingValues.TryNormalize(value, SupportedValues, out normalized);
+            return CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
         }
 
         public static string NormalizeOrDefault(string? value) =>
@@ -39,7 +39,7 @@ public static class SpinnerSettingValues
         public static IReadOnlyList<string> Values { get; } = Array.AsReadOnly(SupportedValues);
 
         public static bool TryNormalize(string? value, out string normalized) =>
-            SpinnerSettingValues.TryNormalize(value, SupportedValues, out normalized);
+            CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
 
         public static string NormalizeOrDefault(string? value) =>
             TryNormalize(value, out var normalized) ? normalized : Default;
@@ -63,7 +63,7 @@ public static class SpinnerSettingValues
         public static IReadOnlyList<string> Values { get; } = Array.AsReadOnly(SupportedValues);
 
         public static bool TryNormalize(string? value, out string normalized) =>
-            SpinnerSettingValues.TryNormalize(value, SupportedValues, out normalized);
+            CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
 
         public static string NormalizeOrDefault(string? value) =>
             TryNormalize(value, out var normalized) ? normalized : Default;
@@ -80,7 +80,7 @@ public static class SpinnerSettingValues
         public static IReadOnlyList<string> Values { get; } = Array.AsReadOnly(SupportedValues);
 
         public static bool TryNormalize(string? value, out string normalized) =>
-            SpinnerSettingValues.TryNormalize(value, SupportedValues, out normalized);
+            CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
 
         public static string NormalizeOrDefault(string? value) =>
             TryNormalize(value, out var normalized) ? normalized : Default;
@@ -100,26 +100,9 @@ public static class SpinnerSettingValues
         public static IReadOnlyList<string> Values { get; } = Array.AsReadOnly(SupportedValues);
 
         public static bool TryNormalize(string? value, out string normalized) =>
-            SpinnerSettingValues.TryNormalize(value, SupportedValues, out normalized);
+            CanonicalValue.TryNormalize(value, SupportedValues, out normalized);
 
         public static string NormalizeOrDefault(string? value) =>
             TryNormalize(value, out var normalized) ? normalized : Default;
-    }
-
-    private static bool TryNormalize(
-        string? value,
-        IEnumerable<string> supportedValues,
-        out string normalized)
-    {
-        var candidate = value?.Trim();
-        foreach (var supported in supportedValues)
-        {
-            if (!string.Equals(candidate, supported, StringComparison.OrdinalIgnoreCase)) continue;
-            normalized = supported;
-            return true;
-        }
-
-        normalized = "";
-        return false;
     }
 }

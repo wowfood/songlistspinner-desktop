@@ -818,4 +818,29 @@ public class SpinnerDataServiceTests
         var result = SpinnerDataService.FilterAvailableSongs([], played, Cfg(exclude: true));
         Assert.Empty(result);
     }
+
+    [Fact]
+    public void Given_NowPlayingFieldsSeparatorAndNoLabels_When_CreatingNowPlayingText_Then_UsesThatConfig()
+    {
+        var nowPlaying = new SpinnerNowPlayingConfig
+        {
+            Fields = [SongFieldNames.Title, SongFieldNames.Requester],
+            Separator = " / ",
+            ShowLabels = false
+        };
+
+        var text = SpinnerDataService.CreateNowPlayingText(Q(), nowPlaying);
+
+        Assert.Equal("Song One / User1", text);
+    }
+
+    [Fact]
+    public void Given_NoNowPlayingFields_When_CreatingNowPlayingText_Then_ShowsTheDefaultFieldsWithLabels()
+    {
+        var nowPlaying = new SpinnerNowPlayingConfig { Fields = [] };
+
+        var text = SpinnerDataService.CreateNowPlayingText(Q(), nowPlaying);
+
+        Assert.Equal("Artist: Artist A | Title: Song One", text);
+    }
 }
