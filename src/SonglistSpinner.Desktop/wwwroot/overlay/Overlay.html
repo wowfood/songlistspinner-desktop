@@ -726,7 +726,8 @@ function updateSongs(data) {
     SpinnerInterop.createWheel(_overlayState.wheelItems, cfg && cfg.wheelColors || [])
     document.getElementById('playedCount').textContent = data.playedCount != null ? data.playedCount : 0
     document.getElementById('availableCount').textContent = data.availableCount != null ? data.availableCount : 0
-    if (data.streamer) document.getElementById('streamerLabel').textContent = data.streamer
+    // An empty streamer means no channel is loaded, as after the Dashboard's Change.
+    document.getElementById('streamerLabel').textContent = data.streamer || 'Waiting for Dashboard...'
     const nowPlaying = document.getElementById('nowPlaying')
     const nowPlayingText = document.getElementById('nowPlayingText')
     const showNowPlaying = Boolean(

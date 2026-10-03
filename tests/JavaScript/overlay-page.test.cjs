@@ -356,3 +356,11 @@ test('Overlay: the live OBS overlay ignores Settings preview messages', () => {
 
     assert.equal(elements.get('streamerLabel').textContent, 'live-channel');
 });
+test('Overlay: after the Dashboard changes streamer, the overlay stops showing the previous streamer', () => {
+    const { elements, send } = loadOverlayPage();
+    send('init_state', initialState({ streamer: 'previous-channel' }));
+
+    send('update_songs', initialState({ streamer: '', wheelItems: [{ label: 'Waiting for Dashboard...' }], availableCount: 0 }));
+
+    assert.equal(elements.get('streamerLabel').textContent, 'Waiting for Dashboard...');
+});
