@@ -7,12 +7,17 @@
 <nav class="ss-nav">
     <a class="ss-nav__brand" href="/">SonglistSpinner</a>
     <div class="ss-nav__links">
-        <a href="/dashboard">Dashboard</a>
-        <a href="/settings">Settings</a>
+        <NavLink href="/dashboard" ActiveClass="ss-nav__link-active">Dashboard</NavLink>
+        <NavLink href="/settings" ActiveClass="ss-nav__link-active">Settings</NavLink>
         <button class="ss-nav__btn" @onclick="CopyOverlayUrl">Copy Overlay URL</button>
-        <a href="https://github.com/wowfood/songlistspinner-desktop/releases" target="_blank"
-           rel="noopener noreferrer">Releases</a>
-        <a href="https://ko-fi.com/wowfood" target="_blank" rel="noopener noreferrer">Donate</a>
+        <details class="ss-nav__more">
+            <summary>More</summary>
+            <div class="ss-nav__more-menu">
+                <a href="https://github.com/wowfood/songlistspinner-desktop/releases" target="_blank"
+                   rel="noopener noreferrer">Releases</a>
+                <a href="https://ko-fi.com/wowfood" target="_blank" rel="noopener noreferrer">Donate</a>
+            </div>
+        </details>
     </div>
 </nav>
 

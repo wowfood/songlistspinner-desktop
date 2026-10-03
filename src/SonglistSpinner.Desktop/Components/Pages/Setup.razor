@@ -19,16 +19,17 @@
     </div>
 
     <ol class="ss-setup-progress" aria-label="Setup progress">
-        <li class="@StepClass(1)"><span>1</span>Access</li>
-        <li class="@StepClass(2)"><span>2</span>Channel</li>
-        <li class="@StepClass(3)"><span>3</span>Ready</li>
+        <li class="@StepClass(1)" aria-current="@StepAriaCurrent(1)"><span>1</span>Access</li>
+        <li class="@StepClass(2)" aria-current="@StepAriaCurrent(2)"><span>2</span>Channel</li>
+        <li class="@StepClass(3)" aria-current="@StepAriaCurrent(3)"><span>3</span>Ready</li>
     </ol>
 
     @if (_step == 1)
     {
         <section class="ss-setup-card">
-            <h2>StreamerSongList access</h2>
+            <h2 @ref="_stepHeading" tabindex="-1">StreamerSongList access</h2>
             <p>For a personal, single-channel setup, create a streamer access token under StreamerSongList <strong>Settings &gt; Access</strong>.</p>
+            <p><a href="https://streamersonglist.com" target="_blank" rel="noopener noreferrer">Open StreamerSongList</a> to create or review your access token.</p>
 
             <div class="ss-setup-field">
                 <label for="setupToken">Streamer access token</label>
@@ -80,14 +81,14 @@
     else if (_step == 2)
     {
         <section class="ss-setup-card">
-            <h2>Choose your channel</h2>
+            <h2 @ref="_stepHeading" tabindex="-1">Choose your channel</h2>
             <p>Paste the public StreamerSongList address you normally share, or enter the streamer name directly.</p>
 
             <div class="ss-setup-field">
                 <label for="setupReference">StreamerSongList URL or streamer name</label>
                 <InputText id="setupReference" @bind-Value="_streamerReference"
                            placeholder="https://streamersonglist.com/t/username"/>
-                <div class="ss-field-hint">Addresses ending in <code>/t/name</code> or <code>/s/name</code> select the identity automatically.</div>
+                <div class="ss-field-hint">Addresses ending in <code>/t/name</code>, <code>/s/name</code>, <code>/k/name</code>, or <code>/y/name</code> select the identity automatically.</div>
             </div>
 
             <div class="ss-setup-field">
@@ -138,7 +139,7 @@
     {
         <section class="ss-setup-card ss-setup-complete">
             <div class="ss-setup-success-mark" aria-hidden="true">✓</div>
-            <h2>SonglistSpinner is ready</h2>
+            <h2 @ref="_stepHeading" tabindex="-1">SonglistSpinner is ready</h2>
             <p><strong>@_matchedChannel?.Name</strong> resolved to StreamerSongList channel <strong>#@_resolvedStreamer?.Id</strong>.</p>
 
             @if (_resolvedStreamer is { Platforms.Count: > 0 } streamerWithPlatforms)

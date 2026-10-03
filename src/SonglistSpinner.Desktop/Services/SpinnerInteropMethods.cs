@@ -14,5 +14,8 @@ internal static class SpinnerInteropMethods
     public const string SetWheelVisible = "SpinnerInterop.setWheelVisible";
     public const string SetPlayedListCollapsed = "SpinnerInterop.setPlayedListCollapsed";
     public const string RunConfetti = "SpinnerInterop.runConfetti";
+    public const string OpenWinnerDialog = "SpinnerInterop.openWinnerDialog";
+    public const string CloseWinnerDialog = "SpinnerInterop.closeWinnerDialog";
     public const string UpdateSettingsPreview = "SpinnerInterop.updateSettingsPreview";
+    public const string ValidateCssSettings = "SpinnerInterop.validateCssSettings";
 }

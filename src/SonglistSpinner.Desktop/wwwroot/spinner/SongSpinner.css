@@ -202,10 +202,23 @@ body.spinner-page .ss-nav {
     width: 0.625rem;
     background: var(--app-resize-handle-bg);
     cursor: ew-resize;
+    touch-action: none;
     position: relative;
 }
 
+.dashboard-health-item:focus-visible,
+.dashboard-health-environment:focus-visible {
+    outline: 3px solid #a78bfa;
+    outline-offset: 2px;
+}
+
 #resizeHandle:hover {
+    background: var(--app-resize-handle-hover-bg);
+}
+
+#resizeHandle:focus-visible {
+    outline: 3px solid var(--app-pointer-color);
+    outline-offset: -3px;
     background: var(--app-resize-handle-hover-bg);
 }
 
@@ -662,12 +675,29 @@ body.spinner-page #streamerInput.streamer-input-invalid:focus-visible {
 .winner-modal {
     position: fixed;
     inset: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100vh;
+    max-height: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    overflow: visible;
     z-index: 1000;
 }
 
-.winner-modal-backdrop {
-    position: absolute;
-    inset: 0;
+.queue-empty-state,
+#playedList li.played-list-empty-state {
+    padding: 0.75rem;
+    border: 1px dashed rgba(255, 255, 255, 0.28);
+    background: rgba(255, 255, 255, 0.04);
+    color: color-mix(in srgb, var(--app-text-color) 78%, transparent);
+    text-align: center;
+}
+
+.winner-modal::backdrop {
     background: rgba(0, 0, 0, 0.65);
 }
 
@@ -811,6 +841,17 @@ body.spinner-page #streamerInput.streamer-input-invalid:focus-visible {
     .slider:before {
         transition-duration: 0.01ms;
     }
+
+    .dashboard-health-item.checking .dashboard-health-dot,
+    .dashboard-health-item.degraded .dashboard-health-dot,
+    .winner-modal-content,
+    .winner-confetti-piece {
+        animation: none;
+    }
+
+    .winner-confetti {
+        display: none;
+    }
 }
 
 /* Overlay mode: hide the entire played list panel when collapsed (no button visible on stream) */
@@ -842,6 +883,10 @@ body.overlay-mode #changeStreamerBtn {
     }
 
     #container {
+        flex-direction: column;
+    }
+
+    #container.played-list-left {
         flex-direction: column;
     }
 

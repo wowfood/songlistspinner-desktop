@@ -6,6 +6,7 @@
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
 @inject OverlayStateService OverlayService
+@inject StreamerSessionService StreamerSession
 @inject ApplicationUpdateService UpdateService
 @inject IJSRuntime JS
 @implements IDisposable
@@ -30,7 +31,7 @@
 
     @if (_dto is null || _editContext is null)
     {
-        <div class="ss-settings-loading">Loading settings...</div>
+        <div class="ss-settings-loading" role="status" aria-live="polite">Loading settings...</div>
     }
     else
     {
@@ -313,7 +314,16 @@
                                     </div>
                                     <div class="ss-field">
                                         <label for="playedListFontSize">Font Size</label>
-                                        <InputText id="playedListFontSize" @bind-Value="_dto.PlayedListFontSize" placeholder="0.875rem"/>
+                                        <InputText id="playedListFontSize" @bind-Value="_dto.PlayedListFontSize"
+                                                   class="@CssValidationClass(nameof(SettingsDto.PlayedListFontSize))"
+                                                   aria-invalid="@HasCssValidation(nameof(SettingsDto.PlayedListFontSize))"
+                                                   aria-describedby="@(HasCssValidation(nameof(SettingsDto.PlayedListFontSize)) ? "playedListFontSizeError" : null)"
+                                                   @oninput="@(_ => ClearCssValidation(nameof(SettingsDto.PlayedListFontSize)))"
+                                                   placeholder="0.875rem"/>
+                                        @if (CssValidationError(nameof(SettingsDto.PlayedListFontSize)) is { } playedListFontSizeError)
+                                        {
+                                            <div id="playedListFontSizeError" class="validation-message" role="alert">@playedListFontSizeError</div>
+                                        }
                                     </div>
                                     <div class="ss-field">
                                         <label for="playedListMaxLines">Maximum Lines per Song</label>
@@ -394,8 +404,17 @@
                                         </div>
                                         <div class="ss-field">
                                             <label for="nowPlayingWidth">Panel Width</label>
-                                            <InputText id="nowPlayingWidth" @bind-Value="_dto.NowPlayingWidth" placeholder="28rem"/>
+                                            <InputText id="nowPlayingWidth" @bind-Value="_dto.NowPlayingWidth"
+                                                       class="@CssValidationClass(nameof(SettingsDto.NowPlayingWidth))"
+                                                       aria-invalid="@HasCssValidation(nameof(SettingsDto.NowPlayingWidth))"
+                                                       aria-describedby="@(HasCssValidation(nameof(SettingsDto.NowPlayingWidth)) ? "nowPlayingWidthError" : null)"
+                                                       @oninput="@(_ => ClearCssValidation(nameof(SettingsDto.NowPlayingWidth)))"
+                                                       placeholder="28rem"/>
                                             <div class="ss-field-hint">CSS sizes such as 28rem, 480px, or 40vw.</div>
+                                            @if (CssValidationError(nameof(SettingsDto.NowPlayingWidth)) is { } nowPlayingWidthError)
+                                            {
+                                                <div id="nowPlayingWidthError" class="validation-message" role="alert">@nowPlayingWidthError</div>
+                                            }
                                         </div>
                                         <div class="ss-field">
                                             <label for="nowPlayingFont">Font Family</label>
@@ -408,7 +427,16 @@
                                         </div>
                                         <div class="ss-field">
                                             <label for="nowPlayingFontSize">Font Size</label>
-                                            <InputText id="nowPlayingFontSize" @bind-Value="_dto.NowPlayingFontSize" placeholder="1.125rem"/>
+                                            <InputText id="nowPlayingFontSize" @bind-Value="_dto.NowPlayingFontSize"
+                                                       class="@CssValidationClass(nameof(SettingsDto.NowPlayingFontSize))"
+                                                       aria-invalid="@HasCssValidation(nameof(SettingsDto.NowPlayingFontSize))"
+                                                       aria-describedby="@(HasCssValidation(nameof(SettingsDto.NowPlayingFontSize)) ? "nowPlayingFontSizeError" : null)"
+                                                       @oninput="@(_ => ClearCssValidation(nameof(SettingsDto.NowPlayingFontSize)))"
+                                                       placeholder="1.125rem"/>
+                                            @if (CssValidationError(nameof(SettingsDto.NowPlayingFontSize)) is { } nowPlayingFontSizeError)
+                                            {
+                                                <div id="nowPlayingFontSizeError" class="validation-message" role="alert">@nowPlayingFontSizeError</div>
+                                            }
                                         </div>
                                     </div>
                                 }
@@ -439,8 +467,17 @@
                                 <div class="ss-settings-field-grid">
                                     <div class="ss-field">
                                         <label for="winnerDialogWidth">Dialog Width</label>
-                                        <InputText id="winnerDialogWidth" @bind-Value="_dto.WinnerDialogWidth" placeholder="36rem"/>
+                                        <InputText id="winnerDialogWidth" @bind-Value="_dto.WinnerDialogWidth"
+                                                   class="@CssValidationClass(nameof(SettingsDto.WinnerDialogWidth))"
+                                                   aria-invalid="@HasCssValidation(nameof(SettingsDto.WinnerDialogWidth))"
+                                                   aria-describedby="@(HasCssValidation(nameof(SettingsDto.WinnerDialogWidth)) ? "winnerDialogWidthError" : null)"
+                                                   @oninput="@(_ => ClearCssValidation(nameof(SettingsDto.WinnerDialogWidth)))"
+                                                   placeholder="36rem"/>
                                         <div class="ss-field-hint">CSS sizes such as 36rem, 600px, or 50vw.</div>
+                                        @if (CssValidationError(nameof(SettingsDto.WinnerDialogWidth)) is { } winnerDialogWidthError)
+                                        {
+                                            <div id="winnerDialogWidthError" class="validation-message" role="alert">@winnerDialogWidthError</div>
+                                        }
                                     </div>
                                     <div class="ss-field">
                                         <label for="winnerDialogFont">Font Family</label>
@@ -453,7 +490,16 @@
                                     </div>
                                     <div class="ss-field">
                                         <label for="winnerDialogFontSize">Font Size</label>
-                                        <InputText id="winnerDialogFontSize" @bind-Value="_dto.WinnerDialogFontSize" placeholder="1rem"/>
+                                        <InputText id="winnerDialogFontSize" @bind-Value="_dto.WinnerDialogFontSize"
+                                                   class="@CssValidationClass(nameof(SettingsDto.WinnerDialogFontSize))"
+                                                   aria-invalid="@HasCssValidation(nameof(SettingsDto.WinnerDialogFontSize))"
+                                                   aria-describedby="@(HasCssValidation(nameof(SettingsDto.WinnerDialogFontSize)) ? "winnerDialogFontSizeError" : null)"
+                                                   @oninput="@(_ => ClearCssValidation(nameof(SettingsDto.WinnerDialogFontSize)))"
+                                                   placeholder="1rem"/>
+                                        @if (CssValidationError(nameof(SettingsDto.WinnerDialogFontSize)) is { } winnerDialogFontSizeError)
+                                        {
+                                            <div id="winnerDialogFontSizeError" class="validation-message" role="alert">@winnerDialogFontSizeError</div>
+                                        }
                                     </div>
                                     <div class="ss-field">
                                         <label class="ss-checkbox-label">
@@ -515,8 +561,16 @@
                                 </div>
                                 <div class="ss-field">
                                     <label for="wheelColors">Wheel Colors</label>
-                                    <InputTextArea id="wheelColors" @bind-Value="WheelColorsRaw" rows="6"/>
+                                    <InputTextArea id="wheelColors" @bind-Value="WheelColorsRaw" rows="6"
+                                                   class="@CssValidationClass(nameof(SettingsDto.WheelColors))"
+                                                   aria-invalid="@HasCssValidation(nameof(SettingsDto.WheelColors))"
+                                                   aria-describedby="@(HasCssValidation(nameof(SettingsDto.WheelColors)) ? "wheelColorsError" : null)"
+                                                   @oninput="@(_ => ClearCssValidation(nameof(SettingsDto.WheelColors)))"/>
                                     <div class="ss-field-hint">Enter one CSS color per line. The wheel repeats the palette when necessary.</div>
+                                    @if (CssValidationError(nameof(SettingsDto.WheelColors)) is { } wheelColorsError)
+                                    {
+                                        <div id="wheelColorsError" class="validation-message" role="alert">@wheelColorsError</div>
+                                    }
                                 </div>
                             </section>
 
@@ -604,6 +658,13 @@
                                         </div>
                                     </div>
                                 </div>
+                                @if (ContrastWarning is { } contrastWarning)
+                                {
+                                    <div class="ss-settings-contrast-warning" role="status">
+                                        <strong>Readability check</strong>
+                                        <span>@contrastWarning</span>
+                                    </div>
+                                }
                             </section>
                             break;
 
@@ -698,7 +759,7 @@
 
             <div class="ss-save-bar">
                 <button type="submit">Save Settings</button>
-                <span class="ss-save-bar-state">
+                <span class="ss-save-bar-state" role="status" aria-live="polite" aria-atomic="true">
                     @if (_vm.SaveSuccess)
                     {
                         <span class="ss-save-success">&#10003; Saved</span>
