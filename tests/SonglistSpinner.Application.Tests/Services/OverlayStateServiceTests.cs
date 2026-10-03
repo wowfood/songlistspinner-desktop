@@ -95,14 +95,72 @@ public class OverlayStateServiceTests
             received);
     }
 
+    [Fact]
+    public async Task Given_NoQueueYet_When_OverlayConnects_Then_InitialStateCarriesTheStateAndLayoutReplay()
+    {
+        var overlay = new OverlayStateService();
+
+        using var state = await ReadInitialStateAsync(overlay);
+
+        Assert.Equal(
+            [
+                "availableCount", "config", "nowPlayingText", "playedCount", "playedFieldTable",
+                "playedListCollapsed", "playedListMinWidth", "playedListWidth", "playedTexts", "streamer",
+                "wheelItems", "wheelVisible", "winner"
+            ],
+            PropertyNames(state.RootElement));
+        var placeholder = Assert.Single(state.RootElement.GetProperty("wheelItems").EnumerateArray());
+        Assert.Equal("""{"label":"Waiting for Dashboard..."}""", placeholder.GetRawText());
+    }
+
+    [Fact]
+    public async Task Given_ConnectedOverlay_When_QueueIsUpdated_Then_UpdateSongsCarriesTheStateWithoutLayoutReplay()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var overlay = new OverlayStateService();
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await events.MoveNextAsync());
+        var song = new SpinnerQueueItem
+        {
+            QueueId = 5,
+            Song = new SpinnerSong { Artist = "Artist", Title = "Title" },
+            Requests = [new SpinnerRequest { Name = "Viewer" }]
+        };
+
+        await overlay.UpdateStateAsync(new SpinnerConfig(), [song], [], song, "streamer");
+
+        Assert.True(await events.MoveNextAsync());
+        using var update = ParseEventData(events.Current, OverlayEventNames.UpdateSongs);
+        var root = update.RootElement;
+        Assert.Equal(
+            [
+                "availableCount", "config", "nowPlayingText", "playedCount", "playedFieldTable", "playedTexts",
+                "streamer", "wheelItems"
+            ],
+            PropertyNames(root));
+        var wheelItem = Assert.Single(root.GetProperty("wheelItems").EnumerateArray());
+        Assert.Equal(5, wheelItem.GetProperty("queueId").GetInt32());
+        Assert.Equal("Artist - Title (Viewer)", wheelItem.GetProperty("label").GetString());
+        Assert.Equal("Artist: Artist | Title: Title", root.GetProperty("nowPlayingText").GetString());
+        Assert.Equal("streamer", root.GetProperty("streamer").GetString());
+        Assert.Equal(1, root.GetProperty("availableCount").GetInt32());
+    }
+
     internal static async Task<JsonDocument> ReadInitialStateAsync(OverlayStateService overlay)
     {
         await using var events = overlay.SubscribeAsync(TestContext.Current.CancellationToken).GetAsyncEnumerator();
         Assert.True(await events.MoveNextAsync());
 
+        return ParseEventData(events.Current, OverlayEventNames.InitialState);
+    }
+
+    private static JsonDocument ParseEventData(string message, string eventName)
+    {
         const string dataPrefix = "\ndata: ";
-        var message = events.Current;
-        Assert.StartsWith("event: init_state" + dataPrefix, message);
+        Assert.StartsWith("event: " + eventName + dataPrefix, message);
         return JsonDocument.Parse(message[(message.IndexOf(dataPrefix, StringComparison.Ordinal) + dataPrefix.Length)..]);
     }
+
+    private static string[] PropertyNames(JsonElement element) =>
+        element.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal).ToArray();
 }

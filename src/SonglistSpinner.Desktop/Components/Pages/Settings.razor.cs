@@ -381,28 +381,19 @@ public partial class Settings
                              ?? new SettingsDto();
             _vm.ApplyToDto(previewDto);
             var config = LocalSettings.ToSpinnerConfig(previewDto);
-            var nowPlayingFields = config.NowPlaying.Fields is { Length: > 0 }
-                ? config.NowPlaying.Fields
-                : SongFieldNames.CreateDefaultSelection();
             var previewPlayedSongs = PreviewSongs.Take(3).ToArray();
 
-            var payload = new
-            {
+            var payload = new OverlayStatePayload(
                 config,
-                streamer = string.IsNullOrWhiteSpace(previewDto.DefaultStreamerName)
+                string.IsNullOrWhiteSpace(previewDto.DefaultStreamerName)
                     ? "your-channel"
                     : previewDto.DefaultStreamerName.Trim(),
-                wheelItems = PreviewSongs.Select(song => new { label = SpinnerDataService.BuildWheelLabel(song) }),
-                playedTexts = SpinnerDataService.CreatePlayedSongTexts(previewPlayedSongs, config),
-                playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(previewPlayedSongs, config),
-                nowPlayingText = SpinnerDataService.CreateSongTextForFields(
-                    PreviewSongs[3],
-                    nowPlayingFields,
-                    config.NowPlaying.Separator,
-                    config.NowPlaying.ShowLabels),
-                playedCount = 3,
-                availableCount = PreviewSongs.Length
-            };
+                PreviewSongs.Select(song => new OverlayWheelItem(SpinnerDataService.BuildWheelLabel(song))).ToArray(),
+                SpinnerDataService.CreatePlayedSongTexts(previewPlayedSongs, config),
+                SpinnerDataService.CreatePlayedSongFieldTable(previewPlayedSongs, config),
+                SpinnerDataService.CreateNowPlayingText(PreviewSongs[3], config.NowPlaying),
+                previewPlayedSongs.Length,
+                PreviewSongs.Length);
 
             await JS.InvokeVoidAsync(
                 SpinnerInteropMethods.UpdateSettingsPreview,

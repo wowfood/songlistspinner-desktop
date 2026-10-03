@@ -85,19 +85,7 @@ public class OverlayStateService
 
     private Task BroadcastStateAsync(OverlaySnapshot snapshot)
     {
-        return BroadcastAsync(OverlayEventNames.UpdateSongs, new
-        {
-            config = snapshot.Config,
-            streamer = snapshot.CurrentStreamer,
-            wheelItems = BuildWheelItems(snapshot.AvailableSongs),
-            playedTexts = SpinnerDataService.CreatePlayedSongTexts(snapshot.PlayedSongs, snapshot.Config),
-            playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(
-                snapshot.PlayedSongs,
-                snapshot.Config),
-            nowPlayingText = BuildNowPlayingText(snapshot.NowPlaying, snapshot.Config),
-            playedCount = snapshot.PlayedSongs.Length,
-            availableCount = snapshot.AvailableSongs.Length
-        });
+        return BroadcastAsync(OverlayEventNames.UpdateSongs, CreateStatePayload(snapshot));
     }
 
     public Task BroadcastSpinCommandAsync(
@@ -224,56 +212,42 @@ public class OverlayStateService
         lock (_stateGate)
             snapshot = _snapshot;
 
-        var wheelItems = BuildWheelItems(snapshot.AvailableSongs);
-        var playedTexts = SpinnerDataService.CreatePlayedSongTexts(snapshot.PlayedSongs, snapshot.Config);
-        var playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(
-            snapshot.PlayedSongs,
-            snapshot.Config);
-        var nowPlayingText = BuildNowPlayingText(snapshot.NowPlaying, snapshot.Config);
-
-        var payload = new
+        var payload = new InitialStatePayload(CreateStatePayload(snapshot))
         {
-            config = snapshot.Config,
-            streamer = snapshot.CurrentStreamer,
-            wheelItems,
-            playedTexts,
-            playedFieldTable,
-            nowPlayingText,
-            playedCount = snapshot.PlayedSongs.Length,
-            availableCount = snapshot.AvailableSongs.Length,
-            playedListCollapsed = snapshot.PlayedListCollapsed,
-            playedListWidth = snapshot.PlayedListWidth,
-            playedListMinWidth = snapshot.PlayedListMinWidth,
-            wheelVisible = snapshot.WheelVisible,
-            winner = snapshot.Winner
+            PlayedListCollapsed = snapshot.PlayedListCollapsed,
+            PlayedListWidth = snapshot.PlayedListWidth,
+            PlayedListMinWidth = snapshot.PlayedListMinWidth,
+            WheelVisible = snapshot.WheelVisible,
+            Winner = snapshot.Winner
         };
 
         var json = JsonSerializer.Serialize(payload, JsonOpts);
         return $"event: {OverlayEventNames.InitialState}\ndata: {json}\n\n";
     }
 
-    private static object[] BuildWheelItems(IReadOnlyCollection<SpinnerQueueItem> songs)
+    private static OverlayStatePayload CreateStatePayload(OverlaySnapshot snapshot)
     {
-        return songs.Count > 0
-            ? songs.Select(song => (object)new
-            {
-                queueId = song.QueueId,
-                label = SpinnerDataService.BuildWheelLabel(song)
-            }).ToArray()
-            : [new { label = "Waiting for Dashboard..." }];
+        return new OverlayStatePayload(
+            snapshot.Config,
+            snapshot.CurrentStreamer,
+            CreateWheelItems(snapshot.AvailableSongs),
+            SpinnerDataService.CreatePlayedSongTexts(snapshot.PlayedSongs, snapshot.Config),
+            SpinnerDataService.CreatePlayedSongFieldTable(snapshot.PlayedSongs, snapshot.Config),
+            snapshot.NowPlaying is null
+                ? null
+                : SpinnerDataService.CreateNowPlayingText(snapshot.NowPlaying, snapshot.Config.NowPlaying),
+            snapshot.PlayedSongs.Length,
+            snapshot.AvailableSongs.Length);
     }
 
-    private static string? BuildNowPlayingText(SpinnerQueueItem? item, SpinnerConfig config)
+    private static OverlayWheelItem[] CreateWheelItems(IReadOnlyCollection<SpinnerQueueItem> songs)
     {
-        if (item is null) return null;
-        var fields = config.NowPlaying.Fields is { Length: > 0 }
-            ? config.NowPlaying.Fields
-            : SongFieldNames.CreateDefaultSelection();
-        return SpinnerDataService.CreateSongTextForFields(
-            item,
-            fields,
-            config.NowPlaying.Separator,
-            config.NowPlaying.ShowLabels);
+        return songs.Count > 0
+            ? songs.Select(song => new OverlayWheelItem(SpinnerDataService.BuildWheelLabel(song))
+            {
+                QueueId = song.QueueId
+            }).ToArray()
+            : [new OverlayWheelItem("Waiting for Dashboard...")];
     }
 
     private void OnHealthChanged()
@@ -295,6 +269,21 @@ public class OverlayStateService
     }
 
     private sealed record WinnerSnapshot(WinnerDialogField[] Fields, int? QueuePosition);
+
+    // init_state is the overlay state plus the layout and winner a reconnecting overlay must replay.
+    private sealed record InitialStatePayload : OverlayStatePayload
+    {
+        public InitialStatePayload(OverlayStatePayload state)
+            : base(state)
+        {
+        }
+
+        public bool PlayedListCollapsed { get; init; }
+        public string PlayedListWidth { get; init; } = "";
+        public string PlayedListMinWidth { get; init; } = "";
+        public bool WheelVisible { get; init; }
+        public WinnerSnapshot? Winner { get; init; }
+    }
 
     private sealed record OverlaySnapshot(
         SpinnerConfig Config,
