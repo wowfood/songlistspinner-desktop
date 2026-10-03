@@ -110,6 +110,70 @@ public class SettingsDtoTests
         Assert.Equal(ToComparableJson(expected), ToComparableJson(json));
     }
 
+    [Theory]
+    [InlineData(SavedSettingsFixture.Release120Defaults)]
+    [InlineData(SavedSettingsFixture.Release120Customised)]
+    public void Given_SettingsSavedByRelease120_When_LoadedAndSavedAgain_Then_WritesTheSameJson(string fixtureName)
+    {
+        var savedJson = SavedSettingsFixture.ReadJson(fixtureName);
+
+        var resavedJson = SavedSettingsFixture.Save(SavedSettingsFixture.Load(fixtureName));
+
+        Assert.Equal(ToComparableJson(savedJson), ToComparableJson(resavedJson));
+    }
+
+    [Fact]
+    public void Given_CustomisedSettingsSavedByRelease120_When_Loaded_Then_KeepsEverySavedValue()
+    {
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+
+        Assert.Equal("""["#123456","#abcdef","#fedcba"]""", settings.WheelColors);
+        Assert.Equal("transparent", settings.BackgroundMode);
+        Assert.Equal("#202020", settings.BackgroundColor);
+        Assert.Equal("https://example.com/stage.png", settings.BackgroundImage);
+        Assert.Equal("examplestreamer", settings.DefaultStreamerName);
+        Assert.Equal("youtube", settings.StreamerPlatform);
+        Assert.False(settings.HideChangeOptionWhenDefault);
+        Assert.Equal("""["title","requester","donation"]""", settings.SongListFields);
+        Assert.Equal(" • ", settings.PlayedListSeparator);
+        Assert.False(settings.PlayedListShowLabels);
+        Assert.True(settings.PlayedListShowFieldHeaders);
+        Assert.True(settings.ExcludePlayedSongs);
+        Assert.Equal("left", settings.PlayedListPosition);
+        Assert.Equal("month", settings.PlayHistoryPeriod);
+        Assert.True(settings.UpdateQueueAfterSpin);
+        Assert.True(settings.DisplayNowPlaying);
+        Assert.Equal("""["requester","artist"]""", settings.NowPlayingFields);
+        Assert.Equal(" / ", settings.NowPlayingSeparator);
+        Assert.False(settings.NowPlayingShowLabels);
+        Assert.Equal("Georgia, serif", settings.NowPlayingFontFamily);
+        Assert.Equal("1.5rem", settings.NowPlayingFontSize);
+        Assert.Equal("40rem", settings.NowPlayingWidth);
+        Assert.Equal("top-right", settings.NowPlayingPosition);
+        Assert.Equal(0.35, settings.NowPlayingBackgroundOpacity);
+        Assert.Equal("""["donation","title"]""", settings.WinnerDialogFields);
+        Assert.Equal("Verdana", settings.WinnerDialogFontFamily);
+        Assert.Equal("1.25rem", settings.WinnerDialogFontSize);
+        Assert.Equal("42rem", settings.WinnerDialogWidth);
+        Assert.False(settings.WinnerDialogShowQueuePosition);
+        Assert.True(settings.DebugMode);
+        Assert.Equal("#eeeeee", settings.ColorText);
+        Assert.Equal("rgba(10, 20, 30, 0.5)", settings.ColorStatusBackground);
+        Assert.Equal("#101820", settings.ColorPlayedListBackground);
+        Assert.Equal("#303030", settings.ColorPlayedItemBackground);
+        Assert.Equal("#404040", settings.ColorResizeHandleBackground);
+        Assert.Equal("#606060", settings.ColorResizeHandleHoverBackground);
+        Assert.Equal("#505050", settings.ColorToggleBackground);
+        Assert.Equal("#707070", settings.ColorButtonBackground);
+        Assert.Equal("#000000", settings.ColorButtonText);
+        Assert.Equal("#ff0000", settings.ColorPointer);
+        Assert.Equal("Arial", settings.PlayedListFontFamily);
+        Assert.Equal("1rem", settings.PlayedListFontSize);
+        Assert.Equal(4, settings.PlayedListMaxLines);
+        Assert.True(settings.PlayedListShowNumbers);
+        Assert.Equal("top", settings.PlayedListNumberingStart);
+    }
+
     private static string ToComparableJson(string json) =>
         JsonNode.Parse(json)!.ToJsonString(IndentedJsonOptions);
 }

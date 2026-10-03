@@ -8,6 +8,10 @@
         <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage"/>
     </ItemGroup>
     <ItemGroup>
+        <!-- Settings JSON exactly as a released version saved it; the logical name survives folder moves. -->
+        <EmbeddedResource Include="**/Fixtures/*.json" LogicalName="Fixtures.%(Filename)%(Extension)"/>
+    </ItemGroup>
+    <ItemGroup>
         <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0"/>
         <PackageReference Include="xunit.v3" Version="4.0.0"/>
     </ItemGroup>

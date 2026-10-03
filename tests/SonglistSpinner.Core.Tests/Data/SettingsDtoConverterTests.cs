@@ -25,6 +25,59 @@ public class SettingsDtoConverterTests
     }
 
     [Fact]
+    public void Given_CustomisedSettingsSavedByRelease120_When_ConvertedToConfig_Then_MapsEverySavedValue()
+    {
+        var settings = SavedSettingsFixture.Load(SavedSettingsFixture.Release120Customised);
+
+        var config = SettingsDtoConverter.ToSpinnerConfig(settings);
+
+        Assert.True(config.Debug);
+        Assert.Equal(["#123456", "#abcdef", "#fedcba"], config.WheelColors);
+        Assert.Equal("transparent", config.Background.Mode);
+        Assert.Equal("#202020", config.Background.Color);
+        Assert.Equal("https://example.com/stage.png", config.Background.Image);
+        Assert.Equal("examplestreamer", config.Streamer.DefaultName);
+        Assert.Equal("youtube", config.Streamer.Platform);
+        Assert.False(config.Streamer.HideChangeOptionWhenDefault);
+        Assert.Equal(["title", "requester", "donation"], config.SongList.Fields);
+        Assert.True(config.SongList.ExcludePlayedSongs);
+        Assert.Equal("left", config.SongList.PlayedListPosition);
+        Assert.Equal("month", config.SongList.PlayHistoryPeriod);
+        Assert.Equal("Arial", config.PlayedList.FontFamily);
+        Assert.Equal("1rem", config.PlayedList.FontSize);
+        Assert.Equal(4, config.PlayedList.MaxLines);
+        Assert.True(config.PlayedList.ShowNumbers);
+        Assert.Equal("top", config.PlayedList.NumberingStart);
+        Assert.Equal(" • ", config.PlayedList.Separator);
+        Assert.False(config.PlayedList.ShowLabels);
+        Assert.True(config.PlayedList.ShowFieldHeaders);
+        Assert.True(config.NowPlaying.Enabled);
+        Assert.Equal(["requester", "artist"], config.NowPlaying.Fields);
+        Assert.Equal(" / ", config.NowPlaying.Separator);
+        Assert.False(config.NowPlaying.ShowLabels);
+        Assert.Equal("Georgia, serif", config.NowPlaying.FontFamily);
+        Assert.Equal("1.5rem", config.NowPlaying.FontSize);
+        Assert.Equal("40rem", config.NowPlaying.Width);
+        Assert.Equal("top-right", config.NowPlaying.Position);
+        Assert.Equal(["donation", "title"], config.WinnerDialog.Fields);
+        Assert.Equal("Verdana", config.WinnerDialog.FontFamily);
+        Assert.Equal("1.25rem", config.WinnerDialog.FontSize);
+        Assert.Equal("42rem", config.WinnerDialog.Width);
+        Assert.False(config.WinnerDialog.ShowQueuePosition);
+        Assert.Equal("#eeeeee", config.Colors.Text);
+        Assert.Equal("rgba(10, 20, 30, 0.5)", config.Colors.StatusBackground);
+        Assert.Equal("#101820", config.Colors.PlayedListBackground);
+        Assert.Equal("rgba(16,24,32,0.35)", config.Colors.NowPlayingBackground);
+        Assert.Equal("#303030", config.Colors.PlayedItemBackground);
+        Assert.Equal("#404040", config.Colors.ResizeHandleBackground);
+        Assert.Equal("#606060", config.Colors.ResizeHandleHoverBackground);
+        Assert.Equal("#505050", config.Colors.ToggleBackground);
+        Assert.Equal("#707070", config.Colors.ButtonBackground);
+        Assert.Equal("#000000", config.Colors.ButtonText);
+        Assert.Equal("#ff0000", config.Colors.Pointer);
+    }
+
+    [Fact]
     public void Given_UnreadableWheelColors_When_ConvertedToConfig_Then_UsesTheDefaultWheelColors()
     {
         var settings = new SettingsDto { WheelColors = "not json" };
