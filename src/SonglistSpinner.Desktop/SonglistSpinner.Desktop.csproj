@@ -58,6 +58,7 @@
         <PackageReference Include="MudBlazor" Version="9.3.0"/>
     </ItemGroup>
     <ItemGroup>
+        <ProjectReference Include="..\SonglistSpinner.Application\SonglistSpinner.Application.csproj"/>
         <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
     </ItemGroup>
     <ItemGroup>
