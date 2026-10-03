@@ -8,9 +8,5 @@ public class SpinnerRequest
 
     [JsonPropertyName("donationAmount")] public decimal? DonationAmount { get; set; }
 
-    [JsonPropertyName("donation")] public decimal? Donation { get; set; }
-
     [JsonPropertyName("amount")] public decimal? Amount { get; set; }
-
-    [JsonPropertyName("price")] public decimal? Price { get; set; }
 }

@@ -145,7 +145,7 @@
                     <p class="queue-empty-state" role="status">No eligible queued songs are available to spin.</p>
                 }
                 @{
-                    var playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(_playedSongs, _config);
+                    var playedFieldTable = PlayedSongList.CreateFieldTable(_playedSongs, _config);
                     var showPlayedFieldHeaders = _config.PlayedList.ShowFieldHeaders &&
                                                  playedFieldTable.Headers.Length > 0;
                 }
@@ -195,7 +195,7 @@
                     }
                     else
                     {
-                        @foreach (var text in SpinnerDataService.CreatePlayedSongTexts(_playedSongs, _config))
+                        @foreach (var text in PlayedSongList.CreateTexts(_playedSongs, _config))
                         {
                             <li>
                                 <span class="played-song-text">

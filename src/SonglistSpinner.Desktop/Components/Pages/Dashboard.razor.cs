@@ -80,7 +80,7 @@ public partial class Dashboard
 
     private string NowPlayingDisplayText => _nowPlaying is null
         ? ""
-        : SpinnerDataService.CreateNowPlayingText(_nowPlaying, _config.NowPlaying);
+        : SongDisplayText.CreateNowPlayingText(_nowPlaying, _config.NowPlaying);
     private string ApiEnvironmentLabel => GetApiEnvironment().label;
     private string ApiEnvironmentClass => GetApiEnvironment().cssClass;
     private string OverlayHealthClass => _overlayHealth.ServerState switch
@@ -268,7 +268,7 @@ public partial class Dashboard
             _streamerId = streamerId;
             _nowPlaying = queue.Playing;
             _playedSongs = played;
-            _availableSongs = SpinnerDataService.FilterAvailableSongs(queue.Items, played, _config);
+            _availableSongs = SongAvailability.FilterAvailableSongs(queue.Items, played, _config);
             StreamerInput = name;
 
             await RebuildWheel(_wheelCts.Token);
@@ -374,7 +374,7 @@ public partial class Dashboard
             _winnerQueueId = winner.Song.QueueId;
             await ShowWinnerModalAsync(winner.Fields, winner.QueuePosition);
             OverlayService.BroadcastWinnerReveal(winner.Fields, winner.QueuePosition);
-            SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(winner.Song)}");
+            SetStatus($"Winner: {SongDisplayText.BuildWheelLabel(winner.Song)}");
             StateHasChanged();
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
@@ -628,7 +628,7 @@ public partial class Dashboard
     {
         if (ct.IsCancellationRequested) return;
         var items = _availableSongs.Count > 0
-            ? _availableSongs.Select(s => new { label = SpinnerDataService.BuildWheelLabel(s) }).ToArray<object>()
+            ? _availableSongs.Select(s => new { label = SongDisplayText.BuildWheelLabel(s) }).ToArray<object>()
             : new object[] { new { label = "No songs in queue" } };
         await JS.InvokeVoidAsync(SpinnerInteropMethods.CreateWheel, ct, items, _config.WheelColors);
     }

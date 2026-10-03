@@ -28,10 +28,10 @@ public static class SettingsPreview
         return new OverlayStatePayload(
             config,
             string.IsNullOrWhiteSpace(defaultStreamerName) ? PlaceholderChannel : defaultStreamerName.Trim(),
-            SampleSongs.Select(song => new OverlayWheelItem(SpinnerDataService.BuildWheelLabel(song))).ToArray(),
-            SpinnerDataService.CreatePlayedSongTexts(playedSongs, config),
-            SpinnerDataService.CreatePlayedSongFieldTable(playedSongs, config),
-            SpinnerDataService.CreateNowPlayingText(SampleSongs[3], config.NowPlaying),
+            SampleSongs.Select(song => new OverlayWheelItem(SongDisplayText.BuildWheelLabel(song))).ToArray(),
+            PlayedSongList.CreateTexts(playedSongs, config),
+            PlayedSongList.CreateFieldTable(playedSongs, config),
+            SongDisplayText.CreateNowPlayingText(SampleSongs[3], config.NowPlaying),
             playedSongs.Length,
             SampleSongs.Length);
     }

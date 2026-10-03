@@ -221,11 +221,11 @@ public class OverlayStateService
             snapshot.Config,
             snapshot.CurrentStreamer,
             CreateWheelItems(snapshot.AvailableSongs),
-            SpinnerDataService.CreatePlayedSongTexts(snapshot.PlayedSongs, snapshot.Config),
-            SpinnerDataService.CreatePlayedSongFieldTable(snapshot.PlayedSongs, snapshot.Config),
+            PlayedSongList.CreateTexts(snapshot.PlayedSongs, snapshot.Config),
+            PlayedSongList.CreateFieldTable(snapshot.PlayedSongs, snapshot.Config),
             snapshot.NowPlaying is null
                 ? null
-                : SpinnerDataService.CreateNowPlayingText(snapshot.NowPlaying, snapshot.Config.NowPlaying),
+                : SongDisplayText.CreateNowPlayingText(snapshot.NowPlaying, snapshot.Config.NowPlaying),
             snapshot.PlayedSongs.Length,
             snapshot.AvailableSongs.Length);
     }
@@ -233,7 +233,7 @@ public class OverlayStateService
     private static OverlayWheelItem[] CreateWheelItems(IReadOnlyCollection<SpinnerQueueItem> songs)
     {
         return songs.Count > 0
-            ? songs.Select(song => new OverlayWheelItem(SpinnerDataService.BuildWheelLabel(song))
+            ? songs.Select(song => new OverlayWheelItem(SongDisplayText.BuildWheelLabel(song))
             {
                 QueueId = song.QueueId
             }).ToArray()

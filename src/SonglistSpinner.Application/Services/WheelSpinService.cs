@@ -69,7 +69,7 @@ public sealed class WheelSpinService
         var queue = await queueTask;
         var played = await historyTask;
 
-        var availableSongs = SpinnerDataService.FilterAvailableSongs(queue.Items, played, config);
+        var availableSongs = SongAvailability.FilterAvailableSongs(queue.Items, played, config);
         int? winnerIndex = availableSongs.Count == 0 ? null : _winnerPicker.Next(availableSongs.Count);
         return new SpinDraw(streamer, config, availableSongs, played, queue.Playing, winnerIndex);
     }
@@ -108,7 +108,7 @@ public sealed class WheelSpinService
         var queuePosition = draw.Config.WinnerDialog.ShowQueuePosition
             ? await LookUpQueuePositionAsync(draw, winner.QueueId, cancellationToken)
             : null;
-        return new SpinWinner(winner, SpinnerDataService.CreateWinnerDialogFields(winner, draw.Config), queuePosition);
+        return new SpinWinner(winner, WinnerDialogContent.CreateFields(winner, draw.Config), queuePosition);
     }
 
     /// <summary>Ends the spin and resumes session refreshes.</summary>
@@ -132,7 +132,7 @@ public sealed class WheelSpinService
             var channel = new StreamerSongListChannel(draw.Streamer, draw.Config.Streamer.Platform);
             var queue = await _songListClient.FetchQueueSnapshotAsync(channel, lookupCts.Token);
             if (!IsChannelStillLoaded(draw.Streamer)) return null;
-            return SpinnerDataService.FindQueuePosition(queue.Items, queueId);
+            return WinnerDialogContent.FindQueuePosition(queue.Items, queueId);
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
         {

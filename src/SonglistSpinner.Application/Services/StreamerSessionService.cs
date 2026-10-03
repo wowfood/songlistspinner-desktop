@@ -151,7 +151,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                     updated = _snapshot with
                     {
                         Config = latestConfig,
-                        AvailableSongs = SpinnerDataService.FilterAvailableSongs(queue.Items, played, latestConfig)
+                        AvailableSongs = SongAvailability.FilterAvailableSongs(queue.Items, played, latestConfig)
                             .ToArray(),
                         PlayedSongs = played,
                         NowPlaying = queue.Playing,
