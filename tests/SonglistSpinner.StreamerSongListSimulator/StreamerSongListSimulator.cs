@@ -162,12 +162,13 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     /// </summary>
     public void Reset()
     {
-        _faults.Clear();
         _events.RejectingConnections = false;
         _events.DropAll();
         _channels.Clear();
         _latestRelease = null;
         _requests.Clear();
+        // Last: a request this releases runs on at once, and must find the channels and the log already emptied.
+        _faults.Clear();
     }
 
     /// <summary>Aborts every event connection without a close handshake, as a network failure would.</summary>
