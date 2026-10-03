@@ -9,8 +9,8 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | Path | What lives there |
 | --- | --- |
 | `src/SonglistSpinner.Core` | MAUI-free domain: StreamerSongList API v2 and Centrifugo client (`Api/V2`), settings DTO and normaliser (`Data`), models, services |
-| `src/SonglistSpinner.Application` | MAUI-free app services: `StreamerSessionService` (queue session, realtime refresh), `OverlayStateService` (overlay state and SSE) |
-| `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` DI |
+| `src/SonglistSpinner.Application` | MAUI-free app services: `StreamerSessionService` (queue session, realtime refresh), `WheelSpinService` and `WinnerActionService` (a spin and the winner's outcome), `ApiCredentialTest` (test a credential, restore the previous one on failure), `OverlayStateService` (overlay state and SSE) |
+| `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` composing the feature registrations |
 | `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
 | `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
 | `tests/JavaScript` | `node:test` tests for the wheel scripts |
@@ -72,6 +72,11 @@ rejects a bare directory.
   repository checkout: `OverlayEventNames`, `SpinnerSettingValues` and `SpinnerInteropMethods` must
   match `SongSpinner.contracts.js` and the `SpinnerInterop` exports. Pass `[JSInvokable]` names to
   JavaScript with `nameof` instead of writing them in the script.
+- Register services with one `Add<Feature>()` extension per feature, in a `<Feature>ServiceCollectionExtensions`
+  file beside the feature's types (for example `AddStreamerSession` in Application, `AddStreamerSongList` in
+  Desktop); `MauiProgram` only composes them. Inject MAUI platform APIs (`IPreferences`, `ISecureStorage`,
+  `IClipboard`, `ILauncher`) and `HttpClient` (through `AddHttpClient`) instead of using the static APIs or
+  `new HttpClient`. Environment variables are read once, into `EnvironmentOverrides`.
 - Fix defects test-first.
 
 ## Branches and releases
