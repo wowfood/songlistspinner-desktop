@@ -57,6 +57,21 @@ seconds), so CI runs them with everything else. On their own:
 dotnet test --project tests/SonglistSpinner.IntegrationTests
 ```
 
+### Coverage
+
+Coverage is a diagnostic, not a target. Use it to find behaviour no test exercises, then decide whether that
+behaviour deserves a test; never write a test to move the number, and judge a test by what it would catch.
+
+```powershell
+dotnet test --solution SonglistSpinner.Desktop.sln -c Release --coverage --coverage-output-format cobertura --coverage-settings tests/coverage.settings.xml
+```
+
+Each test project writes its own `TestResults/<guid>.cobertura.xml` at the repository root (ignored by git).
+Core is exercised by all three .NET test projects and Application by two, so read the reports together, taking
+the higher hit count for each line, rather than one project's figure. `tests/coverage.settings.xml` names the
+two measured assemblies; without it the report is empty. Desktop (Razor pages, MAUI services) is not measured,
+because no test project references it, and the JavaScript has no coverage tool.
+
 ## StreamerSongList simulator
 
 `tests/SonglistSpinner.StreamerSongListSimulator` stands in for the StreamerSongList REST API
