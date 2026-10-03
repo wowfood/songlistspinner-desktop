@@ -21,5 +21,7 @@
     <ItemGroup>
         <!-- The simulator's own tests cover its play-history filtering directly. -->
         <InternalsVisibleTo Include="SonglistSpinner.IntegrationTests"/>
+        <!-- The end-to-end tests start from the demo channel a developer gets from the seed option. -->
+        <InternalsVisibleTo Include="SonglistSpinner.EndToEndTests"/>
     </ItemGroup>
 </Project>

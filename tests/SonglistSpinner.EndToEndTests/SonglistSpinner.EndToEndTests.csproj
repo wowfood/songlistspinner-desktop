@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Opt-in end-to-end tests: each test starts the built Desktop app (a real window) against the in-process
+        StreamerSongList simulator and drives its WebView through the DevTools protocol with Playwright. They skip
+        unless SONGLISTSPINNER_E2E=1; scripts/run-e2e.ps1 builds the app and runs them. The app runs on a fresh
+        temporary test profile, a free overlay port and a local update URL, so it never touches the user's settings,
+        credential, logs or running app, the real StreamerSongList service or GitHub.
+        The project does not reference the Desktop app: it tests the built executable as a user would run it.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage"/>
+    </ItemGroup>
+    <ItemGroup>
+        <!-- Only ConnectOverCDPAsync is used, so no Playwright browser download is needed. -->
+        <PackageReference Include="Microsoft.Playwright" Version="1.54.0"/>
+        <PackageReference Include="xunit.v3" Version="4.0.0"/>
+    </ItemGroup>
+    <ItemGroup>
+        <!-- One app window at a time: each test starts its own app, simulator and profile. -->
+        <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest"/>
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\SonglistSpinner.StreamerSongListSimulator\SonglistSpinner.StreamerSongListSimulator.csproj"/>
+    </ItemGroup>
+</Project>

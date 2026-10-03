@@ -10,7 +10,7 @@ internal static class DemoSeed
     public const string ChannelName = "demo";
     public const int StreamerId = 1001;
 
-    public static async Task ApplyAsync(StreamerSongListSimulator simulator, TimeProvider time)
+    public static async Task<SimulatedChannel> ApplyAsync(StreamerSongListSimulator simulator, TimeProvider time)
     {
         var channel = simulator.AddChannel(ChannelName, "twitch", StreamerId);
         var now = time.GetUtcNow();
@@ -29,5 +29,6 @@ internal static class DemoSeed
         await channel.RequestSongAsync("The Killers", "Mr. Brightside", "indie_kid");
         await channel.RequestSongAsync("Toto", "Africa", "long_time_fan", 10.00m);
         await channel.RequestSongAsync("Journey", "Don't Stop Believin'", "karaoke_star");
+        return channel;
     }
 }
