@@ -11,6 +11,7 @@ namespace SonglistSpinner.Services;
 public class OverlayStateService
 {
     private const int ClientBufferCapacity = 32;
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(15);
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -18,6 +19,7 @@ public class OverlayStateService
 
     private readonly ConcurrentDictionary<Guid, Channel<string>> _clients = new();
     private readonly object _healthGate = new();
+    private readonly TimeProvider _timeProvider;
 
     // Every change to the overlay snapshot is recorded and broadcast while holding this lock, and
     // SubscribeAsync takes it to build a client's initial state and register the client. So clients
@@ -28,6 +30,11 @@ public class OverlayStateService
     private OverlaySnapshot _snapshot = OverlaySnapshot.Empty;
     private string? _serverError;
     private LocalOverlayServerState _serverState = LocalOverlayServerState.Stopped;
+
+    public OverlayStateService(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     public event EventHandler? HealthChanged;
 
@@ -181,7 +188,7 @@ public class OverlayStateService
             {
                 messageAvailable ??= channel.Reader.WaitToReadAsync(ct).AsTask();
                 using var heartbeatCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-                var heartbeatDue = Task.Delay(TimeSpan.FromSeconds(15), heartbeatCts.Token);
+                var heartbeatDue = Task.Delay(HeartbeatInterval, _timeProvider, heartbeatCts.Token);
                 var completed = await Task.WhenAny(messageAvailable, heartbeatDue);
 
                 if (completed == heartbeatDue)

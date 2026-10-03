@@ -15,9 +15,13 @@ public sealed class StreamerSessionService : IAsyncDisposable
     private static readonly TimeSpan InitialRefreshRetryDelay = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan MaxRefreshRetryDelay = TimeSpan.FromSeconds(30);
 
+    /// <summary>Events often arrive in bursts, so a refresh waits this long and then covers the whole burst.</summary>
+    private static readonly TimeSpan RefreshDebounceDelay = TimeSpan.FromMilliseconds(300);
+
     private readonly ISpinnerApiService _apiService;
     private readonly IStreamerSongListEventSource _eventSource;
     private readonly OverlayStateService _overlayService;
+    private readonly TimeProvider _timeProvider;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
     private readonly object _stateGate = new();
@@ -32,11 +36,13 @@ public sealed class StreamerSessionService : IAsyncDisposable
     public StreamerSessionService(
         ISpinnerApiService apiService,
         IStreamerSongListEventSource eventSource,
-        OverlayStateService overlayService)
+        OverlayStateService overlayService,
+        TimeProvider? timeProvider = null)
     {
         _apiService = apiService;
         _eventSource = eventSource;
         _overlayService = overlayService;
+        _timeProvider = timeProvider ?? TimeProvider.System;
     }
 
     public event EventHandler<StreamerSessionChangedEventArgs>? Changed;
@@ -69,7 +75,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 playedSongs.ToArray(),
                 nowPlaying,
                 StreamerSessionHealth.Healthy,
-                $"Queue and history last synchronized at {DateTime.Now:t}.",
+                DescribeSynchronizedNow(),
                 StreamerSessionHealth.Checking,
                 $"Connecting to realtime updates for {streamer}.");
         }
@@ -146,7 +152,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                         PlayedSongs = played,
                         NowPlaying = queue.Playing,
                         ApiHealth = StreamerSessionHealth.Healthy,
-                        ApiHealthDetail = $"Queue and history last synchronized at {DateTime.Now:t}."
+                        ApiHealthDetail = DescribeSynchronizedNow()
                     };
                     _snapshot = updated;
                 }
@@ -189,7 +195,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 PlayedSongs = playedSongs.ToArray(),
                 NowPlaying = nowPlaying,
                 ApiHealth = StreamerSessionHealth.Healthy,
-                ApiHealthDetail = $"Queue and history last synchronized at {DateTime.Now:t}."
+                ApiHealthDetail = DescribeSynchronizedNow()
             };
             _snapshot = updated;
         }
@@ -316,7 +322,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                 {
                 }
 
-                await Task.Delay(TimeSpan.FromMilliseconds(300), cancellationToken);
+                await Task.Delay(RefreshDebounceDelay, _timeProvider, cancellationToken);
                 while (refreshSignals.TryRead(out _))
                 {
                 }
@@ -365,7 +371,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
                     $"[SonglistSpinner] Realtime refresh failed; retrying in {retryDelay.TotalSeconds:0}s: {ex}");
             }
 
-            await Task.Delay(retryDelay, cancellationToken);
+            await Task.Delay(retryDelay, _timeProvider, cancellationToken);
             // The retry fetches the latest state, so signals that arrived while waiting are already covered.
             while (refreshSignals.TryRead(out _))
             {
@@ -374,6 +380,9 @@ public sealed class StreamerSessionService : IAsyncDisposable
             retryDelay = retryDelay * 2 < MaxRefreshRetryDelay ? retryDelay * 2 : MaxRefreshRetryDelay;
         }
     }
+
+    private string DescribeSynchronizedNow() =>
+        $"Queue and history last synchronized at {_timeProvider.GetLocalNow():t}.";
 
     private bool IsRefreshSuspended()
     {

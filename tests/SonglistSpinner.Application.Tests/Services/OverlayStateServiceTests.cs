@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Models;
 using SonglistSpinner.Services;
 using Xunit;
@@ -144,6 +145,23 @@ public class OverlayStateServiceTests
         Assert.Equal("Artist: Artist | Title: Title", root.GetProperty("nowPlayingText").GetString());
         Assert.Equal("streamer", root.GetProperty("streamer").GetString());
         Assert.Equal(1, root.GetProperty("availableCount").GetInt32());
+    }
+
+    [Fact]
+    public async Task Given_ConnectedOverlay_When_FifteenQuietSecondsPass_Then_OverlayReceivesAKeepAliveComment()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider();
+        var overlay = new OverlayStateService(time);
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await events.MoveNextAsync());
+        // The subscription starts its heartbeat delay before MoveNextAsync returns.
+        var next = events.MoveNextAsync().AsTask();
+
+        time.Advance(TimeSpan.FromSeconds(15));
+
+        Assert.True(await next.WaitAsync(TimeSpan.FromSeconds(15), cancellationToken));
+        Assert.Equal(": keep-alive\n\n", events.Current);
     }
 
     internal static async Task<JsonDocument> ReadInitialStateAsync(OverlayStateService overlay)

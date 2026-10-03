@@ -9,6 +9,7 @@
 @inject StreamerSessionService StreamerSession
 @inject ApplicationUpdateService UpdateService
 @inject IJSRuntime JS
+@inject TimeProvider TimeProvider
 @implements IDisposable
 
 <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"

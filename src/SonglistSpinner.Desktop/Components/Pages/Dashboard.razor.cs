@@ -30,7 +30,7 @@ public partial class Dashboard
     private bool _isSpinning;
     private TaskCompletionSource<bool>? _spinCompletion;
     private bool _jsInitialized;
-    private DateTime _lastSpinTime = DateTime.MinValue;
+    private DateTimeOffset _lastSpinTime = DateTimeOffset.MinValue;
     private bool _loading = true;
     private bool _markNowPlayingPending;
     private SpinnerQueueItem? _nowPlaying;
@@ -323,14 +323,14 @@ public partial class Dashboard
             return;
         }
 
-        if ((DateTime.UtcNow - _lastSpinTime).TotalMilliseconds < 1000)
+        if ((TimeProvider.GetUtcNow() - _lastSpinTime).TotalMilliseconds < 1000)
         {
             SetStatus("Cooldown active");
             return;
         }
 
         var spinStreamer = _currentStreamer;
-        _lastSpinTime = DateTime.UtcNow;
+        _lastSpinTime = TimeProvider.GetUtcNow();
         _spinDisabled = true;
         _isSpinning = true;
         StreamerSession.SetRefreshSuspended(true);
@@ -367,7 +367,7 @@ public partial class Dashboard
             }
 
             await RebuildWheel(_wheelCts.Token);
-            var winnerIndex = Random.Shared.Next(_availableSongs.Count);
+            var winnerIndex = WinnerPicker.Next(_availableSongs.Count);
             var spinDuration = SpinDurationMilliseconds;
             SetStatus("Spinning...");
             await InvokeAsync(StateHasChanged);
@@ -387,7 +387,10 @@ public partial class Dashboard
 
             await JS.InvokeVoidAsync(SpinnerInteropMethods.SpinToItem, winnerIndex, spinDuration);
 
-            await Task.Delay(spinDuration + WinnerRevealDelayMilliseconds, _lifetimeCts.Token);
+            await Task.Delay(
+                TimeSpan.FromMilliseconds(spinDuration + WinnerRevealDelayMilliseconds),
+                TimeProvider,
+                _lifetimeCts.Token);
             var displayedQueuePosition = _config.WinnerDialog.ShowQueuePosition
                 ? await ResolveCurrentQueuePositionAsync(
                     spinStreamer,
@@ -625,8 +628,12 @@ public partial class Dashboard
 
         try
         {
-            using var lookupCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            lookupCts.CancelAfter(WinnerQueuePositionLookupTimeoutMilliseconds);
+            using var lookupTimeout = new CancellationTokenSource(
+                TimeSpan.FromMilliseconds(WinnerQueuePositionLookupTimeoutMilliseconds),
+                TimeProvider);
+            using var lookupCts = CancellationTokenSource.CreateLinkedTokenSource(
+                cancellationToken,
+                lookupTimeout.Token);
             var channel = new StreamerSongListChannel(expectedStreamer, _config.Streamer.Platform);
             var queue = await ApiService.FetchQueueSnapshotAsync(channel, lookupCts.Token);
             if (!string.Equals(_currentStreamer, expectedStreamer, StringComparison.Ordinal)) return null;
@@ -661,7 +668,7 @@ public partial class Dashboard
             await Task.WhenAll(queueTask, historyTask);
             SetApiHealth(
                 StreamerSessionHealth.Healthy,
-                $"Queue and history last synchronized at {DateTime.Now:t}.");
+                $"Queue and history last synchronized at {TimeProvider.GetLocalNow():t}.");
             return (await queueTask, await historyTask);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)

@@ -363,7 +363,7 @@ public partial class Settings
     {
         try
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(80), cancellationToken);
+            await Task.Delay(TimeSpan.FromMilliseconds(80), TimeProvider, cancellationToken);
             await InvokeAsync(PushPreviewAsync);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

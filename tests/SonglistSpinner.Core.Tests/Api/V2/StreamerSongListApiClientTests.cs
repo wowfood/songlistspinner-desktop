@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
+using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Api.V2;
 using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
@@ -321,7 +322,7 @@ public class StreamerSongListApiClientTests
             }
             """));
         var now = new DateTimeOffset(2026, 8, 12, 12, 0, 0, TimeSpan.Zero);
-        var client = CreateClient(handler, timeProvider: new FixedTimeProvider(now));
+        var client = CreateClient(handler, timeProvider: new FakeTimeProvider(now));
 
         var result = await client.FetchPlayHistoryAsync(
             new StreamerSongListChannel("wowfood", "youtube"),
@@ -519,10 +520,5 @@ public class StreamerSongListApiClientTests
                 : null;
             return Task.FromResult(responseFactory(request));
         }
-    }
-
-    private sealed class FixedTimeProvider(DateTimeOffset now) : TimeProvider
-    {
-        public override DateTimeOffset GetUtcNow() => now;
     }
 }

@@ -22,6 +22,8 @@ public static class MauiProgram
         builder.Services.AddMudServices();
         builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         builder.Services.AddSingleton(TimeProvider.System);
+        // Random.Shared is thread-safe; the dashboard picks spin winners from it.
+        builder.Services.AddSingleton(Random.Shared);
         builder.Services.AddSingleton<GitHubReleaseUpdateChecker>();
         builder.Services.AddSingleton<ApplicationUpdateService>();
         builder.Services.AddSingleton(CreateStreamerSongListApiOptions());

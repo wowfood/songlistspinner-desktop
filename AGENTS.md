@@ -54,6 +54,10 @@ rejects a bare directory.
 - Test methods are named `Given_X_When_Y_Then_Z`, with Arrange, Act and Assert separated by blank
   lines. A test class is `<TypeUnderTest>Tests`, in the folder that mirrors the type's `src` path.
 - Test projects need `<OutputType>Exe</OutputType>` (xunit.v3 on Microsoft.Testing.Platform).
+- Production code takes the clock and randomness as dependencies: `TimeProvider` instead of
+  `DateTime.Now`/`UtcNow` or a bare `Task.Delay`, and the injected `Random` for winner picks. Tests use
+  `FakeTimeProvider` and advance it; they never wait on the wall clock. When a background task owns the
+  delay, wait for its timer first (`TimerTrackingTimeProvider` in Application.Tests), then advance.
 - Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
   renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
   migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step.
