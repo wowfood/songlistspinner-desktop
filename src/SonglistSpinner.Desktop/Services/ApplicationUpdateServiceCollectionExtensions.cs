@@ -15,7 +15,13 @@ public static class ApplicationUpdateServiceCollectionExtensions
         services.TryAddSingleton<IKeyValueStore, MauiPreferencesStore>();
         services.AddHttpClient(nameof(GitHubReleaseUpdateChecker))
             .AddTypedClient(httpClient => new GitHubReleaseUpdateChecker(httpClient, latestReleaseEndpoint));
-        services.AddSingleton<ApplicationUpdateService>();
+        // This (Desktop) assembly carries the release version; ApplicationUpdateService's own assembly does not.
+        var currentVersion = typeof(ApplicationUpdateServiceCollectionExtensions).Assembly.GetName().Version ??
+                             new Version(0, 0, 0);
+        services.AddSingleton(provider => new ApplicationUpdateService(
+            provider.GetRequiredService<GitHubReleaseUpdateChecker>(),
+            provider.GetRequiredService<IKeyValueStore>(),
+            currentVersion));
         return services;
     }
 }

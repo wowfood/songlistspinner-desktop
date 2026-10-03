@@ -2,6 +2,10 @@ using SonglistSpinner.Core.Updates;
 
 namespace SonglistSpinner.Services;
 
+/// <summary>
+/// The newer release to offer the user, at most one check per app run, minus the release the user dismissed
+/// (remembered across runs under a persisted key).
+/// </summary>
 public sealed class ApplicationUpdateService
 {
     private const string DismissedReleaseKey = "dismissed_application_update";
@@ -11,15 +15,21 @@ public sealed class ApplicationUpdateService
     private readonly Version _currentVersion;
     private Task<ApplicationUpdateInfo?>? _checkTask;
 
-    public ApplicationUpdateService(GitHubReleaseUpdateChecker checker, IKeyValueStore preferences)
+    /// <param name="currentVersion">
+    /// The running app's version: the Desktop assembly's, which carries the release's <c>VersionPrefix</c>, not
+    /// this assembly's.
+    /// </param>
+    public ApplicationUpdateService(
+        GitHubReleaseUpdateChecker checker,
+        IKeyValueStore preferences,
+        Version currentVersion)
     {
         _checker = checker;
         _preferences = preferences;
-        var assemblyVersion = typeof(ApplicationUpdateService).Assembly.GetName().Version ?? new Version(0, 0, 0);
         _currentVersion = new Version(
-            Math.Max(0, assemblyVersion.Major),
-            Math.Max(0, assemblyVersion.Minor),
-            Math.Max(0, assemblyVersion.Build));
+            Math.Max(0, currentVersion.Major),
+            Math.Max(0, currentVersion.Minor),
+            Math.Max(0, currentVersion.Build));
     }
 
     public string CurrentVersion => _currentVersion.ToString(3);
