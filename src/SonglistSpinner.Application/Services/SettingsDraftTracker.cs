@@ -10,7 +10,8 @@ namespace SonglistSpinner.Services;
 /// </summary>
 /// <remarks>
 /// The settings draft is the <see cref="SettingsDto"/> plus the view model's editor state (wheel colours text,
-/// field order and selection, panel background and opacity), which is only written to the DTO on save.
+/// field order and selection, panel background and opacity), which Save writes into the DTO. The DTO is compared
+/// as Save would write it.
 /// </remarks>
 public sealed class SettingsDraftTracker
 {
@@ -31,7 +32,7 @@ public sealed class SettingsDraftTracker
 
     private static string Capture(SettingsDto settings, SettingsViewModel viewModel) =>
         JsonSerializer.Serialize(new SettingsSnapshot(
-            JsonSerializer.Serialize(settings),
+            CaptureAsSaved(settings, viewModel),
             viewModel.WheelColorsRaw,
             CaptureFields(viewModel.DisplayFields),
             CaptureFields(viewModel.NowPlayingDisplayFields),
@@ -40,6 +41,16 @@ public sealed class SettingsDraftTracker
             viewModel.PlayedListBgAlpha,
             viewModel.UseIndependentNowPlayingBgAlpha,
             viewModel.NowPlayingBgAlpha));
+
+    // The DTO as Save would write it. The page writes the editor state into the DTO at other times too (before
+    // reviewing a reset, and in the defaults a reset applies), which re-encodes fields such as the panel colour and
+    // the winner dialog fields without changing them; capturing the raw DTO would count that as a change.
+    private static string CaptureAsSaved(SettingsDto settings, SettingsViewModel viewModel)
+    {
+        var copy = JsonSerializer.Deserialize<SettingsDto>(JsonSerializer.Serialize(settings)) ?? new SettingsDto();
+        viewModel.ApplyToDto(copy);
+        return JsonSerializer.Serialize(copy);
+    }
 
     private static FieldSnapshot[] CaptureFields(IEnumerable<DisplayField> fields) =>
         fields.Select(field => new FieldSnapshot(field.Name, field.Selected)).ToArray();

@@ -74,6 +74,38 @@ public class SettingsDraftTrackerTests
     }
 
     [Fact]
+    public void Given_SavedSettings_When_TheEditorStateIsWrittenToTheDraft_Then_ReportsNoUnsavedSettingsChanges()
+    {
+        // Settings writes the editor state into the draft before it reviews a reset, even when nothing differs.
+        var tracker = new SettingsDraftTracker();
+        var (settings, viewModel) = LoadedDraft();
+        tracker.MarkSettingsSaved(settings, viewModel);
+
+        viewModel.ApplyToDto(settings);
+
+        Assert.False(tracker.HasUnsavedSettingsChanges(settings, viewModel));
+    }
+
+    [Fact]
+    public void Given_SavedDefaults_When_TheDraftIsResetToDefaults_Then_ReportsNoUnsavedSettingsChanges()
+    {
+        var tracker = new SettingsDraftTracker();
+        var (settings, viewModel) = LoadedDraft();
+        tracker.MarkSettingsSaved(settings, viewModel);
+        settings.PlayedListShowNumbers = true;
+
+        // What Settings does when a reset is confirmed: the defaults, as the editor writes them, replace the draft.
+        var defaults = new SettingsDto();
+        var defaultsEditor = new SettingsViewModel();
+        defaultsEditor.Initialize(defaults);
+        defaultsEditor.ApplyToDto(defaults);
+        SettingsResetPlan.ApplyDefaults(settings, defaults);
+        viewModel.Initialize(settings);
+
+        Assert.False(tracker.HasUnsavedSettingsChanges(settings, viewModel));
+    }
+
+    [Fact]
     public void Given_SavedCredential_When_ATokenIsEntered_Then_ReportsUnsavedCredentialChanges()
     {
         var tracker = new SettingsDraftTracker();
