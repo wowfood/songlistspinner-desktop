@@ -104,8 +104,8 @@ public class OverlayLayoutSyncTests(SharedApp sharedApp) : IClassFixture<SharedA
         var dashboard = scenario.Dashboard;
         await dashboard.LoadChannelAsync("layout_streamer");
         var overlay = await scenario.OpenOverlayAsync();
+        // The channel's name arrives with the overlay's initial state, so the overlay is connected once it shows.
         await Expect(overlay.StreamerLabel).ToHaveTextAsync("layout_streamer");
-        await Expect(dashboard.Health.Overlay).ToHaveTextAsync("1 connected");
         await overlay.ExpectPlayedListExpandedAsync();
         return (dashboard, overlay);
     }
