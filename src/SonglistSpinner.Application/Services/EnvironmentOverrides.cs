@@ -32,7 +32,7 @@ public sealed record EnvironmentOverrides(
         var fallbackCredential = string.IsNullOrWhiteSpace(token)
             ? null
             : new StreamerSongListCredential(
-                SecureStorageStreamerSongListCredentialStore.ParseKind(readVariable(TokenTypeVariable)),
+                StreamerSongListCredentialKinds.Parse(readVariable(TokenTypeVariable)),
                 token,
                 readVariable(ClientIdVariable));
 

@@ -4,8 +4,15 @@ using Microsoft.Extensions.Logging;
 
 namespace SonglistSpinner.Services;
 
+/// <summary>
+/// Serves the OBS overlay page, its scripts and its event stream over HTTP on localhost. The page and scripts are
+/// the Desktop <c>wwwroot</c> files embedded in this assembly.
+/// </summary>
 public class LocalOverlayServer : IAsyncDisposable
 {
+    /// <summary>The port OBS browser sources are set up with; changing it breaks every saved overlay URL.</summary>
+    public const int DefaultPort = 5150;
+
     private const string OverlayResourceName = "SonglistSpinner.WebAssets.Overlay.html";
     private const string ContractsResourceName = "SonglistSpinner.WebAssets.SongSpinner.contracts.js";
     private const string SpinWheelResourceName = "SonglistSpinner.WebAssets.spin-wheel-iife.js";
@@ -27,17 +34,19 @@ public class LocalOverlayServer : IAsyncDisposable
     private LocalOverlayServerState _state = LocalOverlayServerState.Stopped;
     private string? _error;
 
-    public LocalOverlayServer(OverlayStateService overlay, ILogger<LocalOverlayServer> logger)
+    /// <param name="port">The app always uses <see cref="DefaultPort"/>; tests pass a free port.</param>
+    public LocalOverlayServer(OverlayStateService overlay, ILogger<LocalOverlayServer> logger, int port = DefaultPort)
     {
         _overlay = overlay;
         _logger = logger;
+        Port = port;
         _overlay.ConnectedClientsChanged += OnConnectedClientsChanged;
     }
 
     /// <summary>Raised when the server's state or its number of connected overlays changes.</summary>
     public event EventHandler? HealthChanged;
 
-    public int Port { get; } = 5150;
+    public int Port { get; }
 
     /// <summary>The address OBS browser sources load.</summary>
     public string OverlayUrl => $"http://localhost:{Port}/overlay";

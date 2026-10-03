@@ -22,7 +22,8 @@ public sealed class SecureStorageStreamerSongListCredentialStore(
         var token = await secureStorage.GetAsync(TokenKey);
         if (string.IsNullOrWhiteSpace(token)) return environment.FallbackCredential;
 
-        var kind = ParseKind(preferences.Get(KindKey, nameof(StreamerSongListCredentialKind.Streamer)));
+        var kind = StreamerSongListCredentialKinds.Parse(
+            preferences.Get(KindKey, nameof(StreamerSongListCredentialKind.Streamer)));
         var clientId = preferences.Get<string?>(ClientIdKey, null);
         return new StreamerSongListCredential(kind, token, clientId);
     }
@@ -51,17 +52,5 @@ public sealed class SecureStorageStreamerSongListCredentialStore(
         preferences.Remove(KindKey);
         preferences.Remove(ClientIdKey);
         return ValueTask.CompletedTask;
-    }
-
-    /// <summary>Reads a stored or configured credential kind; an unknown value means a streamer token.</summary>
-    internal static StreamerSongListCredentialKind ParseKind(string? value)
-    {
-        if (Enum.TryParse<StreamerSongListCredentialKind>(value, true, out var kind)) return kind;
-        return value?.Trim().ToLowerInvariant() switch
-        {
-            "bearer" or "oauth" => StreamerSongListCredentialKind.OAuthBearer,
-            "user" => StreamerSongListCredentialKind.User,
-            _ => StreamerSongListCredentialKind.Streamer
-        };
     }
 }
