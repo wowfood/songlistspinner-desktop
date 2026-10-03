@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Tests the real Core and Application types over real HTTP and WebSocket connections against the
+        in-process StreamerSongList simulator, which listens on a free 127.0.0.1 port. Nothing here reaches the
+        network beyond loopback, the real StreamerSongList service or the app's saved settings.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage"/>
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="xunit.v3" Version="4.0.0"/>
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="..\..\src\SonglistSpinner.Application\SonglistSpinner.Application.csproj"/>
+        <ProjectReference Include="..\SonglistSpinner.StreamerSongListSimulator\SonglistSpinner.StreamerSongListSimulator.csproj"/>
+        <ProjectReference Include="..\SonglistSpinner.Testing\SonglistSpinner.Testing.csproj"/>
+    </ItemGroup>
+</Project>
