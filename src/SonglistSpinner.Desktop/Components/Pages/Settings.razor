@@ -1,13 +1,17 @@
 @page "/settings"
-@inject ILocalSettingsService LocalSettings
+@inject PreferencesSettingsService LocalSettings
 @inject IStreamerSongListCredentialStore CredentialStore
-@inject ISpinnerApiService ApiService
-@inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
+@inject ApiCredentialTest CredentialTest
+@inject IStreamerSongListClient SongListClient
+@inject SonglistSpinner.Core.StreamerSongList.Api.V2.StreamerSongListApiOptions ApiOptions
 @inject IDialogService DialogService
 @inject NavigationManager Navigation
-@inject OverlayStateService OverlayService
-@inject ApplicationUpdateService UpdateService
+@inject LocalOverlayServer OverlayServer
+@inject StreamerSessionService StreamerSession
 @inject IJSRuntime JS
+@inject TimeProvider TimeProvider
+@inject DiagnosticFileLoggerProvider DiagnosticLog
+@inject ILogger<Settings> Logger
 @implements IDisposable
 
 <NavigationLock ConfirmExternalNavigation="@HasUnsavedChanges"
@@ -30,7 +34,7 @@
 
     @if (_dto is null || _editContext is null)
     {
-        <div class="ss-settings-loading">Loading settings...</div>
+        <div class="ss-settings-loading" role="status" aria-live="polite">Loading settings...</div>
     }
     else
     {
@@ -38,31 +42,31 @@
             <div class="ss-settings-workspace">
                 <nav class="ss-settings-nav" aria-label="Settings sections">
                     <button type="button" class="@SectionClass(SettingsSection.Connection)"
-                            aria-pressed="@(_activeSection == SettingsSection.Connection)"
+                            aria-pressed="@(_activeSection == SettingsSection.Connection ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Connection))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#128268;</span>
                         <span><strong>Connection</strong><small>Channel and API access</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Spinner)"
-                            aria-pressed="@(_activeSection == SettingsSection.Spinner)"
+                            aria-pressed="@(_activeSection == SettingsSection.Spinner ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Spinner))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#8635;</span>
                         <span><strong>Spinner &amp; Queue</strong><small>Winner and history rules</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Overlay)"
-                            aria-pressed="@(_activeSection == SettingsSection.Overlay)"
+                            aria-pressed="@(_activeSection == SettingsSection.Overlay ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Overlay))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9638;</span>
                         <span><strong>Overlay Layout</strong><small>Panels and winner dialog</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Appearance)"
-                            aria-pressed="@(_activeSection == SettingsSection.Appearance)"
+                            aria-pressed="@(_activeSection == SettingsSection.Appearance ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Appearance))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9680;</span>
                         <span><strong>Appearance</strong><small>Colors and wheel style</small></span>
                     </button>
                     <button type="button" class="@SectionClass(SettingsSection.Advanced)"
-                            aria-pressed="@(_activeSection == SettingsSection.Advanced)"
+                            aria-pressed="@(_activeSection == SettingsSection.Advanced ? "true" : "false")"
                             @onclick="@(() => SelectSection(SettingsSection.Advanced))">
                         <span class="ss-settings-nav-icon" aria-hidden="true">&#9881;</span>
                         <span><strong>Advanced</strong><small>Diagnostics and endpoints</small></span>
@@ -73,600 +77,51 @@
                     @switch (_activeSection)
                     {
                         case SettingsSection.Connection:
-                            <div class="ss-settings-section-heading">
-                                <span>Connection</span>
-                                <h2>Choose the channel this installation controls</h2>
-                                <p>The channel identity and secure credential are kept separate from overlay appearance.</p>
-                            </div>
-
-                            <section class="ss-settings-section">
-                                <h3>Queue Source</h3>
-                                <div class="ss-field">
-                                    <label for="defaultStreamerName">Default StreamerSongList Name</label>
-                                    <InputText id="defaultStreamerName" @bind-Value="_dto.DefaultStreamerName"
-                                               placeholder="e.g. wowfood"/>
-                                    <div class="ss-field-hint">Automatically loads this channel when the Dashboard opens.</div>
-                                </div>
-                                <div class="ss-field">
-                                    <label for="streamerPlatform">Platform Identity</label>
-                                    <InputSelect id="streamerPlatform" @bind-Value="_dto.StreamerPlatform">
-                                        @foreach (var option in SettingsOptions.Platforms)
-                                        {
-                                            <option value="@option.Value">@option.Label</option>
-                                        }
-                                    </InputSelect>
-                                    <div class="ss-field-hint">Selects the public route used to resolve the StreamerSongList channel.</div>
-                                </div>
-                                <div class="ss-field">
-                                    <label class="ss-checkbox-label">
-                                        <InputCheckbox @bind-Value="_dto.HideChangeOptionWhenDefault"/>
-                                        Hide “Change Streamer” when the default channel is set
-                                    </label>
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <h3>StreamerSongList API v2 Access</h3>
-                                <div class="ss-field">
-                                    <label for="credentialKind">Credential Type</label>
-                                    <InputSelect id="credentialKind" @bind-Value="_credentialKind">
-                                        <option value="@StreamerSongListCredentialKind.Streamer">Streamer token</option>
-                                        <option value="@StreamerSongListCredentialKind.User">User token</option>
-                                        <option value="@StreamerSongListCredentialKind.OAuthBearer">OAuth bearer token</option>
-                                    </InputSelect>
-                                    <div class="ss-field-hint">For one channel, use a streamer token created under StreamerSongList Settings &gt; Access.</div>
-                                </div>
-                                <div class="ss-field">
-                                    <label for="apiToken">API Token</label>
-                                    <InputText id="apiToken" @bind-Value="_credentialToken" type="password"
-                                               autocomplete="off" placeholder="Leave blank to keep the saved token"/>
-                                    <div class="ss-field-hint">Stored in Windows secure storage and never written to the repository.</div>
-                                </div>
-                                @if (_credentialKind == StreamerSongListCredentialKind.OAuthBearer)
-                                {
-                                    <div class="ss-field">
-                                        <label for="oauthClientId">OAuth Client ID</label>
-                                        <InputText id="oauthClientId" @bind-Value="_credentialClientId" autocomplete="off"/>
-                                    </div>
-                                }
-                                <div class="ss-credential-row">
-                                    @if (_hasCredential)
-                                    {
-                                        <span class="ss-auth-status ss-auth-ok">&#10003; API credential configured</span>
-                                        <button type="button" class="ss-btn-danger-subtle"
-                                                disabled="@_clearingCredential"
-                                                @onclick="ClearApiCredentialAsync">
-                                            @(_clearingCredential ? "Clearing..." : "Clear credential")
-                                        </button>
-                                    }
-                                    else
-                                    {
-                                        <span class="ss-auth-status ss-auth-none">No API credential configured</span>
-                                    }
-                                </div>
-                                <div class="ss-settings-actions">
-                                    <button type="button" class="ss-btn-primary" @onclick="TestApiConnection"
-                                            disabled="@_testingCredential">
-                                        @(_testingCredential ? "Testing..." : "Save and test connection")
-                                    </button>
-                                    <button type="button" class="ss-btn-secondary" @onclick="OpenSetupWizard">
-                                        Open connection wizard
-                                    </button>
-                                </div>
-                                @if (!string.IsNullOrWhiteSpace(_credentialTestResult))
-                                {
-                                    <div class="@(_credentialTestSucceeded ? "ss-save-success ss-settings-result" : "ss-save-error ss-settings-result")"
-                                         role="status">
-                                        @_credentialTestResult
-                                    </div>
-                                }
-                            </section>
+                            <SettingsConnectionSection Dto="_dto"
+                                                       @bind-CredentialKind="_credentialKind"
+                                                       @bind-CredentialToken="_credentialToken"
+                                                       @bind-CredentialClientId="_credentialClientId"
+                                                       HasCredential="_hasCredential"
+                                                       ClearingCredential="_clearingCredential"
+                                                       TestingCredential="_testingCredential"
+                                                       CredentialTestResult="@_credentialTestResult"
+                                                       CredentialTestSucceeded="_credentialTestSucceeded"
+                                                       ClearCredential="ClearApiCredentialAsync"
+                                                       TestConnection="TestApiConnection"/>
                             break;
 
                         case SettingsSection.Spinner:
-                            <div class="ss-settings-section-heading">
-                                <span>Spinner &amp; Queue</span>
-                                <h2>Control what can be selected and what happens next</h2>
-                                <p>These options change queue filtering and the explicit actions offered after a spin.</p>
-                            </div>
-
-                            <section class="ss-settings-section">
-                                <h3>Winner Actions</h3>
-                                <div class="ss-field">
-                                    <label class="ss-checkbox-label">
-                                        <InputCheckbox @bind-Value="_dto.UpdateQueueAfterSpin"
-                                                       disabled="@_dto.DisplayNowPlaying"/>
-                                        Prefer Mark Played in the winner popup
-                                    </label>
-                                    <div class="ss-field-hint">Highlights Mark Played as the suggested action. No queue change occurs until an action is chosen.</div>
-                                </div>
-                                <div class="ss-field">
-                                    <label class="ss-checkbox-label">
-                                        <InputCheckbox @bind-Value="_dto.DisplayNowPlaying"/>
-                                        Enable Now Playing workflow
-                                    </label>
-                                    <div class="ss-field-hint">Adds Set Now Playing to the winner popup and enables the configurable overlay panel.</div>
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <h3>Queue Filtering &amp; History</h3>
-                                <div class="ss-field">
-                                    <label class="ss-checkbox-label">
-                                        <InputCheckbox @bind-Value="_dto.ExcludePlayedSongs"/>
-                                        Exclude already-played songs from the wheel
-                                    </label>
-                                </div>
-                                <div class="ss-field">
-                                    <label for="playHistoryPeriod">Play History Period</label>
-                                    <InputSelect id="playHistoryPeriod" @bind-Value="_dto.PlayHistoryPeriod">
-                                        @foreach (var option in SettingsOptions.PlayHistoryPeriods)
-                                        {
-                                            <option value="@option.Value">@option.Label</option>
-                                        }
-                                    </InputSelect>
-                                    <div class="ss-field-hint">This range supplies the played panel and, when enabled, the wheel exclusion filter.</div>
-                                </div>
-                            </section>
+                            <SettingsSpinnerSection Dto="_dto"/>
                             break;
 
                         case SettingsSection.Overlay:
-                            <div class="ss-settings-section-heading">
-                                <span>Overlay Layout</span>
-                                <h2>Arrange the information your viewers see</h2>
-                                <p>Configure field order, panel placement, and typography across the overlay and winner dialog.</p>
-                            </div>
-
-                            <section class="ss-settings-section">
-                                <div class="ss-settings-section-title-row">
-                                    <h3>Played Songs Panel</h3>
-                                    <button type="button" class="ss-btn-reset-subset"
-                                            aria-label="Revert Played Songs Panel to default"
-                                            disabled="@_resetDialogOpen"
-                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.PlayedSongsPanel))">
-                                        Revert to default
-                                    </button>
-                                </div>
-                                <div class="ss-field">
-                                    <label>Display Fields</label>
-                                    <DisplayFieldOrderEditor Items="_vm.DisplayFields"
-                                                             HelpId="playedFieldsHelp"
-                                                             OrderChanged="MovePlayedField"
-                                                             SelectionChanged="TogglePlayedField">
-                                        <HelpContent>
-                                            Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
-                                        </HelpContent>
-                                    </DisplayFieldOrderEditor>
-                                </div>
-                                <div class="ss-settings-field-grid">
-                                    <div class="ss-field">
-                                        <label for="playedListSeparatorChoice">Field Separator</label>
-                                        <InputSelect id="playedListSeparatorChoice" @bind-Value="PlayedListSeparatorChoice">
-                                            @foreach (var option in SettingsOptions.FieldSeparators)
-                                            {
-                                                <option value="@option.Key">@option.Label</option>
-                                            }
-                                            <option value="@SettingsOptions.CustomSeparatorKey">Custom</option>
-                                        </InputSelect>
-                                        <div class="ss-field-hint">Choose a symbol that will render in both desktop and browser overlays.</div>
-                                        @if (PlayedListUsesCustomSeparator)
-                                        {
-                                            <div class="ss-custom-separator">
-                                                <label for="playedListSeparator">Custom Separator</label>
-                                                <InputText id="playedListSeparator" @bind-Value="_dto.PlayedListSeparator"
-                                                           placeholder="Enter a custom separator"/>
-                                                <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
-                                            </div>
-                                        }
-                                    </div>
-                                    <div class="ss-field">
-                                        <label class="ss-checkbox-label">
-                                            <InputCheckbox @bind-Value="_dto.PlayedListShowLabels"
-                                                           disabled="@_dto.PlayedListShowFieldHeaders"/>
-                                            Show field labels
-                                        </label>
-                                        <div class="ss-field-hint">Prefixes each song value with labels such as Artist and Title. A header row replaces these labels while enabled.</div>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label class="ss-checkbox-label">
-                                            <InputCheckbox @bind-Value="_dto.PlayedListShowFieldHeaders"/>
-                                            Show field header row
-                                        </label>
-                                        <div class="ss-field-hint">Displays the selected field labels once above aligned song values.</div>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label class="ss-checkbox-label">
-                                            <InputCheckbox @bind-Value="_dto.PlayedListShowNumbers"/>
-                                            Show sequence numbers
-                                        </label>
-                                        <div class="ss-field-hint">Prefixes each displayed song with a number.</div>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="playedListNumberingStart">Numbering Starts At</label>
-                                        <InputSelect id="playedListNumberingStart"
-                                                     @bind-Value="_dto.PlayedListNumberingStart"
-                                                     disabled="@(!_dto.PlayedListShowNumbers)">
-                                            @foreach (var option in SettingsOptions.PlayedListNumberingStarts)
-                                            {
-                                                <option value="@option.Value">@option.Label</option>
-                                            }
-                                        </InputSelect>
-                                        <div class="ss-field-hint">The displayed history remains newest first.</div>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="playedListPosition">Panel Position</label>
-                                        <InputSelect id="playedListPosition" @bind-Value="_dto.PlayedListPosition">
-                                            @foreach (var option in SettingsOptions.PlayedListPositions)
-                                            {
-                                                <option value="@option.Value">@option.Label</option>
-                                            }
-                                        </InputSelect>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="playedListFont">Font Family</label>
-                                        <InputSelect id="playedListFont" @bind-Value="_dto.PlayedListFontFamily">
-                                            @foreach (var font in FontChoices)
-                                            {
-                                                <option value="@font.Value">@font.Label</option>
-                                            }
-                                        </InputSelect>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="playedListFontSize">Font Size</label>
-                                        <InputText id="playedListFontSize" @bind-Value="_dto.PlayedListFontSize" placeholder="0.875rem"/>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="playedListMaxLines">Maximum Lines per Song</label>
-                                        <InputNumber id="playedListMaxLines" @bind-Value="_dto.PlayedListMaxLines" min="1" max="5"/>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section @(!_dto.DisplayNowPlaying ? "ss-settings-section-muted" : "")">
-                                <div class="ss-settings-section-title-row">
-                                    <h3>Now Playing Panel</h3>
-                                    <div class="ss-settings-section-title-actions">
-                                        <span>@(_dto.DisplayNowPlaying ? "Enabled" : "Disabled")</span>
-                                        <button type="button" class="ss-btn-reset-subset"
-                                                aria-label="Revert Now Playing Panel to default"
-                                                disabled="@_resetDialogOpen"
-                                                @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.NowPlayingPanel))">
-                                            Revert to default
-                                        </button>
-                                    </div>
-                                </div>
-                                @if (!_dto.DisplayNowPlaying)
-                                {
-                                    <p class="ss-settings-inline-notice">
-                                        Enable the Now Playing workflow under Spinner &amp; Queue to show and configure this panel.
-                                        <button type="button" @onclick="@(() => SelectSection(SettingsSection.Spinner))">Open winner settings</button>
-                                    </p>
-                                }
-                                else
-                                {
-                                    <div class="ss-field">
-                                        <label>Display Fields</label>
-                                        <DisplayFieldOrderEditor Items="_vm.NowPlayingDisplayFields"
-                                                                 HelpId="nowPlayingFieldsHelp"
-                                                                 OrderChanged="MoveNowPlayingField"
-                                                                 SelectionChanged="ToggleNowPlayingField">
-                                            <HelpContent>
-                                                Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
-                                            </HelpContent>
-                                        </DisplayFieldOrderEditor>
-                                    </div>
-                                    <div class="ss-settings-field-grid">
-                                        <div class="ss-field">
-                                            <label for="nowPlayingSeparatorChoice">Field Separator</label>
-                                            <InputSelect id="nowPlayingSeparatorChoice" @bind-Value="NowPlayingSeparatorChoice">
-                                                @foreach (var option in SettingsOptions.FieldSeparators)
-                                                {
-                                                    <option value="@option.Key">@option.Label</option>
-                                                }
-                                                <option value="@SettingsOptions.CustomSeparatorKey">Custom</option>
-                                            </InputSelect>
-                                            <div class="ss-field-hint">Choose a symbol that will render in both desktop and browser overlays.</div>
-                                            @if (NowPlayingUsesCustomSeparator)
-                                            {
-                                                <div class="ss-custom-separator">
-                                                    <label for="nowPlayingSeparator">Custom Separator</label>
-                                                    <InputText id="nowPlayingSeparator" @bind-Value="_dto.NowPlayingSeparator"
-                                                               placeholder="Enter a custom separator"/>
-                                                    <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
-                                                </div>
-                                            }
-                                        </div>
-                                        <div class="ss-field">
-                                            <label class="ss-checkbox-label">
-                                                <InputCheckbox @bind-Value="_dto.NowPlayingShowLabels"/>
-                                                Show field labels
-                                            </label>
-                                            <div class="ss-field-hint">Prefixes values with labels such as Artist and Title.</div>
-                                        </div>
-                                        <div class="ss-field">
-                                            <label for="nowPlayingPosition">Screen Position</label>
-                                            <InputSelect id="nowPlayingPosition" @bind-Value="_dto.NowPlayingPosition">
-                                                @foreach (var option in SettingsOptions.NowPlayingPositions)
-                                                {
-                                                    <option value="@option.Value">@option.Label</option>
-                                                }
-                                            </InputSelect>
-                                        </div>
-                                        <div class="ss-field">
-                                            <label for="nowPlayingWidth">Panel Width</label>
-                                            <InputText id="nowPlayingWidth" @bind-Value="_dto.NowPlayingWidth" placeholder="28rem"/>
-                                            <div class="ss-field-hint">CSS sizes such as 28rem, 480px, or 40vw.</div>
-                                        </div>
-                                        <div class="ss-field">
-                                            <label for="nowPlayingFont">Font Family</label>
-                                            <InputSelect id="nowPlayingFont" @bind-Value="_dto.NowPlayingFontFamily">
-                                                @foreach (var font in FontChoices)
-                                                {
-                                                    <option value="@font.Value">@font.Label</option>
-                                                }
-                                            </InputSelect>
-                                        </div>
-                                        <div class="ss-field">
-                                            <label for="nowPlayingFontSize">Font Size</label>
-                                            <InputText id="nowPlayingFontSize" @bind-Value="_dto.NowPlayingFontSize" placeholder="1.125rem"/>
-                                        </div>
-                                    </div>
-                                }
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <div class="ss-settings-section-title-row">
-                                    <h3>Winner Dialog Settings</h3>
-                                    <button type="button" class="ss-btn-reset-subset"
-                                            aria-label="Revert Winner Dialog Settings to default"
-                                            disabled="@_resetDialogOpen"
-                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.WinnerDialog))">
-                                        Revert to default
-                                    </button>
-                                </div>
-                                <div class="ss-field">
-                                    <label>Display Fields</label>
-                                    <DisplayFieldOrderEditor Items="_vm.WinnerDialogDisplayFields"
-                                                             HelpId="winnerFieldsHelp"
-                                                             OrderChanged="MoveWinnerDialogField"
-                                                             SelectionChanged="ToggleWinnerDialogField">
-                                        <HelpContent>
-                                            Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
-                                            Labels are bold while values have equal weighting.
-                                        </HelpContent>
-                                    </DisplayFieldOrderEditor>
-                                </div>
-                                <div class="ss-settings-field-grid">
-                                    <div class="ss-field">
-                                        <label for="winnerDialogWidth">Dialog Width</label>
-                                        <InputText id="winnerDialogWidth" @bind-Value="_dto.WinnerDialogWidth" placeholder="36rem"/>
-                                        <div class="ss-field-hint">CSS sizes such as 36rem, 600px, or 50vw.</div>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="winnerDialogFont">Font Family</label>
-                                        <InputSelect id="winnerDialogFont" @bind-Value="_dto.WinnerDialogFontFamily">
-                                            @foreach (var font in FontChoices)
-                                            {
-                                                <option value="@font.Value">@font.Label</option>
-                                            }
-                                        </InputSelect>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label for="winnerDialogFontSize">Font Size</label>
-                                        <InputText id="winnerDialogFontSize" @bind-Value="_dto.WinnerDialogFontSize" placeholder="1rem"/>
-                                    </div>
-                                    <div class="ss-field">
-                                        <label class="ss-checkbox-label">
-                                            <InputCheckbox @bind-Value="_dto.WinnerDialogShowQueuePosition"/>
-                                            Show queue position when available
-                                        </label>
-                                    </div>
-                                </div>
-                            </section>
+                            <SettingsOverlaySection Dto="_dto"
+                                                    ViewModel="_vm"
+                                                    CssValidation="_cssValidation"
+                                                    CssValidationCleared="ClearCssValidation"
+                                                    ResetDialogOpen="_resetDialogOpen"
+                                                    ResetRequested="ReviewSettingsResetAsync"
+                                                    @bind-PlayedListSeparatorChoice="PlayedListSeparatorChoice"
+                                                    @bind-NowPlayingSeparatorChoice="NowPlayingSeparatorChoice"
+                                                    OpenWinnerSettings="@(() => SelectSection(SettingsSection.Spinner))"
+                                                    DraftChanged="QueuePreviewRefresh"/>
                             break;
 
                         case SettingsSection.Appearance:
-                            <div class="ss-settings-section-heading">
-                                <span>Appearance</span>
-                                <h2>Build a readable overlay that fits your stream</h2>
-                                <p>Color and wheel changes are reflected in the preview without altering the live OBS source.</p>
-                            </div>
-
-                            <section class="ss-settings-section">
-                                <div class="ss-settings-section-title-row">
-                                    <h3>Background</h3>
-                                    <button type="button" class="ss-btn-reset-subset"
-                                            aria-label="Revert Background to default"
-                                            disabled="@_resetDialogOpen"
-                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.Background))">
-                                        Revert to default
-                                    </button>
-                                </div>
-                                <div class="ss-settings-field-grid">
-                                    <div class="ss-field">
-                                        <label for="backgroundMode">Mode</label>
-                                        <InputSelect id="backgroundMode" @bind-Value="_dto.BackgroundMode">
-                                            @foreach (var option in SettingsOptions.BackgroundModes)
-                                            {
-                                                <option value="@option.Value">@option.Label</option>
-                                            }
-                                        </InputSelect>
-                                        <div class="ss-field-hint">Transparent mode is intended for an OBS browser source.</div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Background Color</label>
-                                        <div class="ss-color-preview" style="background:@_dto.BackgroundColor">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false"
-                                                            @bind-Value="ColorBackground"/>
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <div class="ss-settings-section-title-row">
-                                    <h3>Wheel Palette</h3>
-                                    <button type="button" class="ss-btn-reset-subset"
-                                            aria-label="Revert Wheel Palette to default"
-                                            disabled="@_resetDialogOpen"
-                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.WheelPalette))">
-                                        Revert to default
-                                    </button>
-                                </div>
-                                <div class="ss-field">
-                                    <label for="wheelColors">Wheel Colors</label>
-                                    <InputTextArea id="wheelColors" @bind-Value="WheelColorsRaw" rows="6"/>
-                                    <div class="ss-field-hint">Enter one CSS color per line. The wheel repeats the palette when necessary.</div>
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <div class="ss-settings-section-title-row">
-                                    <h3>Overlay Colors</h3>
-                                    <button type="button" class="ss-btn-reset-subset"
-                                            aria-label="Revert Overlay Colors to default"
-                                            disabled="@_resetDialogOpen"
-                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.OverlayColors))">
-                                        Revert to default
-                                    </button>
-                                </div>
-                                <div class="ss-color-grid">
-                                    <div class="ss-field ss-field-row">
-                                        <label>Text</label>
-                                        <div class="ss-color-preview" style="background:@_dto.ColorText">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorText"/>
-                                        </div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Pointer</label>
-                                        <div class="ss-color-preview" style="background:@_dto.ColorPointer">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorPointer"/>
-                                        </div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Button Background</label>
-                                        <div class="ss-color-preview" style="background:@_dto.ColorButtonBackground">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorButtonBg"/>
-                                        </div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Button Text</label>
-                                        <div class="ss-color-preview" style="background:@_dto.ColorButtonText">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorButtonText"/>
-                                        </div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Played Panel Background</label>
-                                        <div class="ss-color-preview" style="background:@_vm.ComputedPlayedListBg()">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false"
-                                                            @bind-Value="ColorPlayedListBg"/>
-                                        </div>
-                                        <div class="ss-opacity-control">
-                                            <div class="ss-opacity-heading">
-                                                <label for="playedPanelOpacity">Opacity</label>
-                                                <output for="playedPanelOpacity">@PlayedListOpacityPercent%</output>
-                                            </div>
-                                            <input id="playedPanelOpacity" class="ss-opacity-range" type="range"
-                                                   min="0" max="100" step="1"
-                                                   @bind="PlayedListOpacityPercent" @bind:event="oninput"/>
-                                            <div class="ss-field-hint">0% is fully transparent; text and controls remain fully visible.</div>
-                                        </div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Now Playing Background</label>
-                                        <div class="ss-panel-background-swatch" aria-hidden="true">
-                                            <span style="background:@_vm.ComputedNowPlayingBg()"></span>
-                                        </div>
-                                        <label class="ss-checkbox-label">
-                                            <input type="checkbox" @bind="UseIndependentNowPlayingOpacity"/>
-                                            Use separate opacity
-                                        </label>
-                                        <div class="ss-opacity-control">
-                                            <div class="ss-opacity-heading">
-                                                <label for="nowPlayingOpacity">Opacity</label>
-                                                <output for="nowPlayingOpacity">@NowPlayingOpacityPercent%</output>
-                                            </div>
-                                            <input id="nowPlayingOpacity" class="ss-opacity-range" type="range"
-                                                   min="0" max="100" step="1"
-                                                   disabled="@(!UseIndependentNowPlayingOpacity)"
-                                                   @bind="NowPlayingOpacityPercent" @bind:event="oninput"/>
-                                            <div class="ss-field-hint">
-                                                @(UseIndependentNowPlayingOpacity
-                                                    ? "Uses the Played Panel color with its own opacity."
-                                                    : "Following the Played Panel opacity.")
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="ss-field ss-field-row">
-                                        <label>Played Song Background</label>
-                                        <div class="ss-color-preview" style="background:@_dto.ColorPlayedItemBackground">
-                                            <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorPlayedItemBg"/>
-                                        </div>
-                                    </div>
-                                </div>
-                            </section>
+                            <SettingsAppearanceSection Dto="_dto"
+                                                       ViewModel="_vm"
+                                                       CssValidation="_cssValidation"
+                                                       CssValidationCleared="ClearCssValidation"
+                                                       ResetDialogOpen="_resetDialogOpen"
+                                                       ResetRequested="ReviewSettingsResetAsync"
+                                                       DraftChanged="QueuePreviewRefresh"/>
                             break;
 
                         case SettingsSection.Advanced:
-                            <div class="ss-settings-section-heading">
-                                <span>Advanced</span>
-                                <h2>Diagnostics and implementation details</h2>
-                                <p>Most installations should not need to change these options.</p>
-                            </div>
-
-                            <section class="ss-settings-section">
-                                <h3>Diagnostics</h3>
-                                <div class="ss-field">
-                                    <label class="ss-checkbox-label">
-                                        <InputCheckbox @bind-Value="_dto.DebugMode"/>
-                                        Enable diagnostic output
-                                    </label>
-                                    <div class="ss-field-hint">
-                                        Writes a rolling diagnostic log under <code>%LOCALAPPDATA%\SonglistSpinner\logs</code>.
-                                        Streamer access tokens are not logged.
-                                    </div>
-                                    <div class="ss-settings-inline-actions">
-                                        <button type="button" class="ss-btn-secondary" @onclick="OpenDiagnosticLogFolder">
-                                            Open log folder
-                                        </button>
-                                    </div>
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <h3>Settings Maintenance</h3>
-                                <p class="ss-settings-inline-notice">
-                                    Restore application settings to their original values. You will review every field
-                                    that differs before the draft is changed.
-                                </p>
-                                <div class="ss-settings-inline-actions">
-                                    <button type="button" class="ss-btn-danger-subtle ss-btn-reset-settings"
-                                            disabled="@_resetDialogOpen"
-                                            @onclick="@(() => ReviewSettingsResetAsync(SettingsResetScope.All))">
-                                        Review reset all settings
-                                    </button>
-                                </div>
-                                <div class="ss-field-hint">
-                                    The API credential is excluded and can only be cleared from Connection.
-                                </div>
-                            </section>
-
-                            <section class="ss-settings-section">
-                                <h3>Service Endpoints</h3>
-                                <dl class="ss-settings-endpoints">
-                                    <div><dt>Application</dt><dd><code>SonglistSpinner @UpdateService.CurrentVersion</code></dd></div>
-                                    <div><dt>API</dt><dd><code>@ApiOptions.BaseAddress</code></dd></div>
-                                    <div><dt>Local overlay</dt><dd><code>@OverlayService.OverlayUrl</code></dd></div>
-                                    <div>
-                                        <dt>Updates</dt>
-                                        <dd>
-                                            <a href="https://github.com/wowfood/songlistspinner-desktop/releases"
-                                               target="_blank" rel="noopener noreferrer">Open GitHub Releases</a>
-                                        </dd>
-                                    </div>
-                                </dl>
-                                <div class="ss-field-hint">Endpoints are configured at application startup and are shown here for troubleshooting.</div>
-                            </section>
+                            <SettingsAdvancedSection Dto="_dto"
+                                                     ResetDialogOpen="_resetDialogOpen"
+                                                     ResetRequested="ReviewSettingsResetAsync"
+                                                     OpenLogFolder="OpenDiagnosticLogFolder"/>
                             break;
                     }
                 </div>
@@ -698,7 +153,7 @@
 
             <div class="ss-save-bar">
                 <button type="submit">Save Settings</button>
-                <span class="ss-save-bar-state">
+                <span class="ss-save-bar-state" role="status" aria-live="polite" aria-atomic="true">
                     @if (_vm.SaveSuccess)
                     {
                         <span class="ss-save-success">&#10003; Saved</span>

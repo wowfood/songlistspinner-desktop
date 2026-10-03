@@ -5,9 +5,7 @@
         <RootNamespace>SonglistSpinner</RootNamespace>
         <UseMaui>true</UseMaui>
         <SingleProject>true</SingleProject>
-        <ImplicitUsings>enable</ImplicitUsings>
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
-        <Nullable>enable</Nullable>
         <MauiVersion>10.0.90</MauiVersion>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
         <!-- Display name -->
@@ -54,21 +52,15 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)"/>
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11"/>
         <PackageReference Include="MudBlazor" Version="9.3.0"/>
     </ItemGroup>
     <ItemGroup>
+        <ProjectReference Include="..\SonglistSpinner.Application\SonglistSpinner.Application.csproj"/>
         <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
     </ItemGroup>
-    <ItemGroup>
-        <!-- Embed the standalone overlay assets so the local OBS server can serve them from the single executable. -->
-        <EmbeddedResource Include="wwwroot\overlay\Overlay.html"
-                          LogicalName="SonglistSpinner.WebAssets.Overlay.html"/>
-        <EmbeddedResource Include="wwwroot\overlay\SongSpinner.contracts.js"
-                          LogicalName="SonglistSpinner.WebAssets.SongSpinner.contracts.js"/>
-        <EmbeddedResource Include="wwwroot\spinner\spin-wheel-iife.js"
-                          LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
-    </ItemGroup>
+    <!-- The overlay's wwwroot files are embedded in SonglistSpinner.Application, beside LocalOverlayServer. -->
 
     <!--
       .NET 10 adds both the build and publish static-web-asset endpoint manifests

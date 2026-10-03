@@ -29,8 +29,9 @@ Before each release merge, update these values in
 - `VersionPrefix` to the next `MAJOR.MINOR.PATCH` version.
 - `ApplicationVersion` to a higher positive Windows build number.
 
-Release `v1.1.1` already exists. Every later release merge must increment
-`VersionPrefix`. If the generated tag already exists, the `develop` to `main`
+The checked-in `VersionPrefix` is the version of the last release, or of the
+release in progress; the repository's tags and GitHub Releases list what has
+shipped. Every release merge must increment `VersionPrefix`. If the generated tag already exists, the `develop` to `main`
 pull request fails validation before it can be merged. The release job repeats
 the check defensively and never replaces an existing executable.
 

@@ -17,7 +17,9 @@ Supported platform values are `twitch`, `youtube`, `kick`, and `none`. Queue and
 
 The first-run connection wizard accepts a plain streamer name or a public route such as `/t/name` or `/s/name`. It resolves the internal streamer ID and linked platform identities, then independently verifies authenticated API reads, Centrifugo subscriptions, and the local OBS overlay before opening the dashboard.
 
-The `day`, `week`, and `month` history settings add an RFC3339 `played_after` value using rolling UTC windows. API v2 does not expose the legacy `period=stream` parameter, so the `stream` setting currently means the most recent page of history.
+The `day`, `week`, and `month` history settings add an RFC3339 `played_after` value using rolling UTC windows. API v2 does not expose the legacy `period=stream` parameter or any other stream-scoped filter, so the `stream` setting (labelled **Most recent plays**) sends no filter, the same as `all`.
+
+Only the first page of play history is read (100 items, the `limit` above); the response's continuation `token` is not followed, so each refresh stays a single request. When a channel has played more songs than that within the selected period, **Exclude already-played songs** only considers the newest 100.
 
 ## Authentication
 
@@ -52,7 +54,7 @@ streamer:{streamerId}-queue
 streamer:{streamerId}-play_history
 ```
 
-`now_playing_update`, `queue_add`, `queue_clear`, `queue_remove`, `queue_reorder`, `queue_update`, and `play_history_add` are treated as invalidation signals. Closely spaced events are debounced into one queue-and-history REST refresh so a queue transition cannot produce competing UI updates. A successful initial connection or reconnection also triggers a complete refresh to cover changes that could have occurred while disconnected.
+The queue and play-history event types listed in `StreamerSongListEventTypes.QueueChanges` and `StreamerSongListEventTypes.PlayHistoryChanges` (`src/SonglistSpinner.Core/StreamerSongList/Api/V2/StreamerSongListEventTypes.cs`) are treated as invalidation signals. Closely spaced events are debounced into one queue-and-history REST refresh so a queue transition cannot produce competing UI updates. A successful initial connection or reconnection also triggers a complete refresh to cover changes that could have occurred while disconnected.
 
 ## Now Playing workflow
 

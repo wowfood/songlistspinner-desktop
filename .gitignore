@@ -54,3 +54,8 @@ __blobstorage__/
 
 # Claude Code local (machine-specific) settings
 .claude/settings.local.json
+
+# Local tool and editor state
+.junie/
+.codex/
+.vscode/

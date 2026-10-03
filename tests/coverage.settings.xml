@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Microsoft.Testing.Extensions.CodeCoverage settings for the command in AGENTS.md. Without explicit module paths
+    the report came out empty, so the two production assemblies the tests can reach are named here. Desktop is
+    not measured: no test project references it.
+-->
+<Configuration>
+    <CodeCoverage>
+        <ModulePaths>
+            <Include>
+                <ModulePath>.*[\\/]SonglistSpinner\.Core\.dll$</ModulePath>
+                <ModulePath>.*[\\/]SonglistSpinner\.Application\.dll$</ModulePath>
+            </Include>
+        </ModulePaths>
+    </CodeCoverage>
+</Configuration>

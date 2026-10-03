@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        An in-memory stand-in for the StreamerSongList REST API and its Centrifugo event service. Integration
+        tests host it in-process; developers run it to point the app at a fake channel. It holds no tests and
+        deliberately does not reference SonglistSpinner.Core: it encodes the wire format on its own, so a
+        client-side change to that format fails the integration tests instead of changing both sides at once.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <RootNamespace>SonglistSpinner.Simulator</RootNamespace>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+    <ItemGroup>
+        <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage"/>
+    </ItemGroup>
+    <ItemGroup>
+        <FrameworkReference Include="Microsoft.AspNetCore.App"/>
+    </ItemGroup>
+    <ItemGroup>
+        <!-- The simulator's own tests cover its play-history filtering directly. -->
+        <InternalsVisibleTo Include="SonglistSpinner.IntegrationTests"/>
+        <!-- The end-to-end tests start from the demo channel a developer gets from the seed option. -->
+        <InternalsVisibleTo Include="SonglistSpinner.EndToEndTests"/>
+    </ItemGroup>
+</Project>

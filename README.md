@@ -256,10 +256,10 @@ connection wizard will open the next time the Dashboard needs a credential.
 | Exclude already-played songs | Removes queue entries matching the selected history range from the wheel. |
 | Play History Period | Supplies the played panel and the optional wheel-exclusion filter. |
 
-History choices are Recent, Last 24 hours, Last 7 days, Last month, and All
-time. With the current API v2 contract, **Recent** means the latest API page,
-not a distinct streaming session. The current client loads at most the first
-100 history entries.
+History choices are Most recent plays, Last 24 hours, Last 7 days, Last month,
+and All time. API v2 has no stream-scoped filter, so **Most recent plays** means
+the latest API page, not a distinct streaming session. The current client loads
+at most the first 100 history entries, so exclusion only considers those.
 
 ### Overlay Layout
 
@@ -391,19 +391,8 @@ the permanent **Releases** navigation link to check manually.
 
 ## Development
 
-Source builds require:
-
-- .NET 10 SDK, selected by `global.json`
-- .NET MAUI Windows workload
-- Windows development prerequisites for MAUI
-
-From the repository root:
-
-```powershell
-dotnet restore SonglistSpinner.Desktop.sln
-dotnet test SonglistSpinner.Desktop.sln
-dotnet build SonglistSpinner.Desktop.sln -c Release
-```
+The prerequisites, the restore, format, test and build commands, the project map
+and the contribution conventions are in [AGENTS.md](AGENTS.md).
 
 Run the desktop project during development with:
 
@@ -432,6 +421,10 @@ Development and automation can override connection values with:
 | `SONGLISTSPINNER_SSL_ACCESS_TOKEN` | Credential fallback when Windows secure storage is empty |
 | `SONGLISTSPINNER_SSL_TOKEN_TYPE` | `streamer`, `user`, or `bearer` |
 | `SONGLISTSPINNER_SSL_CLIENT_ID` | Client ID used with an OAuth bearer token |
+| `SONGLISTSPINNER_PROFILE_DIR` | Test only: a full folder path that holds the settings, the credential (in plain text), the logs and the WebView data instead of your profile |
+| `SONGLISTSPINNER_OVERLAY_PORT` | Overlay server port instead of 5150, for a second instance |
+| `SONGLISTSPINNER_UPDATE_RELEASE_URL` | Where the update check asks for the latest release instead of GitHub |
+| `SONGLISTSPINNER_WEBVIEW_ARGS` | Extra WebView2 browser arguments; used only with `SONGLISTSPINNER_PROFILE_DIR` |
 
 Do not commit tokens, local environment files, or screenshots containing
 credentials.

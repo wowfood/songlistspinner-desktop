@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RootNamespace>SonglistSpinner</RootNamespace>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!--
+            LocalOverlayServer serves the standalone overlay from these embedded copies, so the single executable
+            needs no files beside it. The sources stay in the Desktop wwwroot, where the dashboard loads them too.
+        -->
+        <EmbeddedResource Include="..\SonglistSpinner.Desktop\wwwroot\overlay\Overlay.html"
+                          LogicalName="SonglistSpinner.WebAssets.Overlay.html"/>
+        <EmbeddedResource Include="..\SonglistSpinner.Desktop\wwwroot\overlay\SongSpinner.contracts.js"
+                          LogicalName="SonglistSpinner.WebAssets.SongSpinner.contracts.js"/>
+        <EmbeddedResource Include="..\SonglistSpinner.Desktop\wwwroot\spinner\spin-wheel-iife.js"
+                          LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
+        <!-- The overlay and the dashboard share one SpinnerInterop script. -->
+        <EmbeddedResource Include="..\SonglistSpinner.Desktop\wwwroot\spinner\SongSpinner.interop.js"
+                          LogicalName="SonglistSpinner.WebAssets.SongSpinner.interop.js"/>
+    </ItemGroup>
+
+</Project>

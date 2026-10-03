@@ -1,7 +1,7 @@
-using SonglistSpinner.Core.Contracts;
-using SonglistSpinner.Core.Data;
-using SonglistSpinner.Core.Models;
-using SonglistSpinner.Core.Services;
+using Microsoft.AspNetCore.Components;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.StreamerSongList;
+using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -21,6 +21,8 @@ public partial class Setup
     private string _eventsMessage = "Not checked yet";
     private string _fallbackPlatform = StreamerSongListPlatformNames.Default;
     private bool _hasExistingCredential;
+    private ElementReference _stepHeading;
+    private bool _focusStepHeading;
     private int _historyCount;
     private StreamerSongListChannel? _matchedChannel;
     private VerificationState _overlayState;
@@ -63,14 +65,14 @@ public partial class Setup
             return;
         }
 
-        _step = 2;
+        MoveToStep(2);
     }
 
     private void BackToAccess()
     {
         if (_busy) return;
         _error = null;
-        _step = 1;
+        MoveToStep(1);
     }
 
     private async Task VerifyConnectionAsync()
@@ -90,13 +92,7 @@ public partial class Setup
             return;
         }
 
-        var submittedToken = _token.Trim();
-        var candidateCredential = string.IsNullOrWhiteSpace(submittedToken)
-            ? _existingCredential
-            : new StreamerSongListCredential(
-                _credentialKind,
-                submittedToken,
-                string.IsNullOrWhiteSpace(_clientId) ? null : _clientId.Trim());
+        var candidateCredential = CredentialDraft.ToCredential(_credentialKind, _token, _clientId, _existingCredential);
         if (candidateCredential is null)
         {
             _error = "A StreamerSongList access token is required.";
@@ -113,66 +109,60 @@ public partial class Setup
         _overlayMessage = "Waiting for the API check";
         await InvokeAsync(StateHasChanged);
 
-        var credentialWasReplaced = !string.IsNullOrWhiteSpace(submittedToken);
+        var credentialWasReplaced = !Equals(candidateCredential, _existingCredential);
+        StreamerSongListStreamer resolvedStreamer;
         try
         {
-            if (credentialWasReplaced)
-                await CredentialStore.SaveCredentialAsync(candidateCredential, _lifetimeCts.Token);
+            resolvedStreamer = await CredentialTest.RunAsync(
+                _existingCredential,
+                candidateCredential,
+                async cancellationToken =>
+                {
+                    if (credentialWasReplaced)
+                        await CredentialStore.SaveCredentialAsync(candidateCredential, cancellationToken);
 
-            _resolvedStreamer = await ApiService.ResolveStreamerAsync(channel, _lifetimeCts.Token);
-            var queueTask = ApiService.FetchQueueAsync(channel, _lifetimeCts.Token);
-            var historyTask = ApiService.FetchPlayHistoryAsync(
-                channel,
-                _settings.PlayHistoryPeriod,
+                    _resolvedStreamer = await SongListClient.ResolveStreamerAsync(channel, cancellationToken);
+                    var fetched = await SongListClient.FetchQueueAndHistoryAsync(
+                        channel,
+                        _settings.PlayHistoryPeriod,
+                        cancellationToken);
+                    _queueCount = fetched.Queue.Items.Length;
+                    _historyCount = fetched.PlayedSongs.Length;
+
+                    _settings.DefaultStreamerName = channel.Name;
+                    _settings.StreamerPlatform = channel.Platform;
+                    LocalSettings.SaveSettings(_settings);
+                    return _resolvedStreamer;
+                },
                 _lifetimeCts.Token);
-            await Task.WhenAll(queueTask, historyTask);
-            _queueCount = (await queueTask).Length;
-            _historyCount = (await historyTask).Length;
-
-            _settings.DefaultStreamerName = channel.Name;
-            _settings.StreamerPlatform = channel.Platform;
-            LocalSettings.SaveSettings(_settings);
             _existingCredential = candidateCredential;
             _hasExistingCredential = true;
             _token = "";
             _apiState = VerificationState.Passed;
-            _apiMessage = $"Connected to channel #{_resolvedStreamer.Id} with {_queueCount} queued song(s).";
+            _apiMessage = $"Connected to channel #{resolvedStreamer.Id} with {_queueCount} queued song(s).";
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
         {
             return;
         }
-        catch (Exception ex)
+        catch (ApiCredentialTestFailedException ex)
         {
-            string? rollbackError = null;
-            if (credentialWasReplaced)
-            {
-                try
-                {
-                    await RestoreCredentialAsync(_existingCredential);
-                }
-                catch (Exception restoreException)
-                {
-                    rollbackError = $" The previous credential could not be restored: {restoreException.Message}";
-                }
-            }
-
             _apiState = VerificationState.Failed;
             _apiMessage = "Connection failed";
-            _error = ex.Message + rollbackError;
+            _error = ex.Message + (ex.RestoreFailureDescription is { } restoreFailure ? " " + restoreFailure : null);
             _busy = false;
             return;
         }
 
         await InvokeAsync(StateHasChanged);
-        await VerifyRealtimeAsync(_resolvedStreamer.Id);
+        await VerifyRealtimeAsync(resolvedStreamer.Id);
         await InvokeAsync(StateHasChanged);
         await VerifyOverlayAsync();
 
         _busy = false;
         if (_eventsState == VerificationState.Passed && _overlayState == VerificationState.Passed)
         {
-            _step = 3;
+            MoveToStep(3);
         }
         else
         {
@@ -181,7 +171,7 @@ public partial class Setup
         }
     }
 
-    private async Task VerifyRealtimeAsync(int streamerId)
+    private async Task VerifyRealtimeAsync(StreamerId streamerId)
     {
         _eventsState = VerificationState.Running;
         _eventsMessage = "Connecting to StreamerSongList events...";
@@ -228,13 +218,14 @@ public partial class Setup
         timeout.CancelAfter(TimeSpan.FromSeconds(5));
         try
         {
-            using var response = await Http.GetAsync(
-                OverlayService.OverlayUrl,
+            using var http = HttpClientFactory.CreateClient();
+            using var response = await http.GetAsync(
+                OverlayServer.OverlayUrl,
                 HttpCompletionOption.ResponseHeadersRead,
                 timeout.Token);
             response.EnsureSuccessStatusCode();
             _overlayState = VerificationState.Passed;
-            _overlayMessage = $"Overlay available at {OverlayService.OverlayUrl}.";
+            _overlayMessage = $"Overlay available at {OverlayServer.OverlayUrl}.";
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !_lifetimeCts.IsCancellationRequested)
         {
@@ -243,22 +234,15 @@ public partial class Setup
         }
     }
 
-    private async Task RestoreCredentialAsync(StreamerSongListCredential? credential)
-    {
-        if (credential is null)
-            await CredentialStore.ClearCredentialAsync(_lifetimeCts.Token);
-        else
-            await CredentialStore.SaveCredentialAsync(credential, _lifetimeCts.Token);
-    }
 
     private void ContinueWithWarnings()
     {
-        if (_apiState == VerificationState.Passed) _step = 3;
+        if (_apiState == VerificationState.Passed) MoveToStep(3);
     }
 
     private async Task CopyOverlayUrlAsync()
     {
-        await Clipboard.SetTextAsync(OverlayService.OverlayUrl);
+        await Clipboard.SetTextAsync(OverlayServer.OverlayUrl);
         _completionMessage = "Overlay URL copied to the clipboard.";
     }
 
@@ -266,7 +250,7 @@ public partial class Setup
     {
         try
         {
-            await Launcher.Default.OpenAsync(new Uri(OverlayService.OverlayUrl));
+            await Launcher.OpenAsync(new Uri(OverlayServer.OverlayUrl));
             _completionMessage = "Overlay preview opened in your browser.";
         }
         catch (Exception ex)
@@ -281,6 +265,22 @@ public partial class Setup
     }
 
     private string StepClass(int step) => step == _step ? "active" : step < _step ? "complete" : "";
+
+    private string? StepAriaCurrent(int step) => step == _step ? "step" : null;
+
+    private void MoveToStep(int step)
+    {
+        _step = step;
+        _focusStepHeading = true;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_focusStepHeading) return;
+
+        _focusStepHeading = false;
+        await _stepHeading.FocusAsync(preventScroll: true);
+    }
 
     private static string CheckClass(VerificationState state) => $"ss-setup-check {state.ToString().ToLowerInvariant()}";
 

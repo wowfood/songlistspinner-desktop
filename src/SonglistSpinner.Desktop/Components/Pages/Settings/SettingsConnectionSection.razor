@@ -1,0 +1,90 @@
+@inject NavigationManager Navigation
+
+<div class="ss-settings-section-heading">
+    <span>Connection</span>
+    <h2>Choose the channel this installation controls</h2>
+    <p>The channel identity and secure credential are kept separate from overlay appearance.</p>
+</div>
+
+<section class="ss-settings-section">
+    <h3>Queue Source</h3>
+    <div class="ss-field">
+        <label for="defaultStreamerName">Default StreamerSongList Name</label>
+        <InputText id="defaultStreamerName" @bind-Value="Dto.DefaultStreamerName"
+                   placeholder="e.g. wowfood"/>
+        <div class="ss-field-hint">Automatically loads this channel when the Dashboard opens.</div>
+    </div>
+    <div class="ss-field">
+        <label for="streamerPlatform">Platform Identity</label>
+        <InputSelect id="streamerPlatform" @bind-Value="Dto.StreamerPlatform">
+            @foreach (var option in SettingsOptions.Platforms)
+            {
+                <option value="@option.Value">@option.Label</option>
+            }
+        </InputSelect>
+        <div class="ss-field-hint">Selects the public route used to resolve the StreamerSongList channel.</div>
+    </div>
+    <div class="ss-field">
+        <label class="ss-checkbox-label">
+            <InputCheckbox @bind-Value="Dto.HideChangeOptionWhenDefault"/>
+            Hide “Change Streamer” when the default channel is set
+        </label>
+    </div>
+</section>
+
+<section class="ss-settings-section">
+    <h3>StreamerSongList API v2 Access</h3>
+    <div class="ss-field">
+        <label for="credentialKind">Credential Type</label>
+        <InputSelect id="credentialKind" Value="CredentialKind" ValueChanged="CredentialKindChanged" ValueExpression="CredentialKindExpression">
+            <option value="@StreamerSongListCredentialKind.Streamer">Streamer token</option>
+            <option value="@StreamerSongListCredentialKind.User">User token</option>
+            <option value="@StreamerSongListCredentialKind.OAuthBearer">OAuth bearer token</option>
+        </InputSelect>
+        <div class="ss-field-hint">For one channel, use a streamer token created under StreamerSongList Settings &gt; Access.</div>
+    </div>
+    <div class="ss-field">
+        <label for="apiToken">API Token</label>
+        <InputText id="apiToken" Value="CredentialToken" ValueChanged="CredentialTokenChanged" ValueExpression="CredentialTokenExpression" type="password"
+                   autocomplete="off" placeholder="Leave blank to keep the saved token"/>
+        <div class="ss-field-hint">Stored in Windows secure storage and never written to the repository.</div>
+    </div>
+    @if (CredentialKind == StreamerSongListCredentialKind.OAuthBearer)
+    {
+        <div class="ss-field">
+            <label for="oauthClientId">OAuth Client ID</label>
+            <InputText id="oauthClientId" Value="CredentialClientId" ValueChanged="CredentialClientIdChanged" ValueExpression="CredentialClientIdExpression" autocomplete="off"/>
+        </div>
+    }
+    <div class="ss-credential-row">
+        @if (HasCredential)
+        {
+            <span class="ss-auth-status ss-auth-ok">&#10003; API credential configured</span>
+            <button type="button" class="ss-btn-danger-subtle"
+                    disabled="@ClearingCredential"
+                    @onclick="ClearCredential">
+                @(ClearingCredential ? "Clearing..." : "Clear credential")
+            </button>
+        }
+        else
+        {
+            <span class="ss-auth-status ss-auth-none">No API credential configured</span>
+        }
+    </div>
+    <div class="ss-settings-actions">
+        <button type="button" class="ss-btn-primary" @onclick="TestConnection"
+                disabled="@TestingCredential">
+            @(TestingCredential ? "Testing..." : "Save and test connection")
+        </button>
+        <button type="button" class="ss-btn-secondary" @onclick="OpenSetupWizard">
+            Open connection wizard
+        </button>
+    </div>
+    @if (!string.IsNullOrWhiteSpace(CredentialTestResult))
+    {
+        <div class="@(CredentialTestSucceeded ? "ss-save-success ss-settings-result" : "ss-save-error ss-settings-result")"
+             role="status">
+            @CredentialTestResult
+        </div>
+    }
+</section>
