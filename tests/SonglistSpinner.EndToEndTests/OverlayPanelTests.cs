@@ -105,7 +105,7 @@ public class OverlayPanelTests(SharedApp sharedApp) : IClassFixture<SharedApp>
     }
 
     [Fact(Timeout = 180_000)]
-    public async Task Given_NowPlayingPositionWidthAndFontSizeSaved_When_TheOverlayShowsTheChannel_Then_ThePanelUsesThem()
+    public async Task Given_NowPlayingPositionWidthFontAndSizeSaved_When_TheOverlayShowsTheChannel_Then_ThePanelUsesThem()
     {
         EndToEnd.SkipUnlessEnabled();
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -117,6 +117,7 @@ public class OverlayPanelTests(SharedApp sharedApp) : IClassFixture<SharedApp>
             await layout.NowPlayingPosition.SelectOptionAsync("top-right");
             await layout.NowPlayingWidth.FillAsync("32rem");
             await layout.NowPlayingWidth.BlurAsync();
+            await layout.NowPlayingFont.SelectOptionAsync("monospace");
             await layout.NowPlayingFontSize.FillAsync("1.5rem");
             await layout.NowPlayingFontSize.BlurAsync();
         });
@@ -130,6 +131,7 @@ public class OverlayPanelTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await Expect(overlay.NowPlayingText).ToHaveTextAsync("Artist: Fleetwood Mac | Title: Dreams");
         await Expect(overlay.NowPlaying).ToHaveAttributeAsync("data-position", "top-right");
         await OverlayPage.ExpectInlineStyleAsync(overlay.NowPlaying, "width", "32rem");
+        await OverlayPage.ExpectInlineStyleAsync(overlay.NowPlayingText, "font-family", "monospace");
         await OverlayPage.ExpectInlineStyleAsync(overlay.NowPlayingText, "font-size", "1.5rem");
     }
 

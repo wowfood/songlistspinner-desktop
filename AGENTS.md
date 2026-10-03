@@ -62,7 +62,7 @@ dotnet test --project tests/SonglistSpinner.IntegrationTests
 
 The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run (and CI) every
 one reports as skipped. Run them from a desktop session and leave the windows alone until they finish (the full
-suite, 135 tests, takes about ten minutes, mostly app launches):
+suite, 147 tests, takes about ten minutes, mostly app launches):
 
 ```powershell
 ./scripts/run-e2e.ps1
@@ -80,7 +80,7 @@ does). The suites, one class per feature or workflow:
 | Channel, health and API errors | `ChannelLoadingTests`, `ServiceHealthTests`, `ApiErrorStateTests`, `RealtimeQueueTests`, `RealtimeReconnectTests` |
 | Spin and winner | `SpinTests`, `WinnerDialogTests`, `WinnerActionTests`, `WinnerActionOutcomeTests`, `NowPlayingCompletionTests` |
 | Played list and Now Playing | `PlayedSongsListTests`, `PlayedListFormattingTests`, `PlayedListLayoutTests`, `PlayHistoryPeriodTests`, `PlayedSongExclusionTests`, `NowPlayingDisplayTests` |
-| Settings | `SettingsDraftTests`, `SettingsResetTests`, `SettingsPersistenceTests`, `ConnectionSettingsTests`, `AdvancedSettingsTests`, `SettingsPreviewTests` |
+| Settings | `SettingsDraftTests`, `SettingsResetTests`, `SettingsPersistenceTests`, `ConnectionSettingsTests`, `AppearanceSettingsTests`, `AdvancedSettingsTests`, `SettingsPreviewTests` |
 | OBS overlay (all but `OverlayEventsTests` need Edge, below) | `ObsBrowserSourceTests`, `OverlayEventsTests`, `OverlayWheelTests`, `OverlayWinnerRevealTests`, `OverlayPanelTests`, `OverlayLayoutSyncTests`, `OverlayThemeTests` |
 | Accessibility | `AccessibleStateTests` |
 

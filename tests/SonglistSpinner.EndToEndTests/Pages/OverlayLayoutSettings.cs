@@ -75,6 +75,19 @@ internal sealed partial class OverlayLayoutSettings(IPage page) : SettingsSectio
     public ILocator WinnerShowQueuePosition => Checkbox("Show queue position when available");
 
     /// <summary>
+    /// Sets the Winner Dialog Settings' width, font family (a <see cref="WinnerFont"/> value such as <c>serif</c>)
+    /// and font size, leaving each text field so it applies its value, as it does on change.
+    /// </summary>
+    public async Task SetWinnerDialogStyleAsync(string width, string fontFamily, string fontSize)
+    {
+        await WinnerWidth.FillAsync(width);
+        await WinnerWidth.BlurAsync();
+        await WinnerFont.SelectOptionAsync(fontFamily);
+        await WinnerFontSize.FillAsync(fontSize);
+        await WinnerFontSize.BlurAsync();
+    }
+
+    /// <summary>
     /// The "Revert to default" button of <paramref name="subsection"/>: "Played Songs Panel", "Now Playing Panel"
     /// or "Winner Dialog Settings". It opens a review dialog, or "... already uses defaults".
     /// </summary>

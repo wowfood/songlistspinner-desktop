@@ -30,6 +30,9 @@ internal sealed partial class OverlayPage(IPage page)
 
     public ILocator Winner => Page.Locator("#winnerModal");
 
+    /// <summary>The reveal's card, which takes the Winner Dialog Settings' width, font and font size.</summary>
+    public ILocator WinnerCard => Winner.Locator(".winner-modal-content");
+
     public ILocator WinnerLabels => Winner.Locator(".winner-field-label");
 
     public ILocator WinnerValues => Winner.Locator(".winner-field-value");

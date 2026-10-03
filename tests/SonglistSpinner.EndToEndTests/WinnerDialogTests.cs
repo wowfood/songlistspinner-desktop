@@ -158,6 +158,32 @@ public class WinnerDialogTests(SharedApp sharedApp) : IClassFixture<SharedApp>
             call => ApiCalls.FetchQueue("no_position_streamer")(call));
     }
 
+    [Fact(Timeout = 180_000)]
+    public async Task Given_AWinnerDialogWidthFontAndSizeSaved_When_ASpinEnds_Then_TheDialogCardUsesThem()
+    {
+        EndToEnd.SkipUnlessEnabled();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var scenario = await sharedApp.BeginTestAsync(cancellationToken);
+        var settings = scenario.Settings;
+        await settings.OpenAsync();
+        await settings.OverlayLayout.OpenAsync();
+        await settings.OverlayLayout.SetWinnerDialogStyleAsync("30rem", "serif", "1.25rem");
+        await settings.SaveAsync();
+        await new ChannelSeed("styled_dialog_streamer").WithQueued(SongCatalog.TakeOnMe).ApplyAsync(scenario.Simulator);
+        var dashboard = scenario.Dashboard;
+        await dashboard.OpenAsync();
+        await dashboard.LoadChannelAndSettleAsync("styled_dialog_streamer", scenario.Simulator, cancellationToken);
+
+        var dialog = await dashboard.SpinAsync();
+
+        await dialog.ExpectFieldsAsync(
+            ("Artist", "a-ha"), ("Title", "Take On Me"), ("Requester", "synth_lover"));
+        // 30rem and 1.25rem at the document's 16px root size.
+        await Expect(dialog.Card).ToHaveCSSAsync("width", "480px");
+        await Expect(dialog.Card).ToHaveCSSAsync("font-family", "serif");
+        await Expect(dialog.Card).ToHaveCSSAsync("font-size", "20px");
+    }
+
     private static async Task SaveWinnerDonationFieldAsync(AppScenario scenario)
     {
         var settings = scenario.Settings;

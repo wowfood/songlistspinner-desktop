@@ -11,6 +11,9 @@ internal sealed partial class WinnerDialog(IPage page)
 {
     public ILocator Root => page.Locator("#winnerModal");
 
+    /// <summary>The dialog's card, which takes the Winner Dialog Settings' width, font and font size.</summary>
+    public ILocator Card => Root.Locator(".winner-modal-content");
+
     public ILocator Labels => Root.Locator(".winner-field-label");
 
     public ILocator Values => Root.Locator(".winner-field-value");

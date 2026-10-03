@@ -78,6 +78,28 @@ public class SettingsResetTests(SharedApp sharedApp) : IClassFixture<SharedApp>
     }
 
     [Fact(Timeout = 180_000)]
+    public async Task Given_TheWinnerQueuePositionTurnedOff_When_TheWinnerDialogResetIsConfirmed_Then_ThePositionIsShownAgain()
+    {
+        EndToEnd.SkipUnlessEnabled();
+        var scenario = await sharedApp.BeginTestAsync(TestContext.Current.CancellationToken);
+        var settings = scenario.Settings;
+        var layout = settings.OverlayLayout;
+        await settings.OpenAsync();
+        await layout.OpenAsync();
+        await layout.WinnerShowQueuePosition.UncheckAsync();
+        await Expect(settings.DraftState).ToHaveTextAsync("Unsaved draft");
+
+        await layout.RevertButton("Winner Dialog Settings").ClickAsync();
+        var review = settings.MessageBox("Review Winner dialog reset");
+        await review.ExpectOpenAsync();
+        await Expect(review.ResetFields).ToHaveTextAsync(["Queue position"]);
+        await review.ChooseAsync("Reset draft to defaults");
+
+        await Expect(layout.WinnerShowQueuePosition).ToBeCheckedAsync();
+        await Expect(settings.DraftState).ToHaveTextAsync("All changes saved");
+    }
+
+    [Fact(Timeout = 180_000)]
     public async Task Given_NowPlayingLabelsTurnedOff_When_TheNowPlayingPanelResetIsConfirmed_Then_LabelsReturnAndTheWorkflowStaysOn()
     {
         EndToEnd.SkipUnlessEnabled();

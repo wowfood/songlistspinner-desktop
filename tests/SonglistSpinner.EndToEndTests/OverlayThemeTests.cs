@@ -59,6 +59,27 @@ public class OverlayThemeTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         Assert.Equal("rgba(0,0,0,0.50)", await overlay.ReadThemeVariableAsync("--app-played-list-bg"));
     }
 
+    [Fact(Timeout = 180_000)]
+    public async Task Given_ASeparateNowPlayingOpacityOfFortySaved_When_TheOverlayShowsTheChannel_Then_OnlyTheNowPlayingPanelIsFortyPercentBlack()
+    {
+        EndToEnd.SkipUnlessEnabled();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var scenario = await sharedApp.BeginTestAsync(cancellationToken);
+        var settings = scenario.Settings;
+        await settings.OpenAsync();
+        await settings.Appearance.OpenAsync();
+        await settings.Appearance.UseSeparateNowPlayingOpacity.CheckAsync();
+        await settings.Appearance.NowPlayingOpacity.FillAsync("40");
+        await settings.SaveAsync();
+        await scenario.Dashboard.OpenAsync();
+
+        var overlay = await OpenOverlayOnLoadedChannelAsync(scenario);
+
+        Assert.Equal("rgba(0,0,0,0.40)", await overlay.ReadThemeVariableAsync("--app-now-playing-bg"));
+        // Saving writes the played panel's unchanged 70% in the same rgba form as the opacity it now stores.
+        Assert.Equal("rgba(0,0,0,0.70)", await overlay.ReadThemeVariableAsync("--app-played-list-bg"));
+    }
+
     /// <summary>
     /// Loads a channel and opens the overlay on it. The overlay applies the theme and background in the same state
     /// update that names the channel, so once the label shows the channel the theme can be read once.

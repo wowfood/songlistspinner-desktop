@@ -172,6 +172,25 @@ public class PlayedListFormattingTests(SharedApp sharedApp) : IClassFixture<Shar
     }
 
     [Fact(Timeout = 180_000)]
+    public async Task Given_ArtistMovedLaterInSettings_When_TheChannelLoads_Then_EachLineShowsTheTitleBeforeTheArtist()
+    {
+        EndToEnd.SkipUnlessEnabled();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var scenario = await sharedApp.BeginTestAsync(cancellationToken);
+        await SeedOnePlay().ApplyAsync(scenario.Simulator);
+        var layout = await OpenPlayedPanelSettingsAsync(scenario.Settings);
+        var fields = layout.PlayedFields;
+        await fields.ExpectOrderAsync("artist", "title", "requester", "donation");
+        await fields.MoveLaterAsync("Artist");
+        await fields.ExpectOrderAsync("title", "artist", "requester", "donation");
+        var dashboard = await SaveAndOpenDashboardAsync(scenario);
+
+        await dashboard.LoadChannelAsync(Channel);
+
+        await dashboard.PlayedList.ExpectLinesAsync("Title: Get Lucky | Artist: Daft Punk");
+    }
+
+    [Fact(Timeout = 180_000)]
     public async Task Given_ExtendedFieldsWithTheHeaderRow_When_TheChannelLoads_Then_APlayWithoutATipHasAnEmptyDonationCell()
     {
         EndToEnd.SkipUnlessEnabled();

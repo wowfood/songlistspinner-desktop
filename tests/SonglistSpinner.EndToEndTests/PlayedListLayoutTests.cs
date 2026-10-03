@@ -1,13 +1,14 @@
 using System.Text.RegularExpressions;
 using SonglistSpinner.EndToEndTests.Infrastructure;
 using SonglistSpinner.EndToEndTests.Pages;
+using SonglistSpinner.EndToEndTests.Scenarios;
 using Xunit;
 using static Microsoft.Playwright.Assertions;
 
 namespace SonglistSpinner.EndToEndTests;
 
 /// <summary>
-/// The played-songs panel's layout on the Dashboard: its side, text size, line clamp and background opacity, as
+/// The played-songs panel's layout on the Dashboard: its side, font, text size, line clamp and background opacity, as
 /// set in Settings &gt; Overlay Layout and Settings &gt; Appearance.
 /// </summary>
 public class PlayedListLayoutTests(SharedApp sharedApp) : IClassFixture<SharedApp>
@@ -42,6 +43,29 @@ public class PlayedListLayoutTests(SharedApp sharedApp) : IClassFixture<SharedAp
         var dashboard = await SaveAndOpenDashboardAsync(scenario);
 
         await dashboard.ExpectThemeVariableAsync("--app-played-list-font-size", "1.25rem");
+    }
+
+    [Fact(Timeout = 180_000)]
+    public async Task Given_ASerifPlayedListFontSavedInSettings_When_AChannelLoads_Then_ItsPlayedSongsAreSetInSerif()
+    {
+        EndToEnd.SkipUnlessEnabled();
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var scenario = await sharedApp.BeginTestAsync(cancellationToken);
+        await new ChannelSeed("font_streamer")
+            .WithPlayed(SongCatalog.GetLucky, TimeSpan.FromHours(1))
+            .WithQueued(SongCatalog.TakeOnMe)
+            .ApplyAsync(scenario.Simulator);
+        await scenario.Dashboard.ExpectThemeVariableAsync("--app-played-list-font-family", "sans-serif");
+        var settings = scenario.Settings;
+        await settings.OpenAsync();
+        await settings.OverlayLayout.OpenAsync();
+        await settings.OverlayLayout.PlayedFont.SelectOptionAsync("serif");
+        var dashboard = await SaveAndOpenDashboardAsync(scenario);
+
+        await dashboard.LoadChannelAsync("font_streamer");
+
+        await dashboard.PlayedList.ExpectLinesAsync("Artist: Daft Punk | Title: Get Lucky");
+        await Expect(dashboard.PlayedList.Items).ToHaveCSSAsync("font-family", "serif");
     }
 
     [Fact(Timeout = 180_000)]
