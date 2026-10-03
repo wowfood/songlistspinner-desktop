@@ -6,7 +6,7 @@ using SonglistSpinner.Core.Contracts;
 using SonglistSpinner.Core.Models;
 using Xunit;
 
-namespace SonglistSpinner.Core.Tests.Api;
+namespace SonglistSpinner.Core.Tests.Api.V2;
 
 public class StreamerSongListApiClientTests
 {

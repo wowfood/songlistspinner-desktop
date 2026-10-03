@@ -4,10 +4,41 @@ using Xunit;
 
 namespace SonglistSpinner.Core.Tests.Models;
 
-// The dashboard and the overlay script read these values from SongSpinner.contracts.js; these tests fail
-// when the script and SpinnerSettingValues disagree.
 public class SpinnerSettingValuesTests
 {
+    [Fact]
+    public void Given_SettingCatalogs_When_ReadingValues_Then_WireTokensRemainStable()
+    {
+        Assert.Equal(["color", "transparent"], SpinnerSettingValues.BackgroundModes.Values);
+        Assert.Equal(["right", "left"], SpinnerSettingValues.PlayedListPositions.Values);
+        Assert.Equal(
+            ["top-left", "top-center", "top-right", "bottom-left", "bottom-center", "bottom-right"],
+            SpinnerSettingValues.NowPlayingPositions.Values);
+        Assert.Equal(["top", "bottom"], SpinnerSettingValues.PlayedListNumberingStarts.Values);
+        Assert.Equal(["stream", "day", "week", "month", "all"],
+            SpinnerSettingValues.PlayHistoryPeriods.Values);
+    }
+
+    [Fact]
+    public void Given_SettingCatalogs_When_ComparingValues_Then_EachCatalogIsCaseInsensitivelyUnique()
+    {
+        Assert.Distinct(SpinnerSettingValues.BackgroundModes.Values, StringComparer.OrdinalIgnoreCase);
+        Assert.Distinct(SpinnerSettingValues.PlayedListPositions.Values, StringComparer.OrdinalIgnoreCase);
+        Assert.Distinct(SpinnerSettingValues.NowPlayingPositions.Values, StringComparer.OrdinalIgnoreCase);
+        Assert.Distinct(SpinnerSettingValues.PlayedListNumberingStarts.Values, StringComparer.OrdinalIgnoreCase);
+        Assert.Distinct(SpinnerSettingValues.PlayHistoryPeriods.Values, StringComparer.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Given_LegacyTransparentSpelling_When_Normalizing_Then_ReturnsCanonicalValue()
+    {
+        var result = SpinnerSettingValues.BackgroundModes.NormalizeOrDefault(" TRANSPARANT ");
+
+        Assert.Equal("transparent", result);
+    }
+
+    // The dashboard and the overlay script read these values from SongSpinner.contracts.js; the tests below
+    // fail when the script and SpinnerSettingValues disagree.
     [Fact]
     public void Given_ContractsScript_When_ComparedWithBackgroundModes_Then_TheModesMatch()
     {
