@@ -7,8 +7,8 @@ namespace SonglistSpinner.Services;
 /// While none is stored, the environment's fallback credential is used.
 /// </summary>
 public sealed class SecureStorageStreamerSongListCredentialStore(
-    ISecureStorage secureStorage,
-    IPreferences preferences,
+    ISecretStore secureStorage,
+    IKeyValueStore preferences,
     EnvironmentOverrides environment) : IStreamerSongListCredentialStore
 {
     private const string TokenKey = "streamersonglist_api_token";
@@ -23,8 +23,8 @@ public sealed class SecureStorageStreamerSongListCredentialStore(
         if (string.IsNullOrWhiteSpace(token)) return environment.FallbackCredential;
 
         var kind = StreamerSongListCredentialKinds.Parse(
-            preferences.Get(KindKey, nameof(StreamerSongListCredentialKind.Streamer)));
-        var clientId = preferences.Get<string?>(ClientIdKey, null);
+            preferences.GetValue(KindKey) ?? nameof(StreamerSongListCredentialKind.Streamer));
+        var clientId = preferences.GetValue(ClientIdKey);
         return new StreamerSongListCredential(kind, token, clientId);
     }
 
@@ -37,12 +37,12 @@ public sealed class SecureStorageStreamerSongListCredentialStore(
             throw new ArgumentException("An API token is required.", nameof(credential));
 
         await secureStorage.SetAsync(TokenKey, credential.Token.Trim());
-        preferences.Set(KindKey, credential.Kind.ToString());
+        preferences.SetValue(KindKey, credential.Kind.ToString());
 
         if (string.IsNullOrWhiteSpace(credential.ClientId))
             preferences.Remove(ClientIdKey);
         else
-            preferences.Set(ClientIdKey, credential.ClientId.Trim());
+            preferences.SetValue(ClientIdKey, credential.ClientId.Trim());
     }
 
     public ValueTask ClearCredentialAsync(CancellationToken cancellationToken = default)

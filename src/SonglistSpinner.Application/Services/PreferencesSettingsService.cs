@@ -7,14 +7,14 @@ namespace SonglistSpinner.Services;
 /// Loads and saves the user's settings as normalized <see cref="SettingsDto"/> JSON in MAUI preferences.
 /// The JSON is a persisted contract: renaming a property needs its wire name kept or a migration.
 /// </summary>
-public sealed class PreferencesSettingsService(IPreferences preferences)
+public sealed class PreferencesSettingsService(IKeyValueStore preferences)
 {
     private const string SettingsKey = "local_settings";
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNameCaseInsensitive = true };
 
     public SettingsDto LoadSettings()
     {
-        var json = preferences.Get<string?>(SettingsKey, null);
+        var json = preferences.GetValue(SettingsKey);
         if (string.IsNullOrEmpty(json)) return new SettingsDto();
         try
         {
@@ -29,6 +29,6 @@ public sealed class PreferencesSettingsService(IPreferences preferences)
 
     public void SaveSettings(SettingsDto dto)
     {
-        preferences.Set(SettingsKey, JsonSerializer.Serialize(SettingsDtoNormalizer.NormalizeInPlace(dto), JsonOpts));
+        preferences.SetValue(SettingsKey, JsonSerializer.Serialize(SettingsDtoNormalizer.NormalizeInPlace(dto), JsonOpts));
     }
 }

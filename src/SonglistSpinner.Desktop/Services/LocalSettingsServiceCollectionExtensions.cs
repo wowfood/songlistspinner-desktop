@@ -8,6 +8,7 @@ public static class LocalSettingsServiceCollectionExtensions
     public static IServiceCollection AddLocalSettings(this IServiceCollection services)
     {
         services.TryAddSingleton(Preferences.Default);
+        services.TryAddSingleton<IKeyValueStore, MauiPreferencesStore>();
         services.AddSingleton<PreferencesSettingsService>();
         return services;
     }

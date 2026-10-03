@@ -20,6 +20,8 @@ public static class StreamerSongListServiceCollectionExtensions
 
         services.TryAddSingleton(SecureStorage.Default);
         services.TryAddSingleton(Preferences.Default);
+        services.TryAddSingleton<ISecretStore, MauiSecureStorageStore>();
+        services.TryAddSingleton<IKeyValueStore, MauiPreferencesStore>();
         services.AddSingleton<SecureStorageStreamerSongListCredentialStore>();
         services.AddSingleton<IStreamerSongListCredentialProvider>(serviceProvider =>
             serviceProvider.GetRequiredService<SecureStorageStreamerSongListCredentialStore>());

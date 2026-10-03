@@ -9,7 +9,7 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | Path | What lives there |
 | --- | --- |
 | `src/SonglistSpinner.Core` | MAUI-free domain, one folder (and namespace) per feature: `StreamerSongList` (client contract, channel, ids, queue and history models; the API v2 and Centrifugo implementation in `StreamerSongList/Api/V2`), `Settings` (persisted `SettingsDto`, its normaliser and converter, `SpinnerConfig` and defaults), `Songs` (song fields and display text), `PlayedSongs` (played-song list, played-song exclusion), `Winner` (winner dialog content, Now Playing promotion), `Updates` (GitHub release check) |
-| `src/SonglistSpinner.Application` | MAUI-free app services: `ChannelLoader` (resolve a channel and start the session), `StreamerSessionService` (queue session, realtime refresh), `FetchQueueAndHistoryAsync` (the one queue-plus-history read), `WheelSpinService` and `WinnerActionService` (a spin and the winner's outcome), `ApiCredentialTest` (test a credential, restore the previous one on failure), `OverlayStateService` (overlay state and SSE), `LocalOverlayServer` (the OBS overlay's localhost HTTP server; the Desktop `wwwroot` overlay files are embedded in this assembly for it), `EnvironmentOverrides` (the `SONGLISTSPINNER_SSL_*` startup variables), `SettingsDraftTracker` and `SettingsViewModel` (the Settings page draft) |
+| `src/SonglistSpinner.Application` | MAUI-free app services: `ChannelLoader` (resolve a channel and start the session), `StreamerSessionService` (queue session, realtime refresh), `FetchQueueAndHistoryAsync` (the one queue-plus-history read), `WheelSpinService` and `WinnerActionService` (a spin and the winner's outcome), `ApiCredentialTest` (test a credential, restore the previous one on failure), `OverlayStateService` (overlay state and SSE), `LocalOverlayServer` (the OBS overlay's localhost HTTP server; the Desktop `wwwroot` overlay files are embedded in this assembly for it), `EnvironmentOverrides` (the `SONGLISTSPINNER_SSL_*` startup variables), `PreferencesSettingsService` and `SecureStorageStreamerSongListCredentialStore` (saved settings and API credential, over `IKeyValueStore` and `ISecretStore`), `SettingsDraftTracker` and `SettingsViewModel` (the Settings page draft) |
 | `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` composing the feature registrations |
 | `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded in Application, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
 | `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
@@ -138,7 +138,9 @@ the saved token first. The app still reads and writes your normal settings and l
   file beside the feature's types (for example `AddStreamerSession` in Application, `AddStreamerSongList` in
   Desktop); `MauiProgram` only composes them. Inject MAUI platform APIs (`IPreferences`, `ISecureStorage`,
   `IClipboard`, `ILauncher`) and `HttpClient` (through `AddHttpClient`) instead of using the static APIs or
-  `new HttpClient`. Environment variables are read once, into `EnvironmentOverrides`.
+  `new HttpClient`. Application code reads saved values through `IKeyValueStore` and `ISecretStore`, which
+  Desktop implements over `IPreferences` and `ISecureStorage`. Environment variables are read once, into
+  `EnvironmentOverrides`.
 - Fix defects test-first.
 
 ## Branches and releases
