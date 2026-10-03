@@ -8,7 +8,7 @@ namespace SonglistSpinner.IntegrationTests.Simulator;
 
 /// <summary>
 /// The simulator's test controls that the end-to-end suite shares one simulator through: reset between tests, the
-/// call-log wait, the dropped-connection fault and refused event connections.
+/// call-log wait, the dropped-connection fault, refused event connections and the update-check log.
 /// </summary>
 public class StreamerSongListSimulatorTests
 {
@@ -83,6 +83,23 @@ public class StreamerSongListSimulatorTests
         using var accepted = new ClientWebSocket();
         await accepted.ConnectAsync(simulator.EventsEndpoint, cancellationToken);
         Assert.Equal(WebSocketState.Open, accepted.State);
+    }
+
+    [Fact]
+    public async Task Given_AnUpdateCheck_When_ItIsAnswered_Then_ItIsLoggedApartFromTheApiCalls()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var simulator = await StreamerSongListSimulator.StartAsync(cancellationToken: cancellationToken);
+        var waitForCheck = simulator.WaitForFirstLatestReleaseRequestAsync(_ => true, cancellationToken);
+        using var http = new HttpClient { BaseAddress = simulator.ApiBaseAddress };
+
+        using var response = await http.GetAsync(StreamerSongListSimulator.LatestReleasePath, cancellationToken);
+
+        var check = await waitForCheck;
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Equal(("GET", "/_simulator/releases/latest", 404), (check.Method, check.Path, check.StatusCode));
+        Assert.Equal([check], simulator.LatestReleaseRequests);
+        Assert.Empty(simulator.Requests);
     }
 
     private static HttpClient CreateClient(StreamerSongListSimulator simulator)

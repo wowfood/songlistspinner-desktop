@@ -21,7 +21,8 @@ namespace SonglistSpinner.Simulator;
 /// <see cref="FailNextRequests">injected failure</see> or <see cref="DropNextRequests">dropped connection</see>,
 /// then the token check, then the endpoint. Every answered request is <see cref="Requests">recorded</see>,
 /// failures included. The <c>/connection/websocket</c> event endpoint and the <c>/_simulator</c> endpoints (manual
-/// testing and the <see cref="LatestReleasePath">update check</see>) are unauthenticated and not recorded.
+/// testing and the <see cref="LatestReleasePath">update check</see>) are unauthenticated and not recorded there;
+/// update checks have a log of their own, <see cref="LatestReleaseRequests"/>.
 /// </remarks>
 public sealed class StreamerSongListSimulator : IAsyncDisposable
 {
@@ -40,6 +41,7 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     private readonly ChannelDirectory _channels;
     private readonly EventHub _events;
     private readonly RequestLog _requests = new();
+    private readonly RequestLog _latestReleaseRequests = new();
     private readonly InjectedFaults _faults = new();
     private volatile SimulatedRelease? _latestRelease;
 
@@ -62,6 +64,12 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     public IReadOnlyList<RecordedRequest> Requests => _requests.Snapshot();
 
     public int EventConnectionCount => _events.ConnectionCount;
+
+    /// <summary>
+    /// The update checks answered at <see cref="LatestReleasePath"/> so far, oldest first, each recorded once its
+    /// response was sent. Kept apart from <see cref="Requests"/>, which holds only StreamerSongList API calls.
+    /// </summary>
+    public IReadOnlyList<RecordedRequest> LatestReleaseRequests => _latestReleaseRequests.Snapshot();
 
     /// <summary>The release <see cref="LatestReleasePath"/> describes; null, the default, answers 404.</summary>
     public SimulatedRelease? LatestRelease
@@ -147,6 +155,15 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
         CancellationToken cancellationToken = default) =>
         _requests.WaitForFirstAsync(match, cancellationToken);
 
+    /// <summary>
+    /// Completes with the oldest matching update check in <see cref="LatestReleaseRequests"/>, or with the next one
+    /// answered when there is none yet, so a test can tell when the app has its answer.
+    /// </summary>
+    public Task<RecordedRequest> WaitForFirstLatestReleaseRequestAsync(
+        Func<RecordedRequest, bool> match,
+        CancellationToken cancellationToken = default) =>
+        _latestReleaseRequests.WaitForFirstAsync(match, cancellationToken);
+
     /// <summary>The answered requests to <paramref name="method"/> <paramref name="path"/>, oldest first.</summary>
     public IReadOnlyList<RecordedRequest> RequestsTo(HttpMethod method, string path) =>
         Requests.Where(request =>
@@ -167,6 +184,7 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
         _channels.Clear();
         _latestRelease = null;
         _requests.Clear();
+        _latestReleaseRequests.Clear();
         // Last: a request this releases runs on at once, and must find the channels and the log already emptied.
         _faults.Clear();
     }
@@ -293,15 +311,30 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
             return Results.NoContent();
         });
 
-        _app.MapGet($"/{LatestReleasePath}", () => _latestRelease is { } release
-            ? Results.Json(new
+        _app.MapGet($"/{LatestReleasePath}", (HttpContext context) =>
+        {
+            context.Response.OnCompleted(() =>
             {
-                tag_name = release.Tag,
-                html_url = release.HtmlUrl.ToString(),
-                draft = release.Draft,
-                prerelease = release.Prerelease,
-                published_at = release.PublishedAt
-            })
-            : Results.NotFound());
+                _latestReleaseRequests.Record(new RecordedRequest(
+                    context.Request.Method,
+                    context.Request.Path,
+                    new Dictionary<string, string>(StringComparer.Ordinal),
+                    Authorization: null,
+                    ClientId: null,
+                    context.Response.StatusCode));
+                return Task.CompletedTask;
+            });
+
+            return _latestRelease is { } release
+                ? Results.Json(new
+                {
+                    tag_name = release.Tag,
+                    html_url = release.HtmlUrl.ToString(),
+                    draft = release.Draft,
+                    prerelease = release.Prerelease,
+                    published_at = release.PublishedAt
+                })
+                : Results.NotFound();
+        });
     }
 }
