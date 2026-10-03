@@ -4,14 +4,14 @@
 @inject ISpinnerApiService ApiService
 @inject IStreamerSongListCredentialStore CredentialStore
 @inject ILocalSettingsService LocalSettings
-@inject NowPlayingTransitionService NowPlayingTransitions
 @inject IJSRuntime JS
 @inject OverlayStateService OverlayService
 @inject StreamerSessionService StreamerSession
 @inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
 @inject NavigationManager Navigation
 @inject TimeProvider TimeProvider
-@inject Random WinnerPicker
+@inject WheelSpinService Spins
+@inject WinnerActionService WinnerActions
 @inject ILogger<Dashboard> Logger
 @implements IAsyncDisposable
 
@@ -63,7 +63,7 @@
                 <div id="pointer"></div>
                 <div id="wheelContainer"></div>
                 <div id="buttonContainer">
-                    <button id="spinButton" @onclick="Spin" disabled="@IsSpinDisabled">@_spinButtonText</button>
+                    <button id="spinButton" @onclick="Spin" disabled="@IsBusy">@SpinButtonText</button>
                 </div>
                 <div id="status" role="status" aria-live="polite" aria-atomic="true"
                      style="@(_statusVisible ? "display:block" : "display:none")">@_status</div>
@@ -131,7 +131,7 @@
                                 disabled="@IsBusy"
                                 aria-describedby="nowPlayingSong"
                                 @onclick="MarkNowPlayingPlayedAsync">
-                            @(_markNowPlayingPending ? "Marking..." : "Mark Played")
+                            @(_activity == DashboardActivity.MarkingNowPlaying ? "Marking..." : "Mark Played")
                         </button>
                     </section>
                 }
@@ -210,9 +210,9 @@
                 {
                     <button id="playedListSpinButton"
                             class="small-button played-list-spin-button"
-                            disabled="@IsSpinDisabled"
+                            disabled="@IsBusy"
                             @onclick="Spin">
-                        @_spinButtonText
+                        @SpinButtonText
                     </button>
                 }
                 <div class="toggle-right">

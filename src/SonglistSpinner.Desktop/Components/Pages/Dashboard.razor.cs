@@ -12,12 +12,9 @@ namespace SonglistSpinner.Components.Pages;
 // Injected properties are generated from @inject directives in Dashboard.razor.
 public partial class Dashboard
 {
-    private const int SpinDurationMilliseconds = 5000;
-    private const int WinnerQueuePositionLookupTimeoutMilliseconds = 2000;
-    private const int WinnerRevealDelayMilliseconds = 100;
+    private const string SpinButtonText = "SPIN";
     private readonly CancellationTokenSource _lifetimeCts = new();
-    private readonly SemaphoreSlim _winnerTransitionGate = new(1, 1);
-    private List<SpinnerQueueItem> _availableSongs = [];
+    private IReadOnlyList<SpinnerQueueItem> _availableSongs = [];
 
     private StreamerSessionHealth _apiHealth = StreamerSessionHealth.Unknown;
     private string _apiHealthDetail = "Waiting for a channel to be loaded.";
@@ -25,14 +22,10 @@ public partial class Dashboard
     private string _currentStreamer = "";
 
     private DotNetObjectReference<Dashboard>? _dotNetRef;
-    private bool _channelLoadPending;
+    private DashboardActivity _activity = DashboardActivity.Idle;
     private bool _isLockedDefault;
-    private bool _isSpinning;
-    private TaskCompletionSource<bool>? _spinCompletion;
     private bool _jsInitialized;
-    private DateTimeOffset _lastSpinTime = DateTimeOffset.MinValue;
     private bool _loading = true;
-    private bool _markNowPlayingPending;
     private SpinnerQueueItem? _nowPlaying;
     private LocalOverlayHealth _overlayHealth = new(LocalOverlayServerState.Stopped, 0, null);
     private bool _overlayHealthSubscribed;
@@ -42,9 +35,6 @@ public partial class Dashboard
     private StreamerSessionHealth _realtimeHealth = StreamerSessionHealth.Unknown;
     private string _realtimeHealthDetail = "Waiting for a channel to be loaded.";
     private bool _showStreamerInput = true;
-    private string _spinButtonText = "SPIN";
-
-    private bool _spinDisabled;
 
     private string _status = "";
     private bool _statusVisible;
@@ -57,16 +47,17 @@ public partial class Dashboard
     private bool _wheelVisible = true;
     private WinnerDialogField[] _winnerFields = [];
     private string? _winnerActionError;
+
+    // Set from a winner action's start until its follow-up refresh ends. The spin, and so the winner,
+    // finishes before that refresh, so this outlives ShowingWinner and the dialog stays busy while it closes.
     private bool _winnerActionPending;
     private int? _winnerQueueId;
     private int? _winnerQueuePosition;
-    private bool _winnerVisible;
     private bool _preferMarkWinnerPlayed;
 
     private bool IsNowPlayingWinnerActionEnabled => _config.NowPlaying?.Enabled == true;
-    // A spin, channel load or Now Playing update each replaces the queue; only one may run at a time.
-    private bool IsBusy => _isSpinning || _channelLoadPending || _markNowPlayingPending;
-    private bool IsSpinDisabled => _spinDisabled || IsBusy || _winnerVisible;
+    private bool IsBusy => _activity != DashboardActivity.Idle;
+    private bool IsSpinInProgress => _activity is DashboardActivity.Spinning or DashboardActivity.ShowingWinner;
     private string PreferredWinnerActionId => IsNowPlayingWinnerActionEnabled
         ? "setWinnerNowPlayingBtn"
         : _preferMarkWinnerPlayed
@@ -130,9 +121,10 @@ public partial class Dashboard
 
         StreamerSession.Changed -= OnStreamerSessionChanged;
 
-        if (_isSpinning)
-            SignalSpinCompleted();
-        if (_winnerVisible)
+        var winnerShown = _activity == DashboardActivity.ShowingWinner;
+        if (IsSpinInProgress)
+            FinishSpin();
+        if (winnerShown)
             await OverlayService.BroadcastCloseWinnerAsync();
 
         _lifetimeCts.Cancel();
@@ -147,7 +139,6 @@ public partial class Dashboard
         await InvokePageCleanupAsync("document.body.classList.remove", "spinner-page");
         await InvokePageCleanupAsync(SpinnerInteropMethods.ResetBackground);
 
-        _winnerTransitionGate.Dispose();
         _lifetimeCts.Dispose();
         GC.SuppressFinalize(this);
     }
@@ -260,7 +251,7 @@ public partial class Dashboard
         }
 
         var previousSession = StreamerSession.GetSnapshot();
-        _channelLoadPending = true;
+        _activity = DashboardActivity.LoadingChannel;
         _currentStreamer = name;
         _showStreamerInput = false;
         SetApiHealth(StreamerSessionHealth.Checking, $"Resolving {name} and loading its queue.");
@@ -310,7 +301,7 @@ public partial class Dashboard
         }
         finally
         {
-            _channelLoadPending = false;
+            _activity = DashboardActivity.Idle;
         }
 
         StateHasChanged();
@@ -318,7 +309,7 @@ public partial class Dashboard
 
     private async Task Spin()
     {
-        if (_isSpinning || _winnerVisible)
+        if (IsSpinInProgress)
         {
             SetStatus("Choose what happens to the current winner before spinning again.");
             return;
@@ -336,18 +327,14 @@ public partial class Dashboard
             return;
         }
 
-        if ((TimeProvider.GetUtcNow() - _lastSpinTime).TotalMilliseconds < 1000)
+        if (Spins.IsCoolingDown)
         {
             SetStatus("Cooldown active");
             return;
         }
 
         var spinStreamer = _currentStreamer;
-        _lastSpinTime = TimeProvider.GetUtcNow();
-        _spinDisabled = true;
-        _isSpinning = true;
-        StreamerSession.SetRefreshSuspended(true);
-        _spinCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        _activity = DashboardActivity.Spinning;
         _winnerQueueId = null;
         _winnerQueuePosition = null;
         _wheelCts.Cancel();
@@ -357,71 +344,36 @@ public partial class Dashboard
 
         try
         {
-            var (queue, played) = await FetchQueueAndHistory(spinStreamer, _lifetimeCts.Token);
-            _nowPlaying = queue.Playing;
-            _playedSongs = played;
-            _availableSongs = SpinnerDataService.FilterAvailableSongs(queue.Items, played, _config);
+            var draw = await TrackApiHealthAsync(
+                Spins.DrawAsync(spinStreamer, _config, _lifetimeCts.Token),
+                _lifetimeCts.Token);
+            _nowPlaying = draw.NowPlaying;
+            _playedSongs = draw.PlayedSongs;
+            _availableSongs = draw.AvailableSongs;
+            await RebuildWheel(_wheelCts.Token);
 
-            if (_availableSongs.Count == 0)
+            if (draw.WinnerIndex is not { } winnerIndex)
             {
-                // Publish the empty queue so the wheel and overlay stop showing songs that are gone.
-                await RebuildWheel(_wheelCts.Token);
-                await StreamerSession.UpdateSnapshotAsync(
-                    _config,
-                    _availableSongs,
-                    _playedSongs,
-                    _nowPlaying,
-                    _lifetimeCts.Token);
-                Logger.LogInformation("Spin for {Streamer} found no songs left to spin", spinStreamer);
+                await Spins.StartAsync(draw, _lifetimeCts.Token);
                 SetStatus("No songs left to spin!");
-                _spinDisabled = false;
-                SignalSpinCompleted();
+                FinishSpin();
                 await InvokeAsync(StateHasChanged);
                 return;
             }
 
-            await RebuildWheel(_wheelCts.Token);
-            var winnerIndex = WinnerPicker.Next(_availableSongs.Count);
-            var spinDuration = SpinDurationMilliseconds;
             SetStatus("Spinning...");
             await InvokeAsync(StateHasChanged);
-
-            var spinWinner = _availableSongs[winnerIndex];
-            Logger.LogInformation(
-                "Spin for {Streamer} picked queue entry {QueueId} from {AvailableSongCount} songs",
-                spinStreamer,
-                spinWinner.QueueId,
-                _availableSongs.Count);
-            var winnerFields = SpinnerDataService.CreateWinnerDialogFields(spinWinner, _config);
-            await StreamerSession.UpdateSnapshotAsync(
-                _config,
-                _availableSongs,
-                _playedSongs,
-                _nowPlaying,
-                _lifetimeCts.Token);
-            await OverlayService.BroadcastSpinCommandAsync(
+            await Spins.StartAsync(draw, _lifetimeCts.Token);
+            await JS.InvokeVoidAsync(
+                SpinnerInteropMethods.SpinToItem,
                 winnerIndex,
-                spinWinner.QueueId,
-                spinDuration);
+                (int)WheelSpinService.SpinDuration.TotalMilliseconds);
 
-            await JS.InvokeVoidAsync(SpinnerInteropMethods.SpinToItem, winnerIndex, spinDuration);
-
-            await Task.Delay(
-                TimeSpan.FromMilliseconds(spinDuration + WinnerRevealDelayMilliseconds),
-                TimeProvider,
-                _lifetimeCts.Token);
-            var displayedQueuePosition = _config.WinnerDialog.ShowQueuePosition
-                ? await ResolveCurrentQueuePositionAsync(
-                    spinStreamer,
-                    spinWinner.QueueId,
-                    _lifetimeCts.Token)
-                : null;
-            _winnerQueueId = spinWinner.QueueId;
-            await ShowWinnerModalAsync(winnerFields, displayedQueuePosition);
-            await OverlayService.BroadcastWinnerRevealAsync(winnerFields, displayedQueuePosition);
-            SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(spinWinner)}");
-            _spinButtonText = "SPIN";
-            _spinDisabled = false;
+            var winner = await Spins.RevealWinnerAsync(draw, _lifetimeCts.Token);
+            _winnerQueueId = winner.Song.QueueId;
+            await ShowWinnerModalAsync(winner.Fields, winner.QueuePosition);
+            await OverlayService.BroadcastWinnerRevealAsync(winner.Fields, winner.QueuePosition);
+            SetStatus($"Winner: {SpinnerDataService.BuildWheelLabel(winner.Song)}");
             StateHasChanged();
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
@@ -431,8 +383,7 @@ public partial class Dashboard
         {
             Logger.LogError(ex, "Spin for {Streamer} failed", spinStreamer);
             SetStatus($"Error: {ex.Message}");
-            _spinDisabled = false;
-            SignalSpinCompleted();
+            FinishSpin();
             StateHasChanged();
         }
     }
@@ -448,10 +399,8 @@ public partial class Dashboard
         _nowPlaying = null;
         _availableSongs = [];
         _playedSongs = [];
-        _winnerVisible = false;
         _winnerQueueId = null;
         _winnerQueuePosition = null;
-        SignalSpinCompleted();
         await RebuildWheel(_wheelCts.Token);
         StateHasChanged();
     }
@@ -483,7 +432,7 @@ public partial class Dashboard
         var streamerId = _streamerId;
         var streamer = _currentStreamer;
         var markedPlayed = false;
-        _markNowPlayingPending = true;
+        _activity = DashboardActivity.MarkingNowPlaying;
         await InvokeAsync(StateHasChanged);
 
         try
@@ -512,7 +461,7 @@ public partial class Dashboard
         }
         finally
         {
-            _markNowPlayingPending = false;
+            _activity = DashboardActivity.Idle;
             await InvokeAsync(StateHasChanged);
         }
     }
@@ -523,7 +472,7 @@ public partial class Dashboard
         _winnerQueuePosition = queuePosition;
         _winnerActionError = null;
         _winnerActionPending = false;
-        _winnerVisible = true;
+        _activity = DashboardActivity.ShowingWinner;
         await InvokeAsync(StateHasChanged);
         try
         {
@@ -535,7 +484,7 @@ public partial class Dashboard
         }
         catch
         {
-            _winnerVisible = false;
+            _activity = DashboardActivity.Spinning;
             await InvokeAsync(StateHasChanged);
             throw;
         }
@@ -554,7 +503,7 @@ public partial class Dashboard
         return ExecuteWinnerActionAsync(
             "marking the winner played",
             "Winner marked as played.",
-            (queueId, cancellationToken) => ApiService.MarkQueueItemAsPlayedAsync(queueId, cancellationToken));
+            WinnerActions.MarkPlayedAsync);
     }
 
     private Task SetWinnerNowPlayingAsync()
@@ -562,12 +511,12 @@ public partial class Dashboard
         return ExecuteWinnerActionAsync(
             "updating Now Playing",
             "Winner promoted to Now Playing.",
-            TransitionWinnerToNowPlayingAsync);
+            WinnerActions.PromoteToNowPlayingAsync);
     }
 
     private async Task LeaveWinnerInQueueAsync()
     {
-        if (_winnerActionPending || !_winnerVisible) return;
+        if (_winnerActionPending || _activity != DashboardActivity.ShowingWinner) return;
 
         _winnerActionPending = true;
         _winnerActionError = null;
@@ -581,12 +530,13 @@ public partial class Dashboard
         }
     }
 
+    // WinnerActionService logs the outcome; this shows it.
     private async Task ExecuteWinnerActionAsync(
         string actionDescription,
         string successMessage,
         Func<int, CancellationToken, Task> action)
     {
-        if (_winnerActionPending || !_winnerVisible) return;
+        if (_winnerActionPending || _activity != DashboardActivity.ShowingWinner) return;
         if (_winnerQueueId is not { } queueId)
         {
             _winnerActionError = "The selected queue entry is unavailable. Leave it in the queue and spin again.";
@@ -599,7 +549,6 @@ public partial class Dashboard
         try
         {
             await action(queueId, _lifetimeCts.Token);
-            Logger.LogInformation("Completed {WinnerAction} for queue entry {QueueId}", actionDescription, queueId);
             await CompleteWinnerActionAsync(successMessage);
         }
         catch (OperationCanceledException) when (_lifetimeCts.IsCancellationRequested)
@@ -607,7 +556,6 @@ public partial class Dashboard
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Failed {WinnerAction} for queue entry {QueueId}", actionDescription, queueId);
             SetApiHealth(StreamerSessionHealth.Failed, ex.Message);
             _winnerActionError = $"StreamerSongList failed while {actionDescription}: {ex.Message}";
             SetStatus(_winnerActionError);
@@ -621,8 +569,7 @@ public partial class Dashboard
 
     private async Task CompleteWinnerActionAsync(string statusMessage)
     {
-        _winnerVisible = false;
-        SignalSpinCompleted();
+        FinishSpin();
         await InvokeAsync(StateHasChanged);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.CloseWinnerDialog);
         await OverlayService.BroadcastCloseWinnerAsync();
@@ -640,92 +587,39 @@ public partial class Dashboard
     public Task OnResizeEnd(string width, string minWidth) =>
         OverlayService.UpdatePlayedListWidthAsync(width, minWidth);
 
-    private async Task<int?> ResolveCurrentQueuePositionAsync(
-        string expectedStreamer,
-        int queueId,
-        CancellationToken cancellationToken)
-    {
-        if (queueId <= 0 ||
-            !string.Equals(_currentStreamer, expectedStreamer, StringComparison.Ordinal))
-            return null;
-
-        try
-        {
-            using var lookupTimeout = new CancellationTokenSource(
-                TimeSpan.FromMilliseconds(WinnerQueuePositionLookupTimeoutMilliseconds),
-                TimeProvider);
-            using var lookupCts = CancellationTokenSource.CreateLinkedTokenSource(
-                cancellationToken,
-                lookupTimeout.Token);
-            var channel = new StreamerSongListChannel(expectedStreamer, _config.Streamer.Platform);
-            var queue = await ApiService.FetchQueueSnapshotAsync(channel, lookupCts.Token);
-            if (!string.Equals(_currentStreamer, expectedStreamer, StringComparison.Ordinal)) return null;
-            return SpinnerDataService.FindQueuePosition(queue.Items, queueId);
-        }
-        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
-        {
-            Logger.LogWarning(
-                "Looking up the position of queue entry {QueueId} timed out after {TimeoutMilliseconds} ms; " +
-                "the winner is shown without it",
-                queueId,
-                WinnerQueuePositionLookupTimeoutMilliseconds);
-            return null;
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception ex)
-        {
-            Logger.LogWarning(
-                ex,
-                "Looking up the position of queue entry {QueueId} failed; the winner is shown without it",
-                queueId);
-            return null;
-        }
-    }
-
-    private async Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchQueueAndHistory(
+    private Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchQueueAndHistory(
         string streamer,
         CancellationToken cancellationToken)
     {
-        try
+        return TrackApiHealthAsync(FetchAsync(), cancellationToken);
+
+        async Task<(SpinnerQueueSnapshot queue, PlayHistoryItem[] played)> FetchAsync()
         {
             var period = _config.SongList.PlayHistoryPeriod;
             var channel = new StreamerSongListChannel(streamer, _config.Streamer.Platform);
             var queueTask = ApiService.FetchQueueSnapshotAsync(channel, cancellationToken);
             var historyTask = ApiService.FetchPlayHistoryAsync(channel, period, cancellationToken);
             await Task.WhenAll(queueTask, historyTask);
+            return (await queueTask, await historyTask);
+        }
+    }
+
+    // API health follows the Dashboard's queue fetches. A spin's later steps fail for other reasons, such as
+    // the wheel script, so they leave it alone.
+    private async Task<T> TrackApiHealthAsync<T>(Task<T> queueFetch, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var result = await queueFetch;
             SetApiHealth(
                 StreamerSessionHealth.Healthy,
                 $"Queue and history last synchronized at {TimeProvider.GetLocalNow():t}.");
-            return (await queueTask, await historyTask);
+            return result;
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             SetApiHealth(StreamerSessionHealth.Failed, ex.Message);
             throw;
-        }
-    }
-
-    private async Task TransitionWinnerToNowPlayingAsync(int queueId, CancellationToken cancellationToken)
-    {
-        if (_streamerId <= 0)
-            throw new InvalidOperationException("The current streamer ID is unavailable. Reload the streamer and try again.");
-
-        var channel = new StreamerSongListChannel(_currentStreamer, _config.Streamer.Platform);
-        await _winnerTransitionGate.WaitAsync(cancellationToken);
-        try
-        {
-            await NowPlayingTransitions.PromoteWinnerAsync(
-                channel,
-                _streamerId,
-                queueId,
-                cancellationToken);
-        }
-        finally
-        {
-            _winnerTransitionGate.Release();
         }
     }
 
@@ -753,7 +647,7 @@ public partial class Dashboard
     {
         try
         {
-            if (_isSpinning || string.IsNullOrEmpty(_currentStreamer)) return;
+            if (IsSpinInProgress || string.IsNullOrEmpty(_currentStreamer)) return;
             await RefreshSnapshotAsync(_currentStreamer, ct);
         }
         catch (OperationCanceledException) { }
@@ -777,16 +671,16 @@ public partial class Dashboard
 
     private void OnStreamerSessionChanged(object? sender, StreamerSessionChangedEventArgs e)
     {
-        if (_channelLoadPending || _lifetimeCts.IsCancellationRequested) return;
+        if (_activity == DashboardActivity.LoadingChannel || _lifetimeCts.IsCancellationRequested) return;
 
         try
         {
             InvokeAsync(async () =>
             {
-                if (_lifetimeCts.IsCancellationRequested || _channelLoadPending) return;
+                if (_lifetimeCts.IsCancellationRequested || _activity == DashboardActivity.LoadingChannel) return;
 
                 ApplySessionSnapshot(e.Snapshot);
-                if (_jsInitialized && !_isSpinning)
+                if (_jsInitialized && !IsSpinInProgress)
                     await RebuildWheel(_wheelCts.Token);
                 if (!string.IsNullOrWhiteSpace(e.Announcement))
                     SetStatus(e.Announcement);
@@ -839,12 +733,10 @@ public partial class Dashboard
         _apiHealthDetail = detail;
     }
 
-    private void SignalSpinCompleted()
+    private void FinishSpin()
     {
-        _isSpinning = false;
-        StreamerSession.SetRefreshSuspended(false);
-        _spinCompletion?.TrySetResult(true);
-        _spinCompletion = null;
+        _activity = DashboardActivity.Idle;
+        Spins.Finish();
     }
 
     private void SetRealtimeHealth(StreamerSessionHealth health, string detail)

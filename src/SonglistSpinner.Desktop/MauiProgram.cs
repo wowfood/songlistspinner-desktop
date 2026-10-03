@@ -23,7 +23,7 @@ public static class MauiProgram
         builder.Services.AddMudServices();
         builder.Services.AddSingleton(new HttpClient { Timeout = TimeSpan.FromSeconds(30) });
         builder.Services.AddSingleton(TimeProvider.System);
-        // Random.Shared is thread-safe; the dashboard picks spin winners from it.
+        // Random.Shared is thread-safe; WheelSpinService picks spin winners from it.
         builder.Services.AddSingleton(Random.Shared);
         builder.Services.AddSingleton<GitHubReleaseUpdateChecker>();
         builder.Services.AddSingleton<ApplicationUpdateService>();
@@ -37,6 +37,8 @@ public static class MauiProgram
         builder.Services.AddScoped<ISpinnerApiService, StreamerSongListApiClient>();
         builder.Services.AddScoped<NowPlayingTransitionService>();
         builder.Services.AddScoped<StreamerSessionService>();
+        builder.Services.AddScoped<WheelSpinService>();
+        builder.Services.AddScoped<WinnerActionService>();
         builder.Services.AddSingleton<IStreamerSongListEventSource, CentrifugoStreamerSongListEventSource>();
         builder.Services.AddSingleton<OverlayStateService>();
         builder.Services.AddSingleton<LocalOverlayServer>();
