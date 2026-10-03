@@ -13,7 +13,9 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` composing the feature registrations |
 | `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
 | `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
-| `tests/SonglistSpinner.Testing` | Helpers both test projects share (a fake clock that reports its timers, `wwwroot` reader). Holds no tests |
+| `tests/SonglistSpinner.Testing` | Helpers the test projects share (a fake clock that reports its timers, `wwwroot` reader). Holds no tests |
+| `tests/SonglistSpinner.StreamerSongListSimulator` | In-memory StreamerSongList API v2 and Centrifugo event service, for integration tests and manual runs. Holds no tests |
+| `tests/SonglistSpinner.IntegrationTests` | xUnit v3 tests of the real API client, event source and session services against the simulator over loopback HTTP and WebSocket. Folders mirror `src`; `Simulator/` tests the simulator itself |
 | `tests/JavaScript` | `node:test` tests for the wheel scripts |
 | `scripts/` | Single-file publish, smoke test, release checks (used by CI) |
 | `docs/` | API v2 notes, release process, single-file distribution |
@@ -47,6 +49,45 @@ dotnet test --project tests/SonglistSpinner.Core.Tests --filter-class SonglistSp
 `--filter-method` narrows to one test. Run `dotnet format SonglistSpinner.Desktop.sln` without
 `--verify-no-changes` to apply fixes. The JavaScript command needs the quoted glob; Node 24
 rejects a bare directory.
+
+The integration tests are part of the default `dotnet test --solution` run (the project takes about two
+seconds), so CI runs them with everything else. On their own:
+
+```powershell
+dotnet test --project tests/SonglistSpinner.IntegrationTests
+```
+
+## StreamerSongList simulator
+
+`tests/SonglistSpinner.StreamerSongListSimulator` stands in for the StreamerSongList REST API
+(`/streamers`, `/queue`, `/play_history`, `/queue/played`, `/queue/{id}/play`) and the Centrifugo event
+WebSocket (`/connection/websocket`), holding its channels in memory. It never contacts the real service.
+It encodes the wire format itself rather than referencing Core, so a client-side change to that format
+fails the integration tests; keep it in step with `docs/API_V2.md` and the client's transport models.
+
+- In a test: `await using var simulator = await StreamerSongListSimulator.StartAsync(...)` listens on
+  127.0.0.1 with a free port (`ApiBaseAddress`, `EventsEndpoint`, `AccessToken`). Seed with `AddChannel`
+  and the channel's `RequestSongAsync`/`AddPlayedSongAsync`/`SetNowPlayingAsync`/`MarkPlayedAsync` (each
+  publishes its change to subscribed sockets); inject faults with `FailNextRequests`, `HoldNextRequest`
+  and `DropEventConnections`; inspect with `Requests` and `WaitForRequestAsync`.
+- By hand: `dotnet run --project tests/SonglistSpinner.StreamerSongListSimulator -- --port 5199 --seed demo`
+  (`--token` sets the accepted token, default `simulator-token`; `--seed none` starts empty). The demo
+  channel is `demo` on Twitch, streamer 1001. `POST /_simulator/requests?streamer_id=1001&artist=..&title=..`
+  adds a viewer request and `POST /_simulator/events/drop` drops the event sockets.
+
+Point the app at the running simulator by starting it from a shell with these variables
+(`EnvironmentOverrides` reads them once at startup):
+
+```powershell
+$env:SONGLISTSPINNER_SSL_API_BASE_URL = "http://127.0.0.1:5199/"
+$env:SONGLISTSPINNER_SSL_EVENTS_URL = "ws://127.0.0.1:5199/connection/websocket"
+$env:SONGLISTSPINNER_SSL_ACCESS_TOKEN = "simulator-token"
+$env:SONGLISTSPINNER_SSL_TOKEN_TYPE = "streamer"
+```
+
+The two URLs replace the production endpoints. The token is only a fallback: a token saved in Settings
+(Windows secure storage) takes precedence and would be sent to the simulator, which rejects it, so clear
+the saved token first. The app still reads and writes your normal settings and logs.
 
 ## Conventions
 
