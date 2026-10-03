@@ -16,8 +16,10 @@ public class ServiceHealthTests
 {
     /// <summary>
     /// The overlay server (an HttpListener) learns that a browser source left only when writing to it fails. It
-    /// writes a keep-alive every 15 s, and the first write after the browser closes still succeeds, so a departure
-    /// shows at the second keep-alive: 30 s after the streams below connect, as measured. The limit leaves 15 s over.
+    /// writes a keep-alive every 15 s (OverlayStateService.HeartbeatInterval in SonglistSpinner.Application, which
+    /// this project does not reference), and the first write after the browser closes still succeeds, so a departure
+    /// shows at the second keep-alive: 30 s after the streams below connect, as measured. The limit leaves 15 s over;
+    /// derive it again from three intervals if the heartbeat changes.
     /// </summary>
     private const float DepartureLimitMilliseconds = 45_000;
 

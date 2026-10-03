@@ -151,7 +151,7 @@ public class WinnerDialogTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         var dialog = await dashboard.SpinAsync();
 
         await dialog.ExpectFieldsAsync(("Artist", "a-ha"), ("Title", "Take On Me"), ("Requester", "synth_lover"));
-        await Expect(dialog.Root.Locator(".winner-queue-position")).ToHaveCountAsync(0);
+        await Expect(dialog.QueuePosition).ToHaveCountAsync(0);
         // Only the draw read the queue: no position lookup followed it.
         Assert.Single(
             scenario.Simulator.Requests.Skip(callsBeforeSpin),

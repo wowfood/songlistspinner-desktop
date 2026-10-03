@@ -207,6 +207,11 @@ internal sealed class DesktopApp : IAsyncDisposable
 
     private static bool IsAppUrl(string url) => url.StartsWith(AppUrl, StringComparison.Ordinal);
 
+    /// <summary>
+    /// A loopback port free now. The app's overlay server is an HttpListener, which cannot bind port 0, so the port is
+    /// released before the app binds it and another process can take it in between; AGENTS.md says to run one suite
+    /// at a time for that reason.
+    /// </summary>
     private static int FindFreePort()
     {
         using var listener = new TcpListener(IPAddress.Loopback, 0);

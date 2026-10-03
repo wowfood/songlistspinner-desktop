@@ -14,6 +14,9 @@ internal sealed partial class AppearanceSettings(IPage page) : SettingsSection(p
     /// <summary>One CSS colour per line.</summary>
     public ILocator WheelColors => Page.Locator("#wheelColors");
 
+    /// <summary>Why Save refused <see cref="WheelColors"/>, naming the first line that is not a CSS colour.</summary>
+    public ILocator WheelColorsError => Page.Locator("#wheelColorsError");
+
     /// <summary>A 0-100 range; fill it with a number.</summary>
     public ILocator PlayedPanelOpacity => Page.Locator("#playedPanelOpacity");
 

@@ -7,7 +7,7 @@ namespace SonglistSpinner.EndToEndTests;
 
 /// <summary>
 /// The Settings draft: what the page says about unsaved changes, saving them, the prompt that guards leaving with
-/// them, the CSS checks that block a save, and a saved value surviving a restart.
+/// them, and the CSS checks that block a save. SettingsPersistenceTests covers a saved value surviving a restart.
 /// </summary>
 public class SettingsDraftTests(SharedApp sharedApp) : IClassFixture<SharedApp>
 {
@@ -80,7 +80,7 @@ public class SettingsDraftTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await settings.UnsavedChangesPrompt.ExpectOpenAsync();
         await settings.UnsavedChangesPrompt.ChooseAsync("Abandon changes");
 
-        await Expect(scenario.Page.Locator("#container")).ToBeVisibleAsync();
+        await Expect(scenario.Dashboard.Container).ToBeVisibleAsync();
         await settings.OpenAsync();
         await settings.OverlayLayout.OpenAsync();
         await Expect(settings.OverlayLayout.PlayedShowNumbers).Not.ToBeCheckedAsync();
@@ -108,7 +108,7 @@ public class SettingsDraftTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await settings.UnsavedChangesPrompt.ExpectOpenAsync();
         await settings.UnsavedChangesPrompt.ChooseAsync("Save and leave");
 
-        await Expect(scenario.Page.Locator("#container")).ToBeVisibleAsync();
+        await Expect(scenario.Dashboard.Container).ToBeVisibleAsync();
         await dashboard.PlayedList.ExpectLinesAsync("1. Artist: Daft Punk | Title: Get Lucky");
         await settings.OpenAsync();
         await settings.OverlayLayout.OpenAsync();
@@ -128,8 +128,8 @@ public class SettingsDraftTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await settings.SaveButton.ClickAsync();
 
         // aria-invalid on this field is a known deferred defect, so only the visible messages are asserted.
-        await Expect(scenario.Page.Locator("#playedListFontSizeError"))
-            .ToHaveTextAsync("Played-list font size must be a concrete CSS size such as 1rem or 16px.");
+        await Expect(settings.OverlayLayout.PlayedFontSizeError).ToHaveTextAsync(
+            "Played-list font size must be a concrete CSS size such as 1rem or 16px.");
         await Expect(settings.SaveBarState).ToHaveTextAsync("✗ Correct the highlighted appearance values before saving.");
         await Expect(settings.DraftState).ToHaveTextAsync("Unsaved draft");
     }
@@ -148,28 +148,7 @@ public class SettingsDraftTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await settings.SaveButton.ClickAsync();
 
         await Expect(settings.SelectedSection).ToHaveTextAsync("Appearance");
-        await Expect(scenario.Page.Locator("#wheelColorsError")).ToHaveTextAsync("Use valid CSS colors on line 1.");
+        await Expect(settings.Appearance.WheelColorsError).ToHaveTextAsync("Use valid CSS colors on line 1.");
         await Expect(settings.SaveBarState).ToHaveTextAsync("✗ Correct the highlighted appearance values before saving.");
-    }
-
-    [Fact(Timeout = 180_000)]
-    public async Task Given_ASavedPlayHistoryPeriod_When_TheAppRestartsOnTheSameProfile_Then_SettingsShowsThePeriod()
-    {
-        EndToEnd.SkipUnlessEnabled();
-        var cancellationToken = TestContext.Current.CancellationToken;
-        // A restart is the behaviour under test, so this test has its own app rather than the class's shared one.
-        await using var scenario = await AppScenario.StartAsync(cancellationToken);
-        var settings = scenario.Settings;
-        await settings.OpenAsync();
-        await settings.Spinner.OpenAsync();
-        await settings.Spinner.SelectPlayHistoryPeriodAsync("month");
-        await settings.SaveAsync();
-
-        await scenario.RestartAppAsync(cancellationToken);
-
-        settings = scenario.Settings;
-        await settings.OpenAsync();
-        await settings.Spinner.OpenAsync();
-        await Expect(settings.Spinner.PlayHistoryPeriod).ToHaveValueAsync("month");
     }
 }

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Threading.Channels;
 
@@ -6,6 +7,8 @@ namespace SonglistSpinner.EndToEndTests.Infrastructure;
 /// <summary>An OBS browser source's view of the overlay: the server-sent events the overlay server streams.</summary>
 internal sealed class OverlayEventStream : IAsyncDisposable
 {
+    private static readonly TimeSpan Limit = TimeSpan.FromMilliseconds(EndToEnd.ExpectTimeoutMilliseconds);
+
     private readonly HttpClient _http;
     private readonly HttpResponseMessage _response;
     private readonly CancellationTokenSource _stop = new();
@@ -36,21 +39,41 @@ internal sealed class OverlayEventStream : IAsyncDisposable
     }
 
     /// <summary>Reads events until the next one named <paramref name="name"/>, skipping the others.</summary>
+    /// <exception cref="TimeoutException">None arrived within the expectation timeout.</exception>
     public Task<JsonElement> NextAsync(string name, CancellationToken cancellationToken) =>
-        NextAsync(name, _ => true, cancellationToken);
+        NextAsync(name, _ => true, cancellationToken, "any data");
 
     /// <summary>
-    /// Reads events until the next one named <paramref name="name"/> whose data matches, skipping the others.
+    /// Reads events until the next one named <paramref name="name"/> whose data matches, skipping the others. The
+    /// whole wait is bounded by the expectation timeout, like a Playwright expectation, so a missed event fails the
+    /// test there rather than at the test's own timeout.
     /// </summary>
+    /// <param name="matchDescription">The predicate's source text, named in the timeout's message.</param>
+    /// <exception cref="TimeoutException">No matching event arrived within the expectation timeout.</exception>
     public async Task<JsonElement> NextAsync(
         string name,
         Func<JsonElement, bool> match,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        [CallerArgumentExpression(nameof(match))] string matchDescription = "")
     {
-        while (true)
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        limit.CancelAfter(Limit);
+        var skipped = new List<string>();
+        try
         {
-            var overlayEvent = await _events.Reader.ReadAsync(cancellationToken);
-            if (overlayEvent.Name == name && match(overlayEvent.Data)) return overlayEvent.Data;
+            while (true)
+            {
+                var overlayEvent = await _events.Reader.ReadAsync(limit.Token);
+                if (overlayEvent.Name == name && match(overlayEvent.Data)) return overlayEvent.Data;
+                skipped.Add(overlayEvent.Name);
+            }
+        }
+        catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            throw new TimeoutException(
+                $"No overlay event \"{name}\" matching {matchDescription} arrived within {Limit.TotalSeconds} s; " +
+                $"skipped [{string.Join(", ", skipped)}].",
+                ex);
         }
     }
 

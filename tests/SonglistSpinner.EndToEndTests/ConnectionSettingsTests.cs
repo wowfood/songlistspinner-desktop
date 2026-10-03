@@ -54,8 +54,7 @@ public class ConnectionSettingsTests(SharedApp sharedApp) : IClassFixture<Shared
         await connection.TestConnectionButton.ClickAsync();
 
         await Expect(connection.Result).ToHaveTextAsync("Enter a Default StreamerSongList Name before testing.");
-        // The app's update check may reach the simulator at launch; no StreamerSongList API call may.
-        Assert.DoesNotContain(scenario.Simulator.Requests, request => request.Path is "/streamers" or "/queue" or "/play_history");
+        Assert.Empty(scenario.Simulator.Requests);
     }
 
     [Fact(Timeout = 180_000)]

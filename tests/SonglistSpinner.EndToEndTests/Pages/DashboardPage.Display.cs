@@ -13,6 +13,12 @@ internal sealed partial class DashboardPage
     public ILocator CollapseIcon => Page.Locator("#collapseIcon");
 
     /// <summary>
+    /// The separator that resizes the played panel; its <c>aria-valuenow</c> is the panel's width in pixels.
+    /// </summary>
+    public ILocator PlayedListResizeHandle =>
+        Page.GetByRole(AriaRole.Separator, new() { Name = "Resize played songs panel", Exact = true });
+
+    /// <summary>
     /// Waits until the theme sets the CSS custom property <paramref name="name"/> to exactly
     /// <paramref name="expected"/> (trimmed). The Dashboard applies its theme after it renders, so a single read
     /// could see the stylesheet's fallback; on timeout the failure names the value last read.

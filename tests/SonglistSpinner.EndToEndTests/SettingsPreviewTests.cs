@@ -1,4 +1,3 @@
-using Microsoft.Playwright;
 using SonglistSpinner.EndToEndTests.Infrastructure;
 using SonglistSpinner.EndToEndTests.Scenarios;
 using Xunit;
@@ -29,27 +28,24 @@ public class SettingsPreviewTests(SharedApp sharedApp) : IClassFixture<SharedApp
         var settings = scenario.Settings;
         await settings.OpenAsync();
         await settings.OverlayLayout.OpenAsync();
-        var preview = scenario.Page.FrameLocator("#settingsOverlayPreview");
-        var previewLines = preview.Locator("#playedSongsUl > li > .played-song-text");
+        var preview = settings.Preview;
         // The preview shows SettingsPreview's first three samples as played, newest first, for the default channel.
-        await Expect(preview.Locator("#streamerLabel")).ToHaveTextAsync("your-channel");
-        await Expect(previewLines).ToHaveTextAsync([
+        await Expect(preview.StreamerLabel).ToHaveTextAsync("your-channel");
+        await preview.PlayedList.ExpectLinesAsync(
             "Artist: The Midnight | Title: Sunset",
             "Artist: CHVRCHES | Title: Clearest Blue",
-            "Artist: Daft Punk | Title: Digital Love"
-        ]);
+            "Artist: Daft Punk | Title: Digital Love");
 
         await settings.OverlayLayout.PlayedShowNumbers.CheckAsync();
 
-        await Expect(previewLines).ToHaveTextAsync([
+        await preview.PlayedList.ExpectLinesAsync(
             "3. Artist: The Midnight | Title: Sunset",
             "2. Artist: CHVRCHES | Title: Clearest Blue",
-            "1. Artist: Daft Punk | Title: Digital Love"
-        ]);
+            "1. Artist: Daft Punk | Title: Digital Love");
         await Expect(settings.DraftState).ToHaveTextAsync("Unsaved draft");
         // Returning to the Dashboard sends the live overlay its (saved) settings. Had the preview reached the live
         // overlay, its update would have come first, so the first update a browser source sees is the proof.
-        await scenario.Page.GetByRole(AriaRole.Link, new() { Name = "Dashboard", Exact = true }).ClickAsync();
+        await settings.ClickDashboardLinkAsync();
         await settings.UnsavedChangesPrompt.ChooseAsync("Abandon changes");
         var firstUpdate = await obsSource.NextAsync("update_songs", cancellationToken);
         Assert.Equal("preview_streamer", firstUpdate.GetProperty("streamer").GetString());

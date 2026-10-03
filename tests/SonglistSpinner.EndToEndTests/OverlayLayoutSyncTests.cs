@@ -69,10 +69,8 @@ public class OverlayLayoutSyncTests(SharedApp sharedApp) : IClassFixture<SharedA
         var cancellationToken = TestContext.Current.CancellationToken;
         var scenario = await sharedApp.BeginTestAsync(cancellationToken);
         var (dashboard, overlay) = await OpenLoadedOverlayAsync(scenario);
-        var resizeHandle = dashboard.Page.GetByRole(
-            Microsoft.Playwright.AriaRole.Separator,
-            new() { Name = "Resize played songs panel", Exact = true });
-        var initialWidth = await ReadPixelWidthAsync(dashboard);
+        var resizeHandle = dashboard.PlayedListResizeHandle;
+        var initialWidth = await dashboard.PlayedList.ReadRenderedWidthAsync();
 
         await resizeHandle.FocusAsync();
         await resizeHandle.PressAsync("ArrowLeft");
@@ -87,8 +85,8 @@ public class OverlayLayoutSyncTests(SharedApp sharedApp) : IClassFixture<SharedA
         Assert.True(
             widenedWidth >= Math.Round(initialWidth + 24),
             $"The list widened from {initialWidth} px to only {widenedWidth} px.");
-        var dashboardWidth = await dashboard.PlayedList.Root.EvaluateAsync<string>("list => list.style.width");
-        var dashboardMinWidth = await dashboard.PlayedList.Root.EvaluateAsync<string>("list => list.style.minWidth");
+        var dashboardWidth = await dashboard.PlayedList.ReadInlineStyleAsync("width");
+        var dashboardMinWidth = await dashboard.PlayedList.ReadInlineStyleAsync("min-width");
         Assert.Matches(@"^\d+(\.\d+)?%$", dashboardWidth);
         Assert.Equal("300px", dashboardMinWidth);
         await OverlayPage.ExpectInlineStyleAsync(overlay.PlayedList.Root, "width", dashboardWidth);
@@ -109,7 +107,4 @@ public class OverlayLayoutSyncTests(SharedApp sharedApp) : IClassFixture<SharedA
         await overlay.ExpectPlayedListExpandedAsync();
         return (dashboard, overlay);
     }
-
-    private static Task<double> ReadPixelWidthAsync(DashboardPage dashboard) =>
-        dashboard.PlayedList.Root.EvaluateAsync<double>("list => list.getBoundingClientRect().width");
 }

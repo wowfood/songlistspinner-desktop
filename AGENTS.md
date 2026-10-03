@@ -62,7 +62,7 @@ dotnet test --project tests/SonglistSpinner.IntegrationTests
 
 The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run (and CI) every
 one reports as skipped. Run them from a desktop session and leave the windows alone until they finish (the full
-suite, 136 tests, takes about ten minutes, mostly app launches):
+suite, 135 tests, takes about ten minutes, mostly app launches):
 
 ```powershell
 ./scripts/run-e2e.ps1
@@ -87,7 +87,10 @@ does). The suites, one class per feature or workflow:
 The script builds the Desktop app (Release unless `-Configuration Debug`) and runs the tests with
 `SONGLISTSPINNER_E2E=1`. The app under test is the built executable, started against an in-process simulator on a
 temporary test profile (see below), a free overlay port and an update URL on the simulator; Playwright drives its
-WebView through `ConnectOverCDPAsync`. Every port is picked free per run, so several runs can share the machine.
+WebView through `ConnectOverCDPAsync`. The simulator and the WebView's DevTools port bind port 0, so they never
+collide. The overlay port is a free port the harness finds and releases before the app binds it (`HttpListener` cannot
+bind port 0), so another process can take it in between: the app's overlay server then fails to start, or the tests
+reach the other process's server. Run one suite at a time on a machine.
 
 - **One app per test class.** A class takes `IClassFixture<SharedApp>` and each test calls
   `EndToEnd.SkipUnlessEnabled()` then `sharedApp.BeginTestAsync(...)`. The first test launches the app; later ones

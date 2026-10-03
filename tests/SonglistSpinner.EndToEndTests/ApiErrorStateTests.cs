@@ -98,33 +98,52 @@ public class ApiErrorStateTests(SharedApp sharedApp) : IClassFixture<SharedApp>
     }
 
     [Fact(Timeout = 180_000)]
-    public async Task Given_ALoadedChannel_When_PressingRefresh_Then_TheChannelIsLookedUpAndFetchedAgain()
+    public async Task Given_ALoadedChannelThatGainedARequest_When_PressingRefresh_Then_TheChannelIsLookedUpAgainAndTheStatusCountsTheNewQueue()
     {
         EndToEnd.SkipUnlessEnabled();
         var cancellationToken = TestContext.Current.CancellationToken;
         var scenario = await sharedApp.BeginTestAsync(cancellationToken);
-        await new ChannelSeed("refresh_streamer")
+        var channel = await new ChannelSeed("refresh_streamer")
             .WithQueued(SongCatalog.TakeOnMe, SongCatalog.MrBrightside)
             .WithPlayed(SongCatalog.GetLucky, TimeSpan.FromHours(1))
             .ApplyAsync(scenario.Simulator);
         var dashboard = scenario.Dashboard;
         await dashboard.LoadChannelAsync("refresh_streamer");
-        // Connecting to realtime fetches the queue once more; wait for that, so the log is quiet before Refresh.
-        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.FetchQueue("refresh_streamer"), 2, cancellationToken);
-        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.FetchPlayHistory("refresh_streamer"), 2, cancellationToken);
-        var callsBefore = scenario.Simulator.Requests.Count;
+        await Expect(dashboard.Status).ToHaveTextAsync("Loaded 2 songs. Press SPIN!");
+        // Connecting to realtime reads the queue and history once more; wait for that, so the log is quiet.
+        await WaitForQueueAndHistoryReadsAsync(scenario, "refresh_streamer", 2, cancellationToken);
+        // The new request reaches the app over realtime, whose refresh redraws the wheel but leaves the status: only a
+        // load or Refresh sets it. Wait for that refresh's reads too, so Refresh's calls come next in the log.
+        var africa = SongCatalog.Africa;
+        await channel.Channel.RequestSongAsync(africa.Artist, africa.Title, africa.Requester, africa.Donation);
+        await dashboard.ExpectWheelLabelsAsync(
+            SongCatalog.TakeOnMe.WheelLabel, SongCatalog.MrBrightside.WheelLabel, africa.WheelLabel);
+        await WaitForQueueAndHistoryReadsAsync(scenario, "refresh_streamer", 3, cancellationToken);
+        await Expect(dashboard.Status).ToHaveTextAsync("Loaded 2 songs. Press SPIN!");
+        var callsBefore = scenario.Simulator.Requests.ToHashSet(ReferenceEqualityComparer.Instance);
 
         await dashboard.RefreshButton.ClickAsync();
 
-        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.ResolveStreamer("refresh_streamer"), 2, cancellationToken);
-        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.FetchQueue("refresh_streamer"), 3, cancellationToken);
-        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.FetchPlayHistory("refresh_streamer"), 3, cancellationToken);
-        await Expect(dashboard.Status).ToHaveTextAsync("Loaded 2 songs. Press SPIN!");
+        await Expect(dashboard.Status).ToHaveTextAsync("Loaded 3 songs. Press SPIN!");
         await Expect(dashboard.StreamerLabel).ToHaveTextAsync("Streamer: refresh_streamer");
-        var refreshCalls = scenario.Simulator.Requests.Skip(callsBefore).Take(3).ToList();
+        await dashboard.ExpectWheelLabelsAsync(
+            SongCatalog.TakeOnMe.WheelLabel, SongCatalog.MrBrightside.WheelLabel, africa.WheelLabel);
+        // Refresh reloads the channel: a lookup, then its queue and history in either order.
+        var refreshCalls = await scenario.Simulator.WaitForRequestCountAsync(
+            request => !callsBefore.Contains(request), 3, cancellationToken);
         Assert.True(ApiCalls.ResolveStreamer("refresh_streamer")(refreshCalls[0]));
         Assert.Equal(
             ["/play_history", "/queue"],
             refreshCalls.Skip(1).Select(request => request.Path).Order(StringComparer.Ordinal));
+    }
+
+    private static async Task WaitForQueueAndHistoryReadsAsync(
+        AppScenario scenario,
+        string channel,
+        int count,
+        CancellationToken cancellationToken)
+    {
+        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.FetchQueue(channel), count, cancellationToken);
+        await scenario.Simulator.WaitForRequestCountAsync(ApiCalls.FetchPlayHistory(channel), count, cancellationToken);
     }
 }

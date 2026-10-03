@@ -21,6 +21,8 @@ internal sealed partial class SettingsPage(IPage page)
 
     public AdvancedSettings Advanced => new(Page);
 
+    public SettingsPreview Preview => new(Page.FrameLocator("#settingsOverlayPreview"));
+
     /// <summary>"Unsaved draft" or "All changes saved".</summary>
     public ILocator DraftState => Page.Locator(".ss-settings-draft-state");
 

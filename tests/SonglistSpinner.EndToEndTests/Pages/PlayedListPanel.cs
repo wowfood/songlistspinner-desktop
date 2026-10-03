@@ -12,20 +12,34 @@ namespace SonglistSpinner.EndToEndTests.Pages;
 /// Text expectations normalise whitespace (runs collapse to one space, ends are trimmed), so a separator's exact
 /// spacing is asserted through <see cref="ExpectTableSeparatorAsync"/>, which reads the separators' title.
 /// </remarks>
-internal sealed partial class PlayedListPanel(IPage page)
+internal sealed partial class PlayedListPanel
 {
-    public ILocator Root => page.Locator("#playedList");
+    private readonly Func<string, ILocator> _locate;
 
-    public ILocator Items => page.Locator("#playedSongsUl > li");
+    /// <summary>The list on the Dashboard or on an overlay page.</summary>
+    public PlayedListPanel(IPage page) : this(selector => page.Locator(selector))
+    {
+    }
+
+    /// <summary>The list in a frame, such as the Settings page's overlay preview.</summary>
+    public PlayedListPanel(IFrameLocator frame) : this(selector => frame.Locator(selector))
+    {
+    }
+
+    private PlayedListPanel(Func<string, ILocator> locate) => _locate = locate;
+
+    public ILocator Root => _locate("#playedList");
+
+    public ILocator Items => _locate("#playedSongsUl > li");
 
     /// <summary>"No played songs in the selected history period." when the period has none (Dashboard only).</summary>
-    public ILocator EmptyState => page.Locator("#playedSongsUl > li.played-list-empty-state");
+    public ILocator EmptyState => _locate("#playedSongsUl > li.played-list-empty-state");
 
-    public ILocator HeaderRow => page.Locator("#playedSongsUl > li.played-field-header-row");
+    public ILocator HeaderRow => _locate("#playedSongsUl > li.played-field-header-row");
 
-    private ILocator TextLines => page.Locator("#playedSongsUl > li > .played-song-text");
+    private ILocator TextLines => _locate("#playedSongsUl > li > .played-song-text");
 
-    private ILocator TableRows => page.Locator("#playedSongsUl > li.played-field-grid:not(.played-field-header-row)");
+    private ILocator TableRows => _locate("#playedSongsUl > li.played-field-grid:not(.played-field-header-row)");
 
     /// <summary>Waits until the list shows exactly <paramref name="lines"/>, newest song first.</summary>
     public async Task ExpectLinesAsync(params string[] lines)
@@ -65,9 +79,20 @@ internal sealed partial class PlayedListPanel(IPage page)
     /// <summary>Waits until every separator between table cells is exactly <paramref name="separator"/>.</summary>
     public async Task ExpectTableSeparatorAsync(string separator)
     {
-        var separators = page.Locator("#playedSongsUl .played-field-separator");
+        var separators = _locate("#playedSongsUl .played-field-separator");
         await Expect(separators.First).ToBeAttachedAsync();
         foreach (var element in await separators.AllAsync())
             await Expect(element).ToHaveAttributeAsync("title", separator);
     }
+
+    /// <summary>
+    /// The value the list's inline style gives <paramref name="property"/>, such as <c>width</c>, as the Dashboard's
+    /// resize handle writes it; empty when the style does not set it.
+    /// </summary>
+    public Task<string> ReadInlineStyleAsync(string property) =>
+        Root.EvaluateAsync<string>("(list, property) => list.style.getPropertyValue(property)", property);
+
+    /// <summary>The list's rendered width in CSS pixels.</summary>
+    public Task<double> ReadRenderedWidthAsync() =>
+        Root.EvaluateAsync<double>("list => list.getBoundingClientRect().width");
 }

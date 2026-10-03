@@ -16,6 +16,8 @@ public class OverlayStateService
 {
     /// <summary>How many events a connected overlay may fall behind before it loses the oldest.</summary>
     internal const int ClientBufferCapacity = 32;
+    // A departed overlay is noticed at the second keep-alive after it leaves, so the end-to-end
+    // ServiceHealthTests.DepartureLimitMilliseconds is three intervals; change it with this value.
     private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(15);
     private static readonly JsonSerializerOptions JsonOpts = new()
     {

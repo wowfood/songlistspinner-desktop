@@ -41,6 +41,9 @@ internal sealed partial class OverlayLayoutSettings(IPage page) : SettingsSectio
 
     public ILocator PlayedFontSize => Page.Locator("#playedListFontSize");
 
+    /// <summary>Why Save refused <see cref="PlayedFontSize"/>, such as a size that is not a concrete CSS length.</summary>
+    public ILocator PlayedFontSizeError => Page.Locator("#playedListFontSizeError");
+
     public ILocator PlayedMaxLines => Page.Locator("#playedListMaxLines");
 
     public FieldOrderEditor NowPlayingFields => new(NowPlayingPanel.Locator(".ss-field-multiselect"));

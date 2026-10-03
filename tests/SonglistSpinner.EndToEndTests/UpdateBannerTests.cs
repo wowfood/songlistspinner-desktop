@@ -29,7 +29,7 @@ public class UpdateBannerTests
 
         var banner = scenario.UpdateBanner;
         await Expect(banner.Headline).ToHaveTextAsync("SonglistSpinner 9.9.9 is available");
-        await Expect(banner.CurrentVersion).ToHaveTextAsync("You are currently using 1.2.0.");
+        await Expect(banner.CurrentVersion).ToHaveTextAsync($"You are currently using {AppVersion.Current}.");
         await Expect(banner.ViewReleaseLink).ToHaveAttributeAsync("href", ReleasePage);
     }
 
@@ -55,10 +55,20 @@ public class UpdateBannerTests
         await ExpectNoBannerAsync(scenario);
     }
 
+    /// <summary>
+    /// Releases the app must not offer: the version it is running, a prerelease, and a release published from
+    /// another repository.
+    /// </summary>
+    public static TheoryData<string, string, bool> ReleasesNotOffered =>
+        new()
+        {
+            { $"v{AppVersion.Current}", ReleasePage, false },
+            { "v9.9.9", ReleasePage, true },
+            { "v9.9.9", "https://github.com/someone-else/songlistspinner-desktop/releases/tag/v9.9.9", false }
+        };
+
     [Theory(Timeout = 180_000)]
-    [InlineData("v1.2.0", ReleasePage, false)]
-    [InlineData("v9.9.9", ReleasePage, true)]
-    [InlineData("v9.9.9", "https://github.com/someone-else/songlistspinner-desktop/releases/tag/v9.9.9", false)]
+    [MemberData(nameof(ReleasesNotOffered))]
     public async Task Given_AReleaseTheAppMustNotOffer_When_TheAppStarts_Then_NoBannerIsShown(
         string tag,
         string releasePage,
