@@ -25,13 +25,13 @@ public partial class App
         AppDomain.CurrentDomain.ProcessExit += (_, _) => DiagnosticLog.Shutdown();
 
         InitializeComponent();
-        overlayServer.StartAsync(CancellationToken.None).GetAwaiter().GetResult();
+        overlayServer.Start();
     }
 
     protected override Window CreateWindow(IActivationState? activationState)
     {
         var window = new Window(new MainPage()) { Title = "SonglistSpinner" };
-        window.Destroying += async (_, _) => await _overlayServer.StopAsync(CancellationToken.None);
+        window.Destroying += (_, _) => _overlayServer.Stop();
         return window;
     }
 }

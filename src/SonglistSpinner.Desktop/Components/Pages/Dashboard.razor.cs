@@ -443,7 +443,7 @@ public partial class Dashboard
     {
         _wheelVisible = (bool)(e.Value ?? true);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetWheelVisible, _wheelVisible);
-        _ = OverlayService.BroadcastWheelVisibilityAsync(_wheelVisible);
+        await OverlayService.BroadcastWheelVisibilityAsync(_wheelVisible);
     }
 
     private async Task ToggleCollapse()
@@ -521,7 +521,10 @@ public partial class Dashboard
             throw;
         }
 
-        _ = JS.InvokeVoidAsync(SpinnerInteropMethods.RunConfetti, (object)_config.WheelColors);
+        // Confetti is decoration: the winner reveal does not wait for it or fail with it.
+        JS.InvokeVoidAsync(SpinnerInteropMethods.RunConfetti, (object)_config.WheelColors)
+            .AsTask()
+            .ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Winner confetti failed: {ex}"));
     }
 
     [JSInvokable]
@@ -747,7 +750,7 @@ public partial class Dashboard
 
         try
         {
-            _ = InvokeAsync(async () =>
+            InvokeAsync(async () =>
             {
                 if (_lifetimeCts.IsCancellationRequested || _channelLoadPending) return;
 
@@ -757,7 +760,7 @@ public partial class Dashboard
                 if (!string.IsNullOrWhiteSpace(e.Announcement))
                     SetStatus(e.Announcement);
                 StateHasChanged();
-            });
+            }).ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Applying a session update failed: {ex}"));
         }
         catch (InvalidOperationException)
         {
@@ -788,11 +791,11 @@ public partial class Dashboard
         var health = OverlayService.GetHealth();
         try
         {
-            _ = InvokeAsync(() =>
+            InvokeAsync(() =>
             {
                 _overlayHealth = health;
                 StateHasChanged();
-            });
+            }).ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Showing overlay health failed: {ex}"));
         }
         catch (InvalidOperationException)
         {

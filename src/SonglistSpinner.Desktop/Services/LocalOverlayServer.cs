@@ -42,7 +42,9 @@ public class LocalOverlayServer : IAsyncDisposable
         GC.SuppressFinalize(this);
     }
 
-    public Task StartAsync(CancellationToken cancellationToken)
+    // Start and Stop are synchronous: HttpListener starts and stops without blocking on I/O, and
+    // requests are accepted on a background loop whose faults are logged.
+    public void Start()
     {
         _overlay.SetServerHealth(LocalOverlayServerState.Starting);
         _listener = new HttpListener();
@@ -51,18 +53,17 @@ public class LocalOverlayServer : IAsyncDisposable
         {
             _listener.Start();
             _overlay.SetServerHealth(LocalOverlayServerState.Running);
-            _ = ProcessRequestsAsync(_cts.Token);
+            ProcessRequestsAsync(_cts.Token)
+                .ObserveFaults(ex => Trace.WriteLine($"[OverlayServer] The request loop failed: {ex}"));
         }
         catch (Exception ex)
         {
             Trace.WriteLine($"[OverlayServer] Failed to start on port {_overlay.Port}: {ex.Message}");
             _overlay.SetServerHealth(LocalOverlayServerState.Failed, ex.Message);
         }
-
-        return Task.CompletedTask;
     }
 
-    public Task StopAsync(CancellationToken cancellationToken)
+    public void Stop()
     {
         _cts.Cancel();
         try
@@ -72,7 +73,6 @@ public class LocalOverlayServer : IAsyncDisposable
         catch (ObjectDisposedException ex) { _ = ex; }
 
         _overlay.SetServerHealth(LocalOverlayServerState.Stopped);
-        return Task.CompletedTask;
     }
 
     private async Task ProcessRequestsAsync(CancellationToken ct)
@@ -100,7 +100,8 @@ public class LocalOverlayServer : IAsyncDisposable
                 break;
             }
 
-            _ = Task.Run(() => HandleRequestAsync(context, ct), CancellationToken.None);
+            Task.Run(() => HandleRequestAsync(context, ct), CancellationToken.None)
+                .ObserveFaults(ex => Trace.WriteLine($"[OverlayServer] Serving a request failed: {ex}"));
         }
 
         if (!ct.IsCancellationRequested)

@@ -355,7 +355,8 @@ public partial class Settings
         _previewRefreshCts?.Cancel();
         _previewRefreshCts?.Dispose();
         _previewRefreshCts = new CancellationTokenSource();
-        _ = PushPreviewAfterDelayAsync(_previewRefreshCts.Token);
+        PushPreviewAfterDelayAsync(_previewRefreshCts.Token)
+            .ObserveFaults(ex => Trace.WriteLine($"[SonglistSpinner] Settings preview refresh failed: {ex}"));
     }
 
     private async Task PushPreviewAfterDelayAsync(CancellationToken cancellationToken)
