@@ -22,6 +22,16 @@ internal sealed class ChannelDirectory(SimulatorContext context)
         }
     }
 
+    /// <summary>Removes every channel; the next channel added without an id is numbered from 1001 again.</summary>
+    public void Clear()
+    {
+        lock (context.Gate)
+        {
+            _channels.Clear();
+            _lastStreamerId = 1000;
+        }
+    }
+
     /// <summary>Finds a channel by name, ignoring case, on <paramref name="platform"/>.</summary>
     public SimulatedChannel? Find(string name, string platform)
     {

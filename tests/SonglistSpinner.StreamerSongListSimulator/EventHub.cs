@@ -26,13 +26,28 @@ internal sealed partial class EventHub
 
     private readonly ConcurrentDictionary<EventConnection, byte> _connections = new();
 
+    private volatile bool _rejectingConnections;
+
     public int ConnectionCount => _connections.Count;
+
+    /// <summary>While set, new connections are refused with 503, as when the event service is down.</summary>
+    public bool RejectingConnections
+    {
+        get => _rejectingConnections;
+        set => _rejectingConnections = value;
+    }
 
     public async Task AcceptAsync(HttpContext context)
     {
         if (!context.WebSockets.IsWebSocketRequest)
         {
             context.Response.StatusCode = StatusCodes.Status400BadRequest;
+            return;
+        }
+
+        if (_rejectingConnections)
+        {
+            context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
             return;
         }
 

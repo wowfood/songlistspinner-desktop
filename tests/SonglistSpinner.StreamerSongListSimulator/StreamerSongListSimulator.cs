@@ -18,13 +18,21 @@ namespace SonglistSpinner.Simulator;
 /// </summary>
 /// <remarks>
 /// Each REST request passes, in order: a <see cref="HoldNextRequest">hold</see>, an
-/// <see cref="FailNextRequests">injected failure</see>, then the token check, then the endpoint. Every answered
-/// request is <see cref="Requests">recorded</see>, failures included. The <c>/connection/websocket</c> event
-/// endpoint and the <c>/_simulator</c> endpoints for manual testing are unauthenticated.
+/// <see cref="FailNextRequests">injected failure</see> or <see cref="DropNextRequests">dropped connection</see>,
+/// then the token check, then the endpoint. Every answered request is <see cref="Requests">recorded</see>,
+/// failures included. The <c>/connection/websocket</c> event endpoint and the <c>/_simulator</c> endpoints (manual
+/// testing and the <see cref="LatestReleasePath">update check</see>) are unauthenticated and not recorded.
 /// </remarks>
 public sealed class StreamerSongListSimulator : IAsyncDisposable
 {
     public const string EventsPath = "/connection/websocket";
+
+    /// <summary>
+    /// GitHub's "latest release" response for <see cref="LatestRelease"/>, or 404 (no release) while it is null.
+    /// Relative to <see cref="ApiBaseAddress"/>.
+    /// </summary>
+    public const string LatestReleasePath = "_simulator/releases/latest";
+
     private const string ManualTestingPathPrefix = "/_simulator";
     private static readonly string[] AcceptedSchemes = ["Streamer", "User", "Bearer"];
 
@@ -33,6 +41,7 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     private readonly EventHub _events;
     private readonly RequestLog _requests = new();
     private readonly InjectedFaults _faults = new();
+    private volatile SimulatedRelease? _latestRelease;
 
     private StreamerSongListSimulator(WebApplication app, StreamerSongListSimulatorOptions options)
     {
@@ -53,6 +62,24 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     public IReadOnlyList<RecordedRequest> Requests => _requests.Snapshot();
 
     public int EventConnectionCount => _events.ConnectionCount;
+
+    /// <summary>The release <see cref="LatestReleasePath"/> describes; null, the default, answers 404.</summary>
+    public SimulatedRelease? LatestRelease
+    {
+        get => _latestRelease;
+        set => _latestRelease = value;
+    }
+
+    /// <summary>
+    /// While set, the event WebSocket refuses new connections with 503, so a client that loses its connection
+    /// keeps reconnecting until this is cleared. Connections already open are not affected; see
+    /// <see cref="DropEventConnections"/>.
+    /// </summary>
+    public bool RejectEventConnections
+    {
+        get => _events.RejectingConnections;
+        set => _events.RejectingConnections = value;
+    }
 
     public static async Task<StreamerSongListSimulator> StartAsync(
         StreamerSongListSimulatorOptions? options = null,
@@ -93,6 +120,14 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     public void FailNextRequests(HttpMethod method, string path, HttpStatusCode statusCode, string detail, int count = 1) =>
         _faults.Fail(method.Method, path, (int)statusCode, detail, count);
 
+    /// <summary>
+    /// Aborts the connection of the next <paramref name="count"/> requests to <paramref name="method"/>
+    /// <paramref name="path"/> without answering, as a network failure would. They are recorded with
+    /// <see cref="RecordedRequest.ConnectionAborted"/> set.
+    /// </summary>
+    public void DropNextRequests(HttpMethod method, string path, int count = 1) =>
+        _faults.Abort(method.Method, path, count);
+
     /// <summary>Holds the next request to <paramref name="method"/> <paramref name="path"/> until released.</summary>
     public RequestHold HoldNextRequest(HttpMethod method, string path) => _faults.Hold(method.Method, path);
 
@@ -101,6 +136,39 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
         Func<RecordedRequest, bool> match,
         CancellationToken cancellationToken = default) =>
         _requests.WaitForNextAsync(match, cancellationToken);
+
+    /// <summary>
+    /// Completes with the oldest matching request in <see cref="Requests"/>, or with the next one answered when
+    /// there is none yet. After <see cref="Reset"/> that is the first matching request since the reset, so a test
+    /// can act first and wait afterwards.
+    /// </summary>
+    public Task<RecordedRequest> WaitForFirstRequestAsync(
+        Func<RecordedRequest, bool> match,
+        CancellationToken cancellationToken = default) =>
+        _requests.WaitForFirstAsync(match, cancellationToken);
+
+    /// <summary>The answered requests to <paramref name="method"/> <paramref name="path"/>, oldest first.</summary>
+    public IReadOnlyList<RecordedRequest> RequestsTo(HttpMethod method, string path) =>
+        Requests.Where(request =>
+                string.Equals(request.Method, method.Method, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(request.Path, path, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+
+    /// <summary>
+    /// Returns the simulator to its state just after <see cref="StartAsync"/>, on the same address and token: no
+    /// channels, no queued faults or holds (requests held now are released), an empty request log (pending
+    /// waiters are cancelled), no release, event connections accepted, and every open event connection dropped.
+    /// Queue, history and song ids keep counting up, so an id from before the reset never names a new entry.
+    /// </summary>
+    public void Reset()
+    {
+        _faults.Clear();
+        _events.RejectingConnections = false;
+        _events.DropAll();
+        _channels.Clear();
+        _latestRelease = null;
+        _requests.Clear();
+    }
 
     /// <summary>Aborts every event connection without a close handshake, as a network failure would.</summary>
     public void DropEventConnections() => _events.DropAll();
@@ -135,13 +203,24 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
     private async Task AnswerApiRequestAsync(HttpContext context, RequestDelegate next)
     {
         var request = context.Request;
+        var aborted = false;
         try
         {
             if (_faults.TakeHold(request.Method, request.Path) is { } hold)
                 await hold.WaitAsync(context.RequestAborted);
 
             if (_faults.TakeFailure(request.Method, request.Path) is { } failure)
-                await WireFormat.Problem(failure.StatusCode, failure.Detail).ExecuteAsync(context);
+            {
+                if (failure.AbortConnection)
+                {
+                    aborted = true;
+                    context.Abort();
+                }
+                else
+                {
+                    await WireFormat.Problem(failure.StatusCode, failure.Detail).ExecuteAsync(context);
+                }
+            }
             else if (!IsAuthorized(request, out var authorizationProblem))
                 await WireFormat.Problem(StatusCodes.Status401Unauthorized, authorizationProblem).ExecuteAsync(context);
             else
@@ -159,7 +238,8 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
                 request.Query.ToDictionary(pair => pair.Key, pair => pair.Value.ToString(), StringComparer.Ordinal),
                 request.Headers.Authorization.Count == 0 ? null : request.Headers.Authorization.ToString(),
                 request.Headers.TryGetValue("Client-Id", out var clientId) ? clientId.ToString() : null,
-                context.Response.StatusCode));
+                context.Response.StatusCode,
+                aborted));
         }
     }
 
@@ -211,5 +291,16 @@ public sealed class StreamerSongListSimulator : IAsyncDisposable
             _events.DropAll();
             return Results.NoContent();
         });
+
+        _app.MapGet($"/{LatestReleasePath}", () => _latestRelease is { } release
+            ? Results.Json(new
+            {
+                tag_name = release.Tag,
+                html_url = release.HtmlUrl.ToString(),
+                draft = release.Draft,
+                prerelease = release.Prerelease,
+                published_at = release.PublishedAt
+            })
+            : Results.NotFound());
     }
 }
