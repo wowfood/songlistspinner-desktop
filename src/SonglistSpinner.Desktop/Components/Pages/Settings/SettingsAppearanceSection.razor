@@ -1,0 +1,154 @@
+<div class="ss-settings-section-heading">
+    <span>Appearance</span>
+    <h2>Build a readable overlay that fits your stream</h2>
+    <p>Color and wheel changes are reflected in the preview without altering the live OBS source.</p>
+</div>
+
+<section class="ss-settings-section">
+    <div class="ss-settings-section-title-row">
+        <h3>Background</h3>
+        <button type="button" class="ss-btn-reset-subset"
+                aria-label="Revert Background to default"
+                disabled="@ResetDialogOpen"
+                @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.Background))">
+            Revert to default
+        </button>
+    </div>
+    <div class="ss-settings-field-grid">
+        <div class="ss-field">
+            <label for="backgroundMode">Mode</label>
+            <InputSelect id="backgroundMode" @bind-Value="Dto.BackgroundMode">
+                @foreach (var option in SettingsOptions.BackgroundModes)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </InputSelect>
+            <div class="ss-field-hint">Transparent mode is intended for an OBS browser source.</div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Background Color</label>
+            <div class="ss-color-preview" style="background:@Dto.BackgroundColor">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false"
+                                @bind-Value="ColorBackground" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="ss-settings-section">
+    <div class="ss-settings-section-title-row">
+        <h3>Wheel Palette</h3>
+        <button type="button" class="ss-btn-reset-subset"
+                aria-label="Revert Wheel Palette to default"
+                disabled="@ResetDialogOpen"
+                @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.WheelPalette))">
+            Revert to default
+        </button>
+    </div>
+    <div class="ss-field">
+        <label for="wheelColors">Wheel Colors</label>
+        <InputTextArea id="wheelColors" @bind-Value="ViewModel.WheelColorsRaw" @bind-Value:after="ClearWheelColorsValidation" rows="6"
+                       class="@CssValidation.FieldClass(nameof(SettingsDto.WheelColors))"
+                       aria-invalid="@CssValidation.Has(nameof(SettingsDto.WheelColors))"
+                       aria-describedby="@(CssValidation.Has(nameof(SettingsDto.WheelColors)) ? "wheelColorsError" : null)"
+                       @oninput="@(_ => CssValidationCleared.InvokeAsync(nameof(SettingsDto.WheelColors)))"/>
+        <div class="ss-field-hint">Enter one CSS color per line. The wheel repeats the palette when necessary.</div>
+        @if (CssValidation.ErrorFor(nameof(SettingsDto.WheelColors)) is { } wheelColorsError)
+        {
+            <div id="wheelColorsError" class="validation-message" role="alert">@wheelColorsError</div>
+        }
+    </div>
+</section>
+
+<section class="ss-settings-section">
+    <div class="ss-settings-section-title-row">
+        <h3>Overlay Colors</h3>
+        <button type="button" class="ss-btn-reset-subset"
+                aria-label="Revert Overlay Colors to default"
+                disabled="@ResetDialogOpen"
+                @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.OverlayColors))">
+            Revert to default
+        </button>
+    </div>
+    <div class="ss-color-grid">
+        <div class="ss-field ss-field-row">
+            <label>Text</label>
+            <div class="ss-color-preview" style="background:@Dto.ColorText">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorText" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Pointer</label>
+            <div class="ss-color-preview" style="background:@Dto.ColorPointer">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorPointer" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Button Background</label>
+            <div class="ss-color-preview" style="background:@Dto.ColorButtonBackground">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorButtonBg" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Button Text</label>
+            <div class="ss-color-preview" style="background:@Dto.ColorButtonText">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorButtonText" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Played Panel Background</label>
+            <div class="ss-color-preview" style="background:@ViewModel.ComputedPlayedListBg()">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false"
+                                @bind-Value="ColorPlayedListBg" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+            <div class="ss-opacity-control">
+                <div class="ss-opacity-heading">
+                    <label for="playedPanelOpacity">Opacity</label>
+                    <output for="playedPanelOpacity">@PlayedListOpacityPercent%</output>
+                </div>
+                <input id="playedPanelOpacity" class="ss-opacity-range" type="range"
+                       min="0" max="100" step="1"
+                       @bind="PlayedListOpacityPercent" @bind:event="oninput" @bind:after="NotifyDraftChanged"/>
+                <div class="ss-field-hint">0% is fully transparent; text and controls remain fully visible.</div>
+            </div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Now Playing Background</label>
+            <div class="ss-panel-background-swatch" aria-hidden="true">
+                <span style="background:@ViewModel.ComputedNowPlayingBg()"></span>
+            </div>
+            <label class="ss-checkbox-label">
+                <input type="checkbox" @bind="UseIndependentNowPlayingOpacity" @bind:after="NotifyDraftChanged"/>
+                Use separate opacity
+            </label>
+            <div class="ss-opacity-control">
+                <div class="ss-opacity-heading">
+                    <label for="nowPlayingOpacity">Opacity</label>
+                    <output for="nowPlayingOpacity">@NowPlayingOpacityPercent%</output>
+                </div>
+                <input id="nowPlayingOpacity" class="ss-opacity-range" type="range"
+                       min="0" max="100" step="1"
+                       disabled="@(!UseIndependentNowPlayingOpacity)"
+                       @bind="NowPlayingOpacityPercent" @bind:event="oninput" @bind:after="NotifyDraftChanged"/>
+                <div class="ss-field-hint">
+                    @(UseIndependentNowPlayingOpacity
+                        ? "Uses the Played Panel color with its own opacity."
+                        : "Following the Played Panel opacity.")
+                </div>
+            </div>
+        </div>
+        <div class="ss-field ss-field-row">
+            <label>Played Song Background</label>
+            <div class="ss-color-preview" style="background:@Dto.ColorPlayedItemBackground">
+                <MudColorPicker PickerVariant="PickerVariant.Inline" ShowAlpha="false" @bind-Value="ColorPlayedItemBg" @bind-Value:after="NotifyDraftChanged"/>
+            </div>
+        </div>
+    </div>
+    @if (ContrastWarning is { } contrastWarning)
+    {
+        <div class="ss-settings-contrast-warning" role="status">
+            <strong>Readability check</strong>
+            <span>@contrastWarning</span>
+        </div>
+    }
+</section>

@@ -1,0 +1,63 @@
+@inject SonglistSpinner.Core.StreamerSongList.Api.V2.StreamerSongListApiOptions ApiOptions
+@inject LocalOverlayServer OverlayServer
+@inject ApplicationUpdateService UpdateService
+
+<div class="ss-settings-section-heading">
+    <span>Advanced</span>
+    <h2>Diagnostics and implementation details</h2>
+    <p>Most installations should not need to change these options.</p>
+</div>
+
+<section class="ss-settings-section">
+    <h3>Diagnostics</h3>
+    <div class="ss-field">
+        <label class="ss-checkbox-label">
+            <InputCheckbox @bind-Value="Dto.DebugMode"/>
+            Enable diagnostic output
+        </label>
+        <div class="ss-field-hint">
+            Writes a rolling diagnostic log under <code>%LOCALAPPDATA%\SonglistSpinner\logs</code>.
+            Streamer access tokens are not logged.
+        </div>
+        <div class="ss-settings-inline-actions">
+            <button type="button" class="ss-btn-secondary" @onclick="OpenLogFolder">
+                Open log folder
+            </button>
+        </div>
+    </div>
+</section>
+
+<section class="ss-settings-section">
+    <h3>Settings Maintenance</h3>
+    <p class="ss-settings-inline-notice">
+        Restore application settings to their original values. You will review every field
+        that differs before the draft is changed.
+    </p>
+    <div class="ss-settings-inline-actions">
+        <button type="button" class="ss-btn-danger-subtle ss-btn-reset-settings"
+                disabled="@ResetDialogOpen"
+                @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.All))">
+            Review reset all settings
+        </button>
+    </div>
+    <div class="ss-field-hint">
+        The API credential is excluded and can only be cleared from Connection.
+    </div>
+</section>
+
+<section class="ss-settings-section">
+    <h3>Service Endpoints</h3>
+    <dl class="ss-settings-endpoints">
+        <div><dt>Application</dt><dd><code>SonglistSpinner @UpdateService.CurrentVersion</code></dd></div>
+        <div><dt>API</dt><dd><code>@ApiOptions.BaseAddress</code></dd></div>
+        <div><dt>Local overlay</dt><dd><code>@OverlayServer.OverlayUrl</code></dd></div>
+        <div>
+            <dt>Updates</dt>
+            <dd>
+                <a href="https://github.com/wowfood/songlistspinner-desktop/releases"
+                   target="_blank" rel="noopener noreferrer">Open GitHub Releases</a>
+            </dd>
+        </div>
+    </dl>
+    <div class="ss-field-hint">Endpoints are configured at application startup and are shown here for troubleshooting.</div>
+</section>

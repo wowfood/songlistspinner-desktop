@@ -15,19 +15,6 @@ namespace SonglistSpinner.Components.Pages;
 // Injected properties come from the @inject directives in Settings.razor.
 public partial class Settings
 {
-    private static readonly (string Value, string Label)[] FontChoices =
-    [
-        ("sans-serif", "Sans-serif"),
-        ("serif", "Serif"),
-        ("monospace", "Monospace"),
-        ("Arial", "Arial"),
-        ("Helvetica", "Helvetica"),
-        ("Verdana", "Verdana"),
-        ("Georgia", "Georgia"),
-        ("'Courier New'", "Courier New")
-    ];
-
-
     private readonly SettingsViewModel _vm = new();
     private SettingsSection _activeSection = SettingsSection.Connection;
     private string _credentialClientId = "";
@@ -36,7 +23,7 @@ public partial class Settings
     private bool _credentialTestSucceeded;
     private string _credentialToken = "";
     private bool _clearingCredential;
-    private Dictionary<string, string> _cssValidationErrors = new(StringComparer.Ordinal);
+    private CssValidationErrors _cssValidation = new();
     private SettingsDto? _dto;
     private EditContext? _editContext;
     private StreamerSongListCredential? _existingCredential;
@@ -53,36 +40,7 @@ public partial class Settings
 
     private string PreviewUrl => $"{OverlayServer.OverlayUrl}?preview=1";
 
-    private string WheelColorsRaw
-    {
-        get => _vm.WheelColorsRaw;
-        set
-        {
-            _vm.WheelColorsRaw = value;
-            ClearCssValidation(nameof(SettingsDto.WheelColors));
-            QueuePreviewRefresh();
-        }
-    }
-
     private bool HasUnsavedChanges => HasUnsavedSettingsChanges || HasUnsavedCredentialChanges;
-
-    private string? ContrastWarning
-    {
-        get
-        {
-            if (_dto is null) return null;
-
-            var lowContrastPairs = new List<string>();
-            if (ContrastRatio(_dto.ColorText, _dto.ColorPlayedItemBackground) < 4.5)
-                lowContrastPairs.Add("overlay text on played-song cards");
-            if (ContrastRatio(_dto.ColorButtonText, _dto.ColorButtonBackground) < 4.5)
-                lowContrastPairs.Add("button text on button backgrounds");
-
-            return lowContrastPairs.Count == 0
-                ? null
-                : $"Increase the contrast for {string.Join(" and ", lowContrastPairs)}. Aim for at least 4.5:1 for normal text.";
-        }
-    }
 
     private bool HasUnsavedSettingsChanges =>
         _dto is not null && _draftTracker.HasUnsavedSettingsChanges(_dto, _vm);
@@ -93,121 +51,6 @@ public partial class Settings
         _credentialKind,
         _credentialClientId,
         TokenEntered: !string.IsNullOrWhiteSpace(_credentialToken));
-
-    private MudColor ColorBackground
-    {
-        get => (_dto?.BackgroundColor ?? "#000000").ToMudColor();
-        set
-        {
-            if (_dto == null) return;
-            _dto.BackgroundColor = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
-
-    private MudColor ColorText
-    {
-        get => (_dto?.ColorText ?? "#000000").ToMudColor();
-        set
-        {
-            if (_dto == null) return;
-            _dto.ColorText = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
-
-    private MudColor ColorPointer
-    {
-        get => (_dto?.ColorPointer ?? "#000000").ToMudColor();
-        set
-        {
-            if (_dto == null) return;
-            _dto.ColorPointer = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
-
-    private MudColor ColorButtonBg
-    {
-        get => (_dto?.ColorButtonBackground ?? "#000000").ToMudColor();
-        set
-        {
-            if (_dto == null) return;
-            _dto.ColorButtonBackground = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
-
-    private MudColor ColorButtonText
-    {
-        get => (_dto?.ColorButtonText ?? "#000000").ToMudColor();
-        set
-        {
-            if (_dto == null) return;
-            _dto.ColorButtonText = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
-
-    private MudColor ColorPlayedListBg
-    {
-        get => _vm.PlayedListBgHex.ToMudColor();
-        set
-        {
-            _vm.PlayedListBgHex = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
-
-    private int PlayedListOpacityPercent
-    {
-        get => (int)Math.Round(_vm.PlayedListBgAlpha * 100, MidpointRounding.AwayFromZero);
-        set
-        {
-            _vm.PlayedListBgAlpha = Math.Clamp(value, 0, 100) / 100.0;
-            QueuePreviewRefresh();
-        }
-    }
-
-    private bool UseIndependentNowPlayingOpacity
-    {
-        get => _vm.UseIndependentNowPlayingBgAlpha;
-        set
-        {
-            if (value && !_vm.UseIndependentNowPlayingBgAlpha)
-                _vm.NowPlayingBgAlpha = _vm.PlayedListBgAlpha;
-
-            _vm.UseIndependentNowPlayingBgAlpha = value;
-            QueuePreviewRefresh();
-        }
-    }
-
-    private int NowPlayingOpacityPercent
-    {
-        get
-        {
-            var opacity = _vm.UseIndependentNowPlayingBgAlpha
-                ? _vm.NowPlayingBgAlpha
-                : _vm.PlayedListBgAlpha;
-            return (int)Math.Round(opacity * 100, MidpointRounding.AwayFromZero);
-        }
-        set
-        {
-            _vm.NowPlayingBgAlpha = Math.Clamp(value, 0, 100) / 100.0;
-            QueuePreviewRefresh();
-        }
-    }
-
-    private MudColor ColorPlayedItemBg
-    {
-        get => (_dto?.ColorPlayedItemBackground ?? "#000000").ToMudColor();
-        set
-        {
-            if (_dto == null) return;
-            _dto.ColorPlayedItemBackground = value.ToHexString();
-            QueuePreviewRefresh();
-        }
-    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -237,6 +80,10 @@ public partial class Settings
     {
         _vm.SaveSuccess = false;
         QueuePreviewRefresh();
+
+        // The inputs live in the section components, whose bindings re-render only the section. The unsaved-draft
+        // state in the header and save bar belongs to this page.
+        StateHasChanged();
     }
 
     private void SelectSection(SettingsSection section)
@@ -247,14 +94,6 @@ public partial class Settings
 
     private string SectionClass(SettingsSection section) =>
         _activeSection == section ? "ss-settings-nav-item active" : "ss-settings-nav-item";
-
-    private void MovePlayedField(DisplayFieldOrderChange change)
-    {
-        if (_vm.MoveField(change.FieldName, change.NewIndex))
-        {
-            QueuePreviewRefresh();
-        }
-    }
 
     private string PlayedListSeparatorChoice
     {
@@ -276,58 +115,6 @@ public partial class Settings
             _nowPlayingSeparatorChoice = value;
             if (_dto is null || !SettingsOptions.TryGetSeparator(value, out var separator)) return;
             _dto.NowPlayingSeparator = separator;
-            QueuePreviewRefresh();
-        }
-    }
-
-    private bool PlayedListUsesCustomSeparator =>
-        string.Equals(
-            _playedListSeparatorChoice,
-            SettingsOptions.CustomSeparatorKey,
-            StringComparison.Ordinal);
-
-    private bool NowPlayingUsesCustomSeparator =>
-        string.Equals(
-            _nowPlayingSeparatorChoice,
-            SettingsOptions.CustomSeparatorKey,
-            StringComparison.Ordinal);
-
-    private void TogglePlayedField(string fieldName)
-    {
-        if (_vm.ToggleField(fieldName))
-        {
-            QueuePreviewRefresh();
-        }
-    }
-
-    private void MoveNowPlayingField(DisplayFieldOrderChange change)
-    {
-        if (_vm.MoveNowPlayingField(change.FieldName, change.NewIndex))
-        {
-            QueuePreviewRefresh();
-        }
-    }
-
-    private void ToggleNowPlayingField(string fieldName)
-    {
-        if (_vm.ToggleNowPlayingField(fieldName))
-        {
-            QueuePreviewRefresh();
-        }
-    }
-
-    private void MoveWinnerDialogField(DisplayFieldOrderChange change)
-    {
-        if (_vm.MoveWinnerDialogField(change.FieldName, change.NewIndex))
-        {
-            QueuePreviewRefresh();
-        }
-    }
-
-    private void ToggleWinnerDialogField(string fieldName)
-    {
-        if (_vm.ToggleWinnerDialogField(fieldName))
-        {
             QueuePreviewRefresh();
         }
     }
@@ -402,7 +189,7 @@ public partial class Settings
         if (!await ValidateCssSettingsAsync())
         {
             _vm.SaveError = "Correct the highlighted appearance values before saving.";
-            SelectSection(_cssValidationErrors.ContainsKey(nameof(SettingsDto.WheelColors))
+            SelectSection(_cssValidation.Has(nameof(SettingsDto.WheelColors))
                 ? SettingsSection.Appearance
                 : SettingsSection.Overlay);
             return false;
@@ -445,7 +232,7 @@ public partial class Settings
     {
         if (_dto is null) return false;
 
-        var wheelColors = WheelColorsRaw
+        var wheelColors = _vm.WheelColorsRaw
             .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var request = new
         {
@@ -463,72 +250,16 @@ public partial class Settings
             }
         };
 
-        _cssValidationErrors = await JS.InvokeAsync<Dictionary<string, string>>(
-                                   SpinnerInteropMethods.ValidateCssSettings,
-                                   request)
-                               ?? new Dictionary<string, string>(StringComparer.Ordinal);
-        return _cssValidationErrors.Count == 0;
+        _cssValidation = new CssValidationErrors(await JS.InvokeAsync<Dictionary<string, string>>(
+            SpinnerInteropMethods.ValidateCssSettings,
+            request));
+        return _cssValidation.IsEmpty;
     }
-
-    private bool HasCssValidation(string key) => _cssValidationErrors.ContainsKey(key);
-
-    private string? CssValidationError(string key) =>
-        _cssValidationErrors.TryGetValue(key, out var error) ? error : null;
-
-    private string? CssValidationClass(string key) => HasCssValidation(key) ? "invalid" : null;
 
     private void ClearCssValidation(string key)
     {
-        if (_cssValidationErrors.Remove(key))
+        if (_cssValidation.Remove(key))
             _vm.SaveError = null;
-    }
-
-    private static double ContrastRatio(string foreground, string background)
-    {
-        if (!TryParseHexColor(foreground, out var foregroundRgb) ||
-            !TryParseHexColor(background, out var backgroundRgb))
-            return double.MaxValue;
-
-        var foregroundLuminance = RelativeLuminance(foregroundRgb);
-        var backgroundLuminance = RelativeLuminance(backgroundRgb);
-        return (Math.Max(foregroundLuminance, backgroundLuminance) + 0.05) /
-               (Math.Min(foregroundLuminance, backgroundLuminance) + 0.05);
-    }
-
-    private static bool TryParseHexColor(string? value, out (byte Red, byte Green, byte Blue) color)
-    {
-        color = default;
-        if (string.IsNullOrWhiteSpace(value)) return false;
-
-        var hex = value.Trim();
-        if (hex.Length != 7 || hex[0] != '#') return false;
-        try
-        {
-            color = (
-                Convert.ToByte(hex[1..3], 16),
-                Convert.ToByte(hex[3..5], 16),
-                Convert.ToByte(hex[5..7], 16));
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-
-    private static double RelativeLuminance((byte Red, byte Green, byte Blue) color)
-    {
-        static double Linearize(byte component)
-        {
-            var channel = component / 255d;
-            return channel <= 0.04045
-                ? channel / 12.92
-                : Math.Pow((channel + 0.055) / 1.055, 2.4);
-        }
-
-        return 0.2126 * Linearize(color.Red) +
-               0.7152 * Linearize(color.Green) +
-               0.0722 * Linearize(color.Blue);
     }
 
     private async Task ClearApiCredentialAsync()
@@ -647,10 +378,6 @@ public partial class Settings
         _nowPlayingSeparatorChoice = SettingsOptions.GetSeparatorKey(_dto.NowPlayingSeparator);
     }
 
-    private void OpenSetupWizard()
-    {
-        Navigation.NavigateTo("/setup");
-    }
 
     private void OpenDiagnosticLogFolder()
     {
