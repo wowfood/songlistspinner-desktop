@@ -5,7 +5,7 @@ using System.Net.Sockets;
 using Microsoft.Playwright;
 using SonglistSpinner.Simulator;
 
-namespace SonglistSpinner.EndToEndTests;
+namespace SonglistSpinner.EndToEndTests.Infrastructure;
 
 /// <summary>
 /// The built Desktop app, started against the simulator on a test profile, with its WebView driven through the
@@ -20,8 +20,14 @@ internal sealed class DesktopApp : IAsyncDisposable
     private const string AppWebViewArgumentsVariable = "SONGLISTSPINNER_WEBVIEW_ARGS";
     private const string AppUrl = "https://0.0.0.1/";
 
-    /// <summary>How long each launch step (the DevTools port, the app page) may take before the launch fails.</summary>
+    /// <summary>How long the app page may take to load before the launch fails.</summary>
     private static readonly TimeSpan LaunchLimit = TimeSpan.FromSeconds(60);
+
+    /// <summary>
+    /// How long the WebView may take to write its DevTools port. It usually takes a few seconds; a browser started
+    /// without the port never writes it.
+    /// </summary>
+    private static readonly TimeSpan DevToolsPortLimit = TimeSpan.FromSeconds(30);
 
     private readonly Process _process;
     private readonly IPlaywright _playwright;
@@ -42,28 +48,61 @@ internal sealed class DesktopApp : IAsyncDisposable
 
     public int OverlayPort { get; }
 
+    /// <summary>The OBS browser-source address, on the host name the overlay server accepts.</summary>
+    public Uri OverlayUri => new($"http://localhost:{OverlayPort}/overlay");
+
     /// <summary>The overlay's server-sent events, on the host name the overlay server accepts.</summary>
     public Uri OverlayEventsUri => new($"http://localhost:{OverlayPort}/overlay/events");
 
+    /// <summary>
+    /// Starts the app. With <paramref name="useEnvironmentCredential"/> (the default) the simulator's token is the
+    /// app's fallback credential, as a developer's shell would set it; without it, a profile with no saved
+    /// credential starts in the Setup wizard, as on a first run.
+    /// </summary>
+    /// <remarks>
+    /// The app opens the DevTools port only when its WebView2 test environment is ready before the WebView starts
+    /// (see the app's UseWebViewBrowserArguments); when it is not, the browser starts without the port and the
+    /// app logs a warning. That race is the app's documented limit of its test-only hook, not the behaviour under
+    /// test, so a launch whose port does not appear within <see cref="DevToolsPortLimit"/> is killed and started
+    /// once more on the same, still unused, profile. Every other launch failure fails at once.
+    /// </remarks>
     public static async Task<DesktopApp> LaunchAsync(
         StreamerSongListSimulator simulator,
         TestProfile profile,
+        CancellationToken cancellationToken,
+        bool useEnvironmentCredential = true)
+    {
+        try
+        {
+            return await LaunchOnceAsync(simulator, profile, useEnvironmentCredential, cancellationToken);
+        }
+        catch (DevToolsPortTimeoutException)
+        {
+            return await LaunchOnceAsync(simulator, profile, useEnvironmentCredential, cancellationToken);
+        }
+    }
+
+    private static async Task<DesktopApp> LaunchOnceAsync(
+        StreamerSongListSimulator simulator,
+        TestProfile profile,
+        bool useEnvironmentCredential,
         CancellationToken cancellationToken)
     {
         var overlayPort = FindFreePort();
         var startInfo = new ProcessStartInfo(FindExecutable()) { UseShellExecute = false };
-        SetEnvironment(startInfo.Environment, simulator, profile, overlayPort);
+        SetEnvironment(startInfo.Environment, simulator, profile, overlayPort, useEnvironmentCredential);
 
         DevToolsPort.ForgetPrevious(profile.Directory);
         var process = Process.Start(startInfo) ?? throw new InvalidOperationException("The app did not start.");
         try
         {
-            var devToolsPort = await DevToolsPort.WaitAsync(process, profile.Directory, LaunchLimit, cancellationToken);
+            var devToolsPort = await DevToolsPort.WaitAsync(process, profile.Directory, DevToolsPortLimit, cancellationToken);
             var playwright = await Playwright.CreateAsync();
             try
             {
                 var browser = await playwright.Chromium.ConnectOverCDPAsync($"http://127.0.0.1:{devToolsPort}");
                 var page = await WaitForAppPageAsync(browser.Contexts[0]);
+                await WheelProbe.InstallInAppAsync(page, () => WaitForAppUrlAsync(page));
                 return new DesktopApp(process, playwright, browser, page, overlayPort);
             }
             catch
@@ -100,7 +139,8 @@ internal sealed class DesktopApp : IAsyncDisposable
         IDictionary<string, string?> environment,
         StreamerSongListSimulator simulator,
         TestProfile profile,
-        int overlayPort)
+        int overlayPort,
+        bool useEnvironmentCredential)
     {
         // The developer's own SONGLISTSPINNER_SSL_* overrides must not leak into the app under test.
         foreach (var name in environment.Keys.Where(name => name.StartsWith("SONGLISTSPINNER_SSL_", StringComparison.OrdinalIgnoreCase)).ToList())
@@ -117,13 +157,16 @@ internal sealed class DesktopApp : IAsyncDisposable
         environment["SONGLISTSPINNER_PROFILE_DIR"] = profile.Directory;
         environment["SONGLISTSPINNER_SSL_API_BASE_URL"] = simulator.ApiBaseAddress.ToString();
         environment["SONGLISTSPINNER_SSL_EVENTS_URL"] = simulator.EventsEndpoint.ToString();
-        environment["SONGLISTSPINNER_SSL_ACCESS_TOKEN"] = simulator.AccessToken;
-        environment["SONGLISTSPINNER_SSL_TOKEN_TYPE"] = "streamer";
+        if (useEnvironmentCredential)
+        {
+            environment["SONGLISTSPINNER_SSL_ACCESS_TOKEN"] = simulator.AccessToken;
+            environment["SONGLISTSPINNER_SSL_TOKEN_TYPE"] = "streamer";
+        }
+
         environment["SONGLISTSPINNER_OVERLAY_PORT"] = overlayPort.ToString(CultureInfo.InvariantCulture);
-        // An unmapped simulator path answers 404, which the update check reads as "no release", so GitHub is
-        // never asked.
+        // The simulator answers 404 ("no release") until a test sets its LatestRelease, so GitHub is never asked.
         environment["SONGLISTSPINNER_UPDATE_RELEASE_URL"] =
-            new Uri(simulator.ApiBaseAddress, "_simulator/no-releases/latest").ToString();
+            new Uri(simulator.ApiBaseAddress, StreamerSongListSimulator.LatestReleasePath).ToString();
     }
 
     private static async Task KillAsync(Process process)
@@ -145,6 +188,12 @@ internal sealed class DesktopApp : IAsyncDisposable
         var page = context.Pages.Count > 0
             ? context.Pages[0]
             : await context.WaitForPageAsync(new BrowserContextWaitForPageOptions { Timeout = (float)LaunchLimit.TotalMilliseconds });
+        await WaitForAppUrlAsync(page);
+        return page;
+    }
+
+    private static async Task WaitForAppUrlAsync(IPage page)
+    {
         try
         {
             await page.WaitForURLAsync(IsAppUrl, new PageWaitForURLOptions { Timeout = (float)LaunchLimit.TotalMilliseconds });
@@ -154,8 +203,6 @@ internal sealed class DesktopApp : IAsyncDisposable
             throw new TimeoutException(
                 $"The WebView did not navigate to {AppUrl} within {LaunchLimit.TotalSeconds} s; it is at {page.Url}.", ex);
         }
-
-        return page;
     }
 
     private static bool IsAppUrl(string url) => url.StartsWith(AppUrl, StringComparison.Ordinal);

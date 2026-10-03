@@ -1,3 +1,4 @@
+using SonglistSpinner.EndToEndTests.Infrastructure;
 using Xunit;
 using static Microsoft.Playwright.Assertions;
 
@@ -10,15 +11,19 @@ public class SettingsPersistenceTests
     {
         EndToEnd.SkipUnlessEnabled();
         var cancellationToken = TestContext.Current.CancellationToken;
+        // A restart is the behaviour under test, so this test has its own app rather than the class's shared one.
         await using var scenario = await AppScenario.StartAsync(cancellationToken);
-        await scenario.App.Page.OpenSettingsAsync();
-        await scenario.App.Page.EnableNowPlayingWorkflowAsync();
+        var settings = scenario.Settings;
+        await settings.OpenAsync();
+        await settings.Spinner.OpenAsync();
+        await settings.Spinner.NowPlayingWorkflow.CheckAsync();
+        await settings.SaveAsync();
 
         await scenario.RestartAppAsync(cancellationToken);
 
-        var page = scenario.App.Page;
-        await page.OpenSettingsAsync();
-        await page.GetByRole(Microsoft.Playwright.AriaRole.Button, new() { Name = "Spinner & Queue" }).ClickAsync();
-        await Expect(page.NowPlayingWorkflowCheckbox()).ToBeCheckedAsync();
+        settings = scenario.Settings;
+        await settings.OpenAsync();
+        await settings.Spinner.OpenAsync();
+        await Expect(settings.Spinner.NowPlayingWorkflow).ToBeCheckedAsync();
     }
 }

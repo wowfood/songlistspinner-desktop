@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.Globalization;
 
-namespace SonglistSpinner.EndToEndTests;
+namespace SonglistSpinner.EndToEndTests.Infrastructure;
 
 /// <summary>
 /// Finds the DevTools port of the app's WebView. The app starts its browser with <c>--remote-debugging-port=0</c>,
@@ -18,7 +18,7 @@ internal static class DevToolsPort
             File.Delete(file);
     }
 
-    /// <exception cref="TimeoutException">
+    /// <exception cref="DevToolsPortTimeoutException">
     /// The port was not written within <paramref name="limit"/>; the usual cause is that the app started its
     /// browser without the test arguments (it then logs "The WebView2 test environment was not ready").
     /// </exception>
@@ -36,7 +36,7 @@ internal static class DevToolsPort
         }
         catch (OperationCanceledException ex) when (!cancellationToken.IsCancellationRequested)
         {
-            throw new TimeoutException(
+            throw new DevToolsPortTimeoutException(
                 $"The app's WebView did not open its DevTools port within {limit.TotalSeconds} s. It may have " +
                 "started without --remote-debugging-port; the app logs \"The WebView2 test environment was not " +
                 "ready\" when it does.", ex);
@@ -90,3 +90,7 @@ internal static class DevToolsPort
         }
     }
 }
+
+/// <summary>The app's WebView did not write its DevTools port in time.</summary>
+internal sealed class DevToolsPortTimeoutException(string message, Exception innerException)
+    : TimeoutException(message, innerException);

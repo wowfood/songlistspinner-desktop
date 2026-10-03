@@ -1,7 +1,7 @@
 using System.Text.Json;
 using System.Threading.Channels;
 
-namespace SonglistSpinner.EndToEndTests;
+namespace SonglistSpinner.EndToEndTests.Infrastructure;
 
 /// <summary>An OBS browser source's view of the overlay: the server-sent events the overlay server streams.</summary>
 internal sealed class OverlayEventStream : IAsyncDisposable

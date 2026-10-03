@@ -70,11 +70,31 @@ minute):
 ```
 
 The script builds the Desktop app (Release unless `-Configuration Debug`) and runs the tests with
-`SONGLISTSPINNER_E2E=1`. Each test starts the in-process simulator with the demo channel, launches the built
-executable on a fresh temporary test profile (see below), a free overlay port and an update URL on the simulator,
-and connects Playwright to the WebView with `ConnectOverCDPAsync`; no Playwright browser download is needed. When
-a test ends, pass or fail, the app and its WebView2 processes are killed and the profile is deleted. Select
-elements by their existing ids and accessible names.
+`SONGLISTSPINNER_E2E=1`. The app under test is the built executable, started against an in-process simulator on a
+temporary test profile (see below), a free overlay port and an update URL on the simulator; Playwright drives its
+WebView through `ConnectOverCDPAsync`. Every port is picked free per run, so several runs can share the machine.
+
+- **One app per test class.** A class takes `IClassFixture<SharedApp>` and each test calls
+  `EndToEnd.SkipUnlessEnabled()` then `sharedApp.BeginTestAsync(...)`. The first test launches the app; later ones
+  get it reset (winner dialog dismissed, channel unloaded, a new Dashboard, the simulator emptied). When the
+  previous test left state a reset cannot undo (saved settings or credential, another page or a dialog, a
+  collapsed or resized overlay list), the app is relaunched on a fresh profile instead; the test output says
+  which. A test that needs a first run or a restart starts its own `AppScenario` (see `SettingsPersistenceTests`).
+- **Each test seeds its own data** with `ChannelSeed` and the songs in `SongCatalog`, and asserts exact values
+  derived from them. `ApiCalls` matches the simulator's request log for the calls an action must make.
+- **Page objects** in `Pages/` (`DashboardPage`, `WinnerDialog`, `PlayedListPanel`, `HealthBar`, `SettingsPage`
+  and one class per Settings section, `SetupWizard`, `UpdateBanner`, `OverlayPage`) expose user actions and
+  retrying expectations. They are `partial`, so a new test file can add members in its own file. Select elements
+  by their ids and accessible names.
+- **The wheel** is a canvas, so `WheelProbe` records the labels each page passes to `SpinnerInterop.createWheel`;
+  assert them with `ExpectWheelLabelsAsync`.
+- **The OBS overlay** is opened by `AppScenario.OpenOverlayAsync()` in headless Microsoft Edge (Playwright's
+  `msedge` channel, the system browser), so no Playwright browser download is needed. Without Edge, run
+  `pwsh tests/SonglistSpinner.EndToEndTests/bin/Release/net10.0/playwright.ps1 install chromium` and drop the
+  channel in `OverlayBrowser`.
+
+When a class ends, pass or fail, its app and WebView2 processes are killed and its profile is deleted. Wait on
+conditions (Playwright expectations, the simulator's request log), never on time.
 
 ### Coverage
 
@@ -102,8 +122,12 @@ fails the integration tests; keep it in step with `docs/API_V2.md` and the clien
 - In a test: `await using var simulator = await StreamerSongListSimulator.StartAsync(...)` listens on
   127.0.0.1 with a free port (`ApiBaseAddress`, `EventsEndpoint`, `AccessToken`). Seed with `AddChannel`
   and the channel's `RequestSongAsync`/`AddPlayedSongAsync`/`SetNowPlayingAsync`/`MarkPlayedAsync` (each
-  publishes its change to subscribed sockets); inject faults with `FailNextRequests`, `HoldNextRequest`
-  and `DropEventConnections`; inspect with `Requests` and `WaitForRequestAsync`.
+  publishes its change to subscribed sockets); inject faults with `FailNextRequests`, `DropNextRequests`
+  (abort the connection), `HoldNextRequest`, `DropEventConnections` and `RejectEventConnections`; inspect with
+  `Requests`, `RequestsTo`, `WaitForRequestAsync` (the next match) and `WaitForFirstRequestAsync` (the first
+  match already logged, or the next). `LatestRelease` sets the GitHub-style release served at
+  `_simulator/releases/latest` for the app's update check. `Reset()` empties a running simulator, so one
+  simulator, and the app pointed at it, can serve several tests.
 - By hand: `dotnet run --project tests/SonglistSpinner.StreamerSongListSimulator -- --port 5199 --seed demo`
   (`--token` sets the accepted token, default `simulator-token`; `--seed none` starts empty). The demo
   channel is `demo` on Twitch, streamer 1001. `POST /_simulator/requests?streamer_id=1001&artist=..&title=..`
