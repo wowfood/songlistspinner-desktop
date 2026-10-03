@@ -48,8 +48,7 @@ public partial class Settings
     private bool _resetDialogOpen;
     private string _playedListSeparatorChoice = SettingsOptions.CustomSeparatorKey;
     private string _nowPlayingSeparatorChoice = SettingsOptions.CustomSeparatorKey;
-    private string? _savedCredentialFormState;
-    private string? _savedSettingsFormState;
+    private readonly SettingsDraftTracker _draftTracker = new();
     private bool _testingCredential;
 
     private string PreviewUrl => $"{OverlayServer.OverlayUrl}?preview=1";
@@ -86,12 +85,14 @@ public partial class Settings
     }
 
     private bool HasUnsavedSettingsChanges =>
-        _savedSettingsFormState is not null &&
-        !StringComparer.Ordinal.Equals(_savedSettingsFormState, CaptureSettingsFormState());
+        _dto is not null && _draftTracker.HasUnsavedSettingsChanges(_dto, _vm);
 
-    private bool HasUnsavedCredentialChanges =>
-        _savedCredentialFormState is not null &&
-        !StringComparer.Ordinal.Equals(_savedCredentialFormState, CaptureCredentialFormState());
+    private bool HasUnsavedCredentialChanges => _draftTracker.HasUnsavedCredentialChanges(CredentialFormDraft);
+
+    private CredentialDraft CredentialFormDraft => new(
+        _credentialKind,
+        _credentialClientId,
+        TokenEntered: !string.IsNullOrWhiteSpace(_credentialToken));
 
     private MudColor ColorBackground
     {
@@ -219,8 +220,7 @@ public partial class Settings
             _hasCredential = true;
         }
 
-        _savedSettingsFormState = CaptureSettingsFormState();
-        _savedCredentialFormState = CaptureCredentialFormState();
+        MarkDraftSaved();
     }
 
     public void Dispose()
@@ -433,8 +433,7 @@ public partial class Settings
             }
 
             _vm.SaveSuccess = true;
-            _savedSettingsFormState = CaptureSettingsFormState();
-            _savedCredentialFormState = CaptureCredentialFormState();
+            MarkDraftSaved();
             return true;
         }
         catch (Exception ex)
@@ -559,7 +558,7 @@ public partial class Settings
             _hasCredential = false;
             _credentialTestSucceeded = true;
             _credentialTestResult = "API credential cleared. Other settings were not changed.";
-            _savedCredentialFormState = CaptureCredentialFormState();
+            _draftTracker.MarkCredentialSaved(CredentialFormDraft);
         }
         catch (Exception ex)
         {
@@ -745,7 +744,7 @@ public partial class Settings
         _credentialKind = credential?.Kind ?? StreamerSongListCredentialKind.Streamer;
         _credentialClientId = credential?.ClientId ?? "";
         _credentialToken = "";
-        _savedCredentialFormState = CaptureCredentialFormState();
+        _draftTracker.MarkCredentialSaved(CredentialFormDraft);
     }
     private async Task ConfirmNavigationAsync(LocationChangingContext context)
     {
@@ -782,52 +781,12 @@ public partial class Settings
         }
     }
 
-    private string CaptureSettingsFormState()
+    private void MarkDraftSaved()
     {
-        if (_dto is null) return "";
-
-        return JsonSerializer.Serialize(new SettingsFormSnapshot(
-            JsonSerializer.Serialize(_dto),
-            _vm.WheelColorsRaw,
-            CaptureDisplayFields(_vm.DisplayFields),
-            CaptureDisplayFields(_vm.NowPlayingDisplayFields),
-            CaptureDisplayFields(_vm.WinnerDialogDisplayFields),
-            _vm.PlayedListBgHex,
-            _vm.PlayedListBgAlpha,
-            _vm.UseIndependentNowPlayingBgAlpha,
-            _vm.NowPlayingBgAlpha));
+        if (_dto is not null)
+            _draftTracker.MarkSettingsSaved(_dto, _vm);
+        _draftTracker.MarkCredentialSaved(CredentialFormDraft);
     }
-
-    private string CaptureCredentialFormState()
-    {
-        return JsonSerializer.Serialize(new CredentialFormSnapshot(
-            _credentialKind,
-            _credentialClientId,
-            !string.IsNullOrWhiteSpace(_credentialToken)));
-    }
-
-    private static string CaptureDisplayFields(IEnumerable<DisplayField> fields)
-    {
-        return JsonSerializer.Serialize(fields.Select(field => new DisplayFieldSnapshot(field.Name, field.Selected)));
-    }
-
-    private sealed record DisplayFieldSnapshot(string Name, bool Selected);
-
-    private sealed record SettingsFormSnapshot(
-        string Settings,
-        string WheelColors,
-        string DisplayFields,
-        string NowPlayingDisplayFields,
-        string WinnerDialogDisplayFields,
-        string PlayedListBackground,
-        double PlayedListBackgroundAlpha,
-        bool UseIndependentNowPlayingBackgroundAlpha,
-        double NowPlayingBackgroundAlpha);
-
-    private sealed record CredentialFormSnapshot(
-        StreamerSongListCredentialKind CredentialKind,
-        string CredentialClientId,
-        bool CredentialTokenEdited);
 
     private enum SettingsSection
     {

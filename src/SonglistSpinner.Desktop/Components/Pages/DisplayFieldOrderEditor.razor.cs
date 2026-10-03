@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using SonglistSpinner.Services;
 
 namespace SonglistSpinner.Components.Pages;
 

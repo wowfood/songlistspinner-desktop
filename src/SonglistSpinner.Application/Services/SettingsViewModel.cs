@@ -2,7 +2,7 @@ using System.Text.Json;
 using SonglistSpinner.Core.Settings;
 using SonglistSpinner.Core.Songs;
 
-namespace SonglistSpinner.Components.Pages;
+namespace SonglistSpinner.Services;
 
 public sealed class SettingsViewModel
 {
