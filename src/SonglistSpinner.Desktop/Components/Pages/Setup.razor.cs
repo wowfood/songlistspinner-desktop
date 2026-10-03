@@ -92,13 +92,7 @@ public partial class Setup
             return;
         }
 
-        var submittedToken = _token.Trim();
-        var candidateCredential = string.IsNullOrWhiteSpace(submittedToken)
-            ? _existingCredential
-            : new StreamerSongListCredential(
-                _credentialKind,
-                submittedToken,
-                string.IsNullOrWhiteSpace(_clientId) ? null : _clientId.Trim());
+        var candidateCredential = CredentialDraft.ToCredential(_credentialKind, _token, _clientId, _existingCredential);
         if (candidateCredential is null)
         {
             _error = "A StreamerSongList access token is required.";
@@ -115,7 +109,7 @@ public partial class Setup
         _overlayMessage = "Waiting for the API check";
         await InvokeAsync(StateHasChanged);
 
-        var credentialWasReplaced = !string.IsNullOrWhiteSpace(submittedToken);
+        var credentialWasReplaced = !Equals(candidateCredential, _existingCredential);
         StreamerSongListStreamer resolvedStreamer;
         try
         {

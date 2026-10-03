@@ -416,16 +416,13 @@ public partial class Settings
             DiagnosticLog.SetEnabled(_dto.DebugMode);
             StreamerSession.UpdateConfig(SettingsDtoConverter.ToSpinnerConfig(_dto));
 
-            var submittedToken = _credentialToken.Trim();
-            var token = string.IsNullOrWhiteSpace(submittedToken)
-                ? _existingCredential?.Token
-                : submittedToken;
-            if (!string.IsNullOrWhiteSpace(token))
+            var credential = CredentialDraft.ToCredential(
+                _credentialKind,
+                _credentialToken,
+                _credentialClientId,
+                _existingCredential);
+            if (credential is not null)
             {
-                var credential = new StreamerSongListCredential(
-                    _credentialKind,
-                    token,
-                    string.IsNullOrWhiteSpace(_credentialClientId) ? null : _credentialClientId.Trim());
                 await CredentialStore.SaveCredentialAsync(credential);
                 _existingCredential = credential;
                 _credentialToken = "";
