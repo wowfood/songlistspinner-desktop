@@ -61,13 +61,28 @@ dotnet test --project tests/SonglistSpinner.IntegrationTests
 ### End-to-end tests
 
 The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run (and CI) every
-one reports as skipped. Run them from a desktop session and leave the windows alone until they finish (about a
-minute):
+one reports as skipped. Run them from a desktop session and leave the windows alone until they finish (the full
+suite, 136 tests, takes about ten minutes, mostly app launches):
 
 ```powershell
 ./scripts/run-e2e.ps1
 ./scripts/run-e2e.ps1 -Filter SonglistSpinner.EndToEndTests.WinnerActionTests
 ```
+
+`-Filter` takes one class. For several classes or one test, call `dotnet test` with the opt-in set (MTP flags
+repeat): `$env:SONGLISTSPINNER_E2E='1'; dotnet test --project tests/SonglistSpinner.EndToEndTests -c Release
+--filter-method SonglistSpinner.EndToEndTests.SpinTests.<method>` (build the Desktop app first, as the script
+does). The suites, one class per feature or workflow:
+
+| Area | Classes |
+| --- | --- |
+| Startup and setup | `FirstRunSetupTests`, `ChannelSetupTests`, `DefaultChannelTests`, `UpdateBannerTests` |
+| Channel, health and API errors | `ChannelLoadingTests`, `ServiceHealthTests`, `ApiErrorStateTests`, `RealtimeQueueTests`, `RealtimeReconnectTests` |
+| Spin and winner | `SpinTests`, `WinnerDialogTests`, `WinnerActionTests`, `WinnerActionOutcomeTests`, `NowPlayingCompletionTests` |
+| Played list and Now Playing | `PlayedSongsListTests`, `PlayedListFormattingTests`, `PlayedListLayoutTests`, `PlayHistoryPeriodTests`, `PlayedSongExclusionTests`, `NowPlayingDisplayTests` |
+| Settings | `SettingsDraftTests`, `SettingsResetTests`, `SettingsPersistenceTests`, `ConnectionSettingsTests`, `AdvancedSettingsTests`, `SettingsPreviewTests` |
+| OBS overlay (all but `OverlayEventsTests` need Edge, below) | `ObsBrowserSourceTests`, `OverlayEventsTests`, `OverlayWheelTests`, `OverlayWinnerRevealTests`, `OverlayPanelTests`, `OverlayLayoutSyncTests`, `OverlayThemeTests` |
+| Accessibility | `AccessibleStateTests` |
 
 The script builds the Desktop app (Release unless `-Configuration Debug`) and runs the tests with
 `SONGLISTSPINNER_E2E=1`. The app under test is the built executable, started against an in-process simulator on a

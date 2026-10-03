@@ -30,9 +30,11 @@ internal sealed class TestProfile : IAsyncDisposable
 
     /// <summary>
     /// Saves <paramref name="settings"/> as the app's settings before it starts, as a user who saved them earlier
-    /// would have. Pass an anonymous object with <c>SettingsDto</c> property names, for example
+    /// would have. Pass an anonymous object with <c>SettingsDto</c>'s JSON names, for example
     /// <c>new { DefaultStreamerName = "streamer", PlayedListShowNumbers = true }</c>; properties left out keep
-    /// their defaults. The app reads the file only at startup.
+    /// their defaults. Two differ from the C# names: <c>PlayedListFields</c> is saved as <c>SongListFields</c> and
+    /// <c>UpdateQueueAfterSpin</c> as <c>AutoPlay</c>. An unknown name is silently ignored. The app reads the file
+    /// only at startup.
     /// </summary>
     public void SaveSettings(object settings)
     {
