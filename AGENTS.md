@@ -9,7 +9,7 @@ overlay from a local HTTP server. User-facing documentation is in `README.md`.
 | Path | What lives there |
 | --- | --- |
 | `src/SonglistSpinner.Core` | MAUI-free domain, one folder (and namespace) per feature: `StreamerSongList` (client contract, channel, ids, queue and history models; the API v2 and Centrifugo implementation in `StreamerSongList/Api/V2`), `Settings` (persisted `SettingsDto`, its normaliser and converter, `SpinnerConfig` and defaults), `Songs` (song fields and display text), `PlayedSongs` (played-song list, played-song exclusion), `Winner` (winner dialog content, Now Playing promotion), `Updates` (GitHub release check) |
-| `src/SonglistSpinner.Application` | MAUI-free app services: `StreamerSessionService` (queue session, realtime refresh), `WheelSpinService` and `WinnerActionService` (a spin and the winner's outcome), `ApiCredentialTest` (test a credential, restore the previous one on failure), `OverlayStateService` (overlay state and SSE) |
+| `src/SonglistSpinner.Application` | MAUI-free app services: `ChannelLoader` (resolve a channel and start the session), `StreamerSessionService` (queue session, realtime refresh), `FetchQueueAndHistoryAsync` (the one queue-plus-history read), `WheelSpinService` and `WinnerActionService` (a spin and the winner's outcome), `ApiCredentialTest` (test a credential, restore the previous one on failure), `OverlayStateService` (overlay state and SSE), `SettingsDraftTracker` and `SettingsViewModel` (the Settings page draft) |
 | `src/SonglistSpinner.Desktop` | MAUI host: Razor pages (`Components/Pages`), MAUI-backed services (`Services`), `MauiProgram.cs` composing the feature registrations |
 | `src/SonglistSpinner.Desktop/wwwroot` | Wheel and overlay JavaScript, CSS, `overlay/Overlay.html`. `spinner/SongSpinner.interop.js` is the one `window.SpinnerInterop`, used by the app and (embedded, served by `LocalOverlayServer`) by the overlay. `lib/` and `spinner/spin-wheel-iife.js` are vendored; don't edit them |
 | `tests/SonglistSpinner.*.Tests` | xUnit v3 tests for Core and Application. Folders mirror `src` |
@@ -68,9 +68,10 @@ rejects a bare directory.
   to `%LOCALAPPDATA%\SonglistSpinner\logs\songlistspinner.log`.
 - Persisted settings are a contract. `SettingsDto` is serialised as JSON into MAUI Preferences, so
   renaming a persisted type or property must keep the wire name (`[JsonPropertyName]`) or ship a
-  migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step. The
-  JSON a released version saved is embedded under `tests/SonglistSpinner.Core.Tests/Settings/Fixtures`
-  and must keep loading; add a fixture for a new release's format, never regenerate an old one.
+  migration with a round-trip test. Keep `SettingsResetPlan`'s field table and its test in step. Saved
+  settings JSON is embedded under `tests/SonglistSpinner.Core.Tests/Settings/Fixtures`, named for the
+  version that wrote it (release 1.2.0, and develop at 4f36e18), and must keep loading; add a fixture for
+  a new release's format, never regenerate an old one.
 - Default settings live once, in `SpinnerDefaults` (Core). `SettingsDto` and the `Spinner*Config` models
   both start from it, and `SettingsDtoTests` locks the values a user with no saved settings gets.
 - JavaScript contracts are guarded by tests that read `wwwroot` from the source tree, so they need the
