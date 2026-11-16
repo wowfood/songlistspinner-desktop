@@ -8,7 +8,7 @@
         <ImplicitUsings>enable</ImplicitUsings>
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
         <Nullable>enable</Nullable>
-        <MauiVersion>10.0.90</MauiVersion>
+        <MauiVersion>11.0.10</MauiVersion>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
         <!-- Display name -->
         <ApplicationTitle>SonglistSpinner</ApplicationTitle>
@@ -54,7 +54,7 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)"/>
-        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11"/>
+        <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="11.0.0"/>
         <PackageReference Include="MudBlazor" Version="9.3.0"/>
     </ItemGroup>
     <ItemGroup>
