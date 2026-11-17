@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Net.WebSockets;
 using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.StreamerSongList;
@@ -275,6 +276,46 @@ public class CentrifugoStreamerSongListEventSourceTests
         Assert.True(socket.IsDisposed);
     }
 
+    [Fact]
+    public async Task Given_ConnectedSubscription_When_NoDataArrivesWithinTheIdleTimeout_Then_TheBufferOfTheReceiveStillWaitingIsKeptOutOfThePool()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider();
+        var buffers = new RecordingBufferPool();
+        var source = CreateSource(new ScriptedConnector().Accept(ScriptedWebSocket.AcceptingSubscriptions()), time, buffers);
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+        await NextAsync(events, cancellationToken);
+        var returnedBeforeTheTimeout = buffers.Returned;
+        var next = events.MoveNextAsync().AsTask();
+
+        time.Advance(Options.ReceiveIdleTimeout);
+
+        Assert.True(await next.WaitAsync(WaitLimit, cancellationToken));
+        Assert.Equal(StreamerSongListEventKind.Reconnecting, events.Current.Kind);
+        // The receive that timed out may still write to its buffer, so nobody else may be handed it.
+        Assert.Equal(returnedBeforeTheTimeout, buffers.Returned);
+        Assert.Equal(buffers.Returned + 1, buffers.Rented);
+    }
+
+    [Fact]
+    public async Task Given_ServerAcceptsTheConnection_When_EveryMessageHasBeenReceived_Then_EachReceiveBufferIsBackInThePool()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var buffers = new RecordingBufferPool();
+        var source = CreateSource(
+            new ScriptedConnector().Accept(ScriptedWebSocket.AcceptingSubscriptions()),
+            new FakeTimeProvider(),
+            buffers);
+        await using var events = source.SubscribeAsync(StreamerId, cancellationToken)
+            .GetAsyncEnumerator(cancellationToken);
+
+        await NextAsync(events, cancellationToken);
+
+        Assert.Equal(3, buffers.Rented);
+        Assert.Equal(3, buffers.Returned);
+    }
+
     [Theory]
     [InlineData("""{"id":2,"error":{"code":103,"message":"permission denied"}}""", "permission denied")]
     [InlineData(
@@ -393,8 +434,32 @@ public class CentrifugoStreamerSongListEventSourceTests
 
     private static CentrifugoStreamerSongListEventSource CreateSource(
         ScriptedConnector connector,
-        TimeProvider timeProvider) =>
-        new(Options, timeProvider, connector.ConnectAsync);
+        TimeProvider timeProvider,
+        ArrayPool<byte>? bufferPool = null) =>
+        new(Options, timeProvider, connector.ConnectAsync, bufferPool: bufferPool);
+
+    /// <summary>The shared buffer pool, counting what is rented from it and what comes back.</summary>
+    private sealed class RecordingBufferPool : ArrayPool<byte>
+    {
+        private int _rented;
+        private int _returned;
+
+        public int Rented => Volatile.Read(ref _rented);
+
+        public int Returned => Volatile.Read(ref _returned);
+
+        public override byte[] Rent(int minimumLength)
+        {
+            Interlocked.Increment(ref _rented);
+            return Shared.Rent(minimumLength);
+        }
+
+        public override void Return(byte[] array, bool clearArray = false)
+        {
+            Interlocked.Increment(ref _returned);
+            Shared.Return(array, clearArray);
+        }
+    }
 
     /// <summary>A queue_add publication padded to roughly <paramref name="length"/> bytes.</summary>
     private static string PublicationOfLength(int length) =>

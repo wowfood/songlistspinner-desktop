@@ -120,6 +120,8 @@ internal sealed class ScriptedWebSocket : WebSocket
     {
         WasAborted = true;
         _state = WebSocketState.Aborted;
+        // As with a real socket, a receive still waiting when the connection is aborted fails.
+        _incoming.Writer.TryComplete(new WebSocketException("The connection was aborted."));
     }
 
     public override void Dispose()

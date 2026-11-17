@@ -15,6 +15,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     private readonly TimeProvider _timeProvider;
     private readonly Func<Uri, CancellationToken, Task<WebSocket>> _connectAsync;
     private readonly ILogger<CentrifugoStreamerSongListEventSource> _logger;
+    private readonly ArrayPool<byte> _bufferPool;
 
     public CentrifugoStreamerSongListEventSource(
         StreamerSongListEventsOptions options,
@@ -25,17 +26,20 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
     }
 
     // connectAsync opens a connected socket for each connection attempt, and the event source disposes it.
-    // Tests pass a scripted socket here instead of connecting to a server.
+    // Tests pass a scripted socket here instead of connecting to a server, and a pool that records which
+    // receive buffers come back to it.
     internal CentrifugoStreamerSongListEventSource(
         StreamerSongListEventsOptions options,
         TimeProvider? timeProvider,
         Func<Uri, CancellationToken, Task<WebSocket>> connectAsync,
-        ILogger<CentrifugoStreamerSongListEventSource>? logger = null)
+        ILogger<CentrifugoStreamerSongListEventSource>? logger = null,
+        ArrayPool<byte>? bufferPool = null)
     {
         _options = options;
         _timeProvider = timeProvider ?? TimeProvider.System;
         _connectAsync = connectAsync;
         _logger = logger ?? NullLogger<CentrifugoStreamerSongListEventSource>.Instance;
+        _bufferPool = bufferPool ?? ArrayPool<byte>.Shared;
 
         if (!_options.Endpoint.IsAbsoluteUri ||
             _options.Endpoint.Scheme is not ("ws" or "wss"))
@@ -243,7 +247,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         WebSocket socket,
         CancellationToken cancellationToken)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(ReceiveBufferBytes);
+        var buffer = _bufferPool.Rent(ReceiveBufferBytes);
         var receivePending = false;
         try
         {
@@ -284,7 +288,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         }
         finally
         {
-            if (!receivePending) ArrayPool<byte>.Shared.Return(buffer);
+            if (!receivePending) _bufferPool.Return(buffer);
         }
     }
 
