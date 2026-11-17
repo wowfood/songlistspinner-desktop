@@ -39,8 +39,11 @@ jobs:
       - name: Require develop as the source branch for a pull request
         if: github.event_name == 'pull_request'
         shell: bash
+        # A branch name is chosen by whoever opens the pull request, so it reaches the script as data.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [[ "${{ github.head_ref }}" != "develop" ]]; then
+          if [[ "$HEAD_REF" != "develop" ]]; then
             echo "Pull requests into main must come from develop."
             exit 1
           fi

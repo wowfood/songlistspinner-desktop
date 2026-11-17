@@ -52,6 +52,12 @@ The `Windows CI` workflow:
    - `SonglistSpinner.Desktop.exe`
    - `SonglistSpinner.Desktop.exe.sha256`
 
+For the pull request that promotes `develop` to `main`, and for a manual run
+with `end_to_end` ticked, a separate `End-to-end tests` job also builds the app
+with its test profile enabled and runs the end-to-end suite (about ten minutes).
+Publishing the release does not wait for that job, so check its result on the
+pull request before merging.
+
 The executable remains a single-file application. The checksum is a separate
 release download used to verify the executable; users do not need to keep it
 beside the application.
