@@ -163,9 +163,11 @@ $env:SONGLISTSPINNER_SSL_ACCESS_TOKEN = "simulator-token"
 $env:SONGLISTSPINNER_SSL_TOKEN_TYPE = "streamer"
 ```
 
-The two URLs replace the production endpoints. The token is only a fallback: a token saved in Settings
-(Windows secure storage) takes precedence and would be sent to the simulator, which rejects it, so clear
-the saved token first, or keep your own profile out of it with a test profile:
+The two URLs replace the production endpoints. An unencrypted address (`http`, `ws`) is accepted only on this
+machine, because the saved token is sent to the API address; anything else keeps the production endpoint. The
+token is only a fallback, and saving it in Settings stores nothing: a token saved in Settings (Windows secure
+storage) takes precedence and would be sent to the simulator, which rejects it, so clear the saved token first,
+or keep your own profile out of it with a test profile:
 
 ```powershell
 $env:SONGLISTSPINNER_PROFILE_DIR = "$env:TEMP\songlistspinner-test"   # a full path

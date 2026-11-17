@@ -4,7 +4,8 @@ namespace SonglistSpinner.Services;
 
 /// <summary>
 /// Keeps the StreamerSongList API token in Windows secure storage and its kind and client id in preferences.
-/// While none is stored, the environment's fallback credential is used.
+/// While none is stored, the environment's fallback credential is used. The fallback itself is never stored:
+/// saving it clears the store instead.
 /// </summary>
 public sealed class SecureStorageStreamerSongListCredentialStore(
     ISecretStore secureStorage,
@@ -36,6 +37,15 @@ public sealed class SecureStorageStreamerSongListCredentialStore(
         if (string.IsNullOrWhiteSpace(credential.Token))
             throw new ArgumentException("An API token is required.", nameof(credential));
 
+        if (IsEnvironmentFallback(credential))
+        {
+            // Settings saves the credential in effect whenever its token field is left blank, and a failed
+            // connection test saves the one from before the test. Writing the fallback would keep it after its
+            // variable is gone; removing whatever is stored is what puts it back in effect.
+            await ClearCredentialAsync(cancellationToken);
+            return;
+        }
+
         await secureStorage.SetAsync(TokenKey, credential.Token.Trim());
         preferences.SetValue(KindKey, credential.Kind.ToString());
 
@@ -53,4 +63,14 @@ public sealed class SecureStorageStreamerSongListCredentialStore(
         preferences.Remove(ClientIdKey);
         return ValueTask.CompletedTask;
     }
+
+    // Compared as the credential would be stored: trimmed, with a blank client id as none.
+    private bool IsEnvironmentFallback(StreamerSongListCredential credential) =>
+        environment.FallbackCredential is { } fallback
+        && credential.Kind == fallback.Kind
+        && string.Equals(credential.Token.Trim(), fallback.Token.Trim(), StringComparison.Ordinal)
+        && string.Equals(StoredClientId(credential), StoredClientId(fallback), StringComparison.Ordinal);
+
+    private static string? StoredClientId(StreamerSongListCredential credential) =>
+        string.IsNullOrWhiteSpace(credential.ClientId) ? null : credential.ClientId.Trim();
 }

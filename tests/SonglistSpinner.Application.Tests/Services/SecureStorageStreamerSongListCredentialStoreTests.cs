@@ -81,6 +81,42 @@ public class SecureStorageStreamerSongListCredentialStoreTests
     }
 
     [Fact]
+    public async Task Given_NothingSaved_When_SavingTheEnvironmentFallback_Then_NothingIsStored()
+    {
+        var secrets = new InMemorySecretStore();
+        var preferences = new InMemoryKeyValueStore();
+        var store = CreateStore(secrets, preferences);
+
+        // What Settings saves when its token field is left blank while only the environment supplies a token.
+        await store.SaveCredentialAsync(
+            new StreamerSongListCredential(StreamerSongListCredentialKind.Streamer, " simulator-token ", " "),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(secrets.Values);
+        Assert.Empty(preferences.Values);
+    }
+
+    [Fact]
+    public async Task Given_AnotherCredentialSaved_When_SavingTheEnvironmentFallback_Then_TheSavedOneIsRemovedSoTheFallbackApplies()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var secrets = new InMemorySecretStore();
+        var preferences = new InMemoryKeyValueStore();
+        var store = CreateStore(secrets, preferences);
+        await store.SaveCredentialAsync(
+            new StreamerSongListCredential(StreamerSongListCredentialKind.OAuthBearer, "rejected-token", "client-id"),
+            cancellationToken);
+
+        // What a failed connection test does when the credential before it was the environment's.
+        await store.SaveCredentialAsync(EnvironmentCredential, cancellationToken);
+        var credential = await store.GetCredentialAsync(cancellationToken);
+
+        Assert.Empty(secrets.Values);
+        Assert.Empty(preferences.Values);
+        Assert.Equal(EnvironmentCredential, credential);
+    }
+
+    [Fact]
     public async Task Given_ASavedCredential_When_Cleared_Then_ItsKeysAreRemovedAndTheEnvironmentFallbackApplies()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

@@ -59,12 +59,10 @@ public sealed record EnvironmentOverrides(
     /// </param>
     public static EnvironmentOverrides Read(Func<string, string?> readVariable, bool allowTestProfile)
     {
-        var apiBaseAddress = Uri.TryCreate(readVariable(ApiBaseUrlVariable), UriKind.Absolute, out var configuredAddress)
-            ? configuredAddress
-            : StreamerSongListApiOptions.ProductionBaseAddress;
-        var eventsEndpoint = Uri.TryCreate(readVariable(EventsUrlVariable), UriKind.Absolute, out var configuredEndpoint)
-            ? configuredEndpoint
-            : StreamerSongListEventsOptions.ProductionEndpoint;
+        var apiBaseAddress = TryReadEndpoint(readVariable(ApiBaseUrlVariable), Uri.UriSchemeHttps, Uri.UriSchemeHttp)
+                             ?? StreamerSongListApiOptions.ProductionBaseAddress;
+        var eventsEndpoint = TryReadEndpoint(readVariable(EventsUrlVariable), Uri.UriSchemeWss, Uri.UriSchemeWs)
+                             ?? StreamerSongListEventsOptions.ProductionEndpoint;
 
         var token = readVariable(AccessTokenVariable);
         var fallbackCredential = string.IsNullOrWhiteSpace(token)
@@ -102,5 +100,18 @@ public sealed record EnvironmentOverrides(
                 ? null
                 : webViewBrowserArguments
         };
+    }
+
+    /// <summary>
+    /// The StreamerSongList address <paramref name="value"/> names, or null to keep the production one. The saved
+    /// API token is sent to the API address, so an unencrypted address is accepted only on this machine, which is
+    /// where the simulator listens.
+    /// </summary>
+    private static Uri? TryReadEndpoint(string? value, string encryptedScheme, string unencryptedScheme)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var endpoint)) return null;
+        if (endpoint.Scheme == encryptedScheme) return endpoint;
+
+        return endpoint.Scheme == unencryptedScheme && endpoint.IsLoopback ? endpoint : null;
     }
 }

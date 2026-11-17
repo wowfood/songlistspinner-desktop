@@ -416,8 +416,8 @@ Development and automation can override connection values with:
 
 | Environment variable | Purpose |
 | --- | --- |
-| `SONGLISTSPINNER_SSL_API_BASE_URL` | StreamerSongList API base address |
-| `SONGLISTSPINNER_SSL_EVENTS_URL` | StreamerSongList events WebSocket address |
+| `SONGLISTSPINNER_SSL_API_BASE_URL` | StreamerSongList API base address: `https`, or `http` on this machine only |
+| `SONGLISTSPINNER_SSL_EVENTS_URL` | StreamerSongList events WebSocket address: `wss`, or `ws` on this machine only |
 | `SONGLISTSPINNER_SSL_ACCESS_TOKEN` | Credential fallback when Windows secure storage is empty |
 | `SONGLISTSPINNER_SSL_TOKEN_TYPE` | `streamer`, `user`, or `bearer` |
 | `SONGLISTSPINNER_SSL_CLIENT_ID` | Client ID used with an OAuth bearer token |

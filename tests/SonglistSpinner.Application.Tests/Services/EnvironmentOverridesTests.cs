@@ -21,6 +21,37 @@ public class EnvironmentOverridesTests
         Assert.Equal(new Uri("ws://127.0.0.1:5199/connection/websocket"), overrides.Events.Endpoint);
     }
 
+    [Fact]
+    public void Given_EncryptedAddressesOnAnotherMachine_When_Reading_Then_TheApiAndEventsUseThem()
+    {
+        var overrides = Read(new()
+        {
+            [EnvironmentOverrides.ApiBaseUrlVariable] = "https://staging.example.test/",
+            [EnvironmentOverrides.EventsUrlVariable] = "wss://staging.example.test/connection/websocket"
+        });
+
+        Assert.Equal(new Uri("https://staging.example.test/"), overrides.Api.BaseAddress);
+        Assert.Equal(new Uri("wss://staging.example.test/connection/websocket"), overrides.Events.Endpoint);
+    }
+
+    [Theory]
+    // The saved API token is sent to the API address, so an unencrypted one must stay on this machine.
+    [InlineData("http://staging.example.test/", "ws://staging.example.test/connection/websocket")]
+    [InlineData("ftp://127.0.0.1/", "http://127.0.0.1/connection/websocket")]
+    public void Given_UnencryptedAddressesOnAnotherMachineOrAnotherProtocol_When_Reading_Then_TheProductionEndpointsAreKept(
+        string apiAddress,
+        string eventsAddress)
+    {
+        var overrides = Read(new()
+        {
+            [EnvironmentOverrides.ApiBaseUrlVariable] = apiAddress,
+            [EnvironmentOverrides.EventsUrlVariable] = eventsAddress
+        });
+
+        Assert.Equal(StreamerSongListApiOptions.ProductionBaseAddress, overrides.Api.BaseAddress);
+        Assert.Equal(StreamerSongListEventsOptions.ProductionEndpoint, overrides.Events.Endpoint);
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]

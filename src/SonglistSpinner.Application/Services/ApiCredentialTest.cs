@@ -7,6 +7,7 @@ namespace SonglistSpinner.Services;
 /// <summary>
 /// Tests the StreamerSongList connection with a candidate API credential and puts the previous credential
 /// back when the test fails, so a failed test never leaves an untested credential in secure storage.
+/// A test the caller cancels is not a failed test: the candidate stays stored, as <see cref="RunAsync"/> explains.
 /// Settings and Setup both save a credential this way.
 /// </summary>
 public sealed class ApiCredentialTest
