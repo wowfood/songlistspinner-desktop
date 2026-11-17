@@ -77,7 +77,7 @@ public class SpinTests(SharedApp sharedApp) : IClassFixture<SharedApp>
     }
 
     [Fact(Timeout = 180_000)]
-    public async Task Given_TheQueueFetchFails_When_SpinIsPressed_Then_TheStatusShowsTheErrorAndNoWinnerIsShown()
+    public async Task Given_TheQueueFetchFails_When_SpinIsPressed_Then_TheStatusShowsTheErrorNoWinnerIsShownAndQueueRefreshesResume()
     {
         EndToEnd.SkipUnlessEnabled();
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -97,12 +97,17 @@ public class SpinTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await dashboard.SpinButton.ClickAsync();
 
         await Expect(dashboard.Status).ToHaveTextAsync($"Error: {ApiError}");
-        await Expect(dashboard.Health.Api).ToHaveTextAsync("Error");
         await Expect(dashboard.Winner.Root).ToBeHiddenAsync();
-        var drawQueueCall = Assert.Single(
-            scenario.Simulator.Requests.Skip(callsBeforeSpin),
-            call => ApiCalls.FetchQueue("failing_spin_streamer")(call));
-        Assert.Equal(500, drawQueueCall.StatusCode);
+        // The failed draw ends the spin, which resumes the queue refreshes the spin suspended. API health reads
+        // "Error" only until that refresh succeeds a moment later, so the lasting state is what is asserted.
+        await Expect(dashboard.Health.Api).ToHaveTextAsync("Connected");
+        var callsSinceSpin = scenario.Simulator.Requests.Skip(callsBeforeSpin).ToList();
+        Assert.Single(
+            callsSinceSpin,
+            call => ApiCalls.FetchQueue("failing_spin_streamer")(call) && call.StatusCode == 500);
+        Assert.Contains(
+            callsSinceSpin,
+            call => ApiCalls.FetchQueue("failing_spin_streamer")(call) && call.StatusCode == 200);
     }
 
     [Fact(Timeout = 180_000)]
