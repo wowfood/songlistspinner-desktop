@@ -27,7 +27,11 @@ $ErrorActionPreference = 'Stop'
 
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 
-dotnet build (Join-Path $repositoryRoot 'src\SonglistSpinner.Desktop\SonglistSpinner.Desktop.csproj') -c $Configuration
+# A Release build ignores the test-profile variables unless it is built for them, and the tests refuse to start
+# an app that would ignore them. The next ordinary build of the app leaves them out again.
+dotnet build (Join-Path $repositoryRoot 'src\SonglistSpinner.Desktop\SonglistSpinner.Desktop.csproj') `
+    -c $Configuration `
+    -p:EnableTestProfile=true
 if ($LASTEXITCODE -ne 0) { throw "Building the Desktop app failed with exit code $LASTEXITCODE." }
 
 $testArguments = @(

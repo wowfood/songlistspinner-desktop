@@ -34,6 +34,20 @@
         <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     </PropertyGroup>
 
+    <!--
+      The test-profile variables (SONGLISTSPINNER_PROFILE_DIR, SONGLISTSPINNER_WEBVIEW_ARGS) are compiled in for
+      Debug builds and for builds that ask for them (scripts/run-e2e.ps1 passes -p:EnableTestProfile=true). A
+      Release build, and so every published executable, ignores both; TestProfileBuild.cs says why. The assembly
+      metadata is how the end-to-end tests tell that a built app honours them before they start it.
+    -->
+    <PropertyGroup>
+        <EnableTestProfile Condition="'$(EnableTestProfile)' == '' And '$(Configuration)' == 'Debug'">true</EnableTestProfile>
+        <DefineConstants Condition="'$(EnableTestProfile)' == 'true'">$(DefineConstants);TEST_PROFILE</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(EnableTestProfile)' == 'true'">
+        <AssemblyMetadata Include="SonglistSpinner.TestProfile" Value="enabled"/>
+    </ItemGroup>
+
     <!-- RID-specific settings apply only when the publish command supplies win-x64. -->
     <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' == 'win-x64'">
         <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>

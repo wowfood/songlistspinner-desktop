@@ -238,8 +238,24 @@ internal sealed class DesktopApp : IAsyncDisposable
                 .OrderByDescending(file => file.LastWriteTimeUtc)
                 .FirstOrDefault()
             : null;
-        return executable?.FullName ?? throw new InvalidOperationException(
-            $"The {configuration} Desktop app is not built. Run scripts/run-e2e.ps1, or " +
-            $"dotnet build src/SonglistSpinner.Desktop -c {configuration} first.");
+        if (executable is null)
+        {
+            throw new InvalidOperationException(
+                $"The {configuration} Desktop app is not built. Run scripts/run-e2e.ps1, or " +
+                $"dotnet build src/SonglistSpinner.Desktop -c {configuration} -p:EnableTestProfile=true first.");
+        }
+
+        // Checked before anything starts: an app built without the test profile ignores the profile folder the
+        // tests give it and runs on the developer's own settings and saved credential instead.
+        var assembly = Path.ChangeExtension(executable.FullName, ".dll");
+        if (!File.Exists(assembly) || !TestProfileStamp.IsOn(assembly))
+        {
+            throw new InvalidOperationException(
+                $"The {configuration} Desktop app at {executable.FullName} was built without the test profile, so " +
+                "it is not started. Run scripts/run-e2e.ps1, or " +
+                $"dotnet build src/SonglistSpinner.Desktop -c {configuration} -p:EnableTestProfile=true first.");
+        }
+
+        return executable.FullName;
     }
 }

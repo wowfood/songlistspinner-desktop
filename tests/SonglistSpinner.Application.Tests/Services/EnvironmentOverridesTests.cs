@@ -167,6 +167,23 @@ public class EnvironmentOverridesTests
         Assert.Equal(expectedArguments, overrides.WebViewBrowserArguments);
     }
 
-    private static EnvironmentOverrides Read(Dictionary<string, string?> variables) =>
-        EnvironmentOverrides.Read(name => variables.GetValueOrDefault(name));
+    [Fact]
+    public void Given_ABuildWithoutTheTestProfile_When_Reading_Then_TheProfileDirectoryAndWebViewArgumentsAreIgnored()
+    {
+        var overrides = Read(
+            new()
+            {
+                [EnvironmentOverrides.ProfileDirectoryVariable] = Path.Combine(Path.GetTempPath(), "songlistspinner-e2e"),
+                [EnvironmentOverrides.WebViewBrowserArgumentsVariable] = "--remote-debugging-port=9222",
+                [EnvironmentOverrides.OverlayPortVariable] = "51999"
+            },
+            allowTestProfile: false);
+
+        Assert.Null(overrides.ProfileDirectory);
+        Assert.Null(overrides.WebViewBrowserArguments);
+        Assert.Equal(51999, overrides.OverlayPort);
+    }
+
+    private static EnvironmentOverrides Read(Dictionary<string, string?> variables, bool allowTestProfile = true) =>
+        EnvironmentOverrides.Read(name => variables.GetValueOrDefault(name), allowTestProfile);
 }

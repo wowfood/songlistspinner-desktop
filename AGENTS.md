@@ -72,7 +72,8 @@ suite, 147 tests, takes about ten minutes, mostly app launches):
 `-Filter` takes one class. For several classes or one test, call `dotnet test` with the opt-in set (MTP flags
 repeat): `$env:SONGLISTSPINNER_E2E='1'; dotnet test --project tests/SonglistSpinner.EndToEndTests -c Release
 --filter-method SonglistSpinner.EndToEndTests.SpinTests.<method>` (build the Desktop app first, as the script
-does). The suites, one class per feature or workflow:
+does: `dotnet build src/SonglistSpinner.Desktop -c Release -p:EnableTestProfile=true`; the tests refuse to
+start an app built without that property). The suites, one class per feature or workflow:
 
 | Area | Classes |
 | --- | --- |
@@ -178,6 +179,12 @@ preferences, Windows secure storage and `%LOCALAPPDATA%\SonglistSpinner`; `MauiP
 end-to-end tests open the DevTools port with it, because the WebView ignores WebView2's own
 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in this app. Windows' shared Direct3D shader cache
 (`%LOCALAPPDATA%\D3DSCache`) is still written, as by any app that draws with the GPU.
+
+Those two variables are compiled in only when the `EnableTestProfile` MSBuild property is true: by default in
+Debug builds, and in a Release build made with `-p:EnableTestProfile=true` (`scripts/run-e2e.ps1` does this). A
+plain Release build, and so every published executable, ignores both, so a variable left in a user's
+environment cannot move their credential into a plain-text file or open a debugging port. The other
+`SONGLISTSPINNER_*` variables work in every build.
 
 ## Conventions
 

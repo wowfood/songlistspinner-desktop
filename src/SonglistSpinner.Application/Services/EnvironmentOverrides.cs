@@ -9,7 +9,8 @@ namespace SonglistSpinner.Services;
 /// Startup configuration for development and testing, read once from the SONGLISTSPINNER_* environment
 /// variables. A missing or invalid value keeps the production behaviour: the real StreamerSongList and GitHub
 /// endpoints, overlay port <see cref="LocalOverlayServer.DefaultPort"/> and the user's own profile. The fallback
-/// credential is used only while secure storage holds none.
+/// credential is used only while secure storage holds none. The test profile and its WebView arguments are read
+/// only by builds that allow them; see <see cref="Read"/>.
 /// </summary>
 public sealed record EnvironmentOverrides(
     StreamerSongListApiOptions Api,
@@ -28,7 +29,8 @@ public sealed record EnvironmentOverrides(
 
     /// <summary>
     /// A test-only folder that holds every value the app saves (settings, the API credential in plain text, logs
-    /// and WebView data) instead of the user's profile; null for the normal profile. Only a rooted path is used.
+    /// and WebView data) instead of the user's profile; null for the normal profile. Only a rooted path is used,
+    /// and only in a build that allows the test profile.
     /// </summary>
     public string? ProfileDirectory { get; init; }
 
@@ -49,7 +51,13 @@ public sealed record EnvironmentOverrides(
     /// </remarks>
     public string? WebViewBrowserArguments { get; init; }
 
-    public static EnvironmentOverrides Read(Func<string, string?> readVariable)
+    /// <param name="readVariable">Returns an environment variable's value, or null when it is not set.</param>
+    /// <param name="allowTestProfile">
+    /// Whether this build honours <see cref="ProfileDirectoryVariable"/> and, with it,
+    /// <see cref="WebViewBrowserArgumentsVariable"/>. A released build passes false, so a variable left in a
+    /// user's environment can neither move their credential into a plain-text file nor open a debugging port.
+    /// </param>
+    public static EnvironmentOverrides Read(Func<string, string?> readVariable, bool allowTestProfile)
     {
         var apiBaseAddress = Uri.TryCreate(readVariable(ApiBaseUrlVariable), UriKind.Absolute, out var configuredAddress)
             ? configuredAddress
@@ -67,7 +75,9 @@ public sealed record EnvironmentOverrides(
                 readVariable(ClientIdVariable));
 
         // A relative path would follow the working directory, which differs between launches.
-        var profileDirectory = readVariable(ProfileDirectoryVariable) is { } directory && Path.IsPathFullyQualified(directory)
+        var profileDirectory = allowTestProfile
+                               && readVariable(ProfileDirectoryVariable) is { } directory
+                               && Path.IsPathFullyQualified(directory)
             ? directory
             : null;
         var webViewBrowserArguments = readVariable(WebViewBrowserArgumentsVariable);

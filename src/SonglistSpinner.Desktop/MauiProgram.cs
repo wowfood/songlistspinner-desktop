@@ -13,7 +13,7 @@ public static class MauiProgram
             .UseMauiApp<App>()
             .ConfigureFonts(fonts => { fonts.AddFont("OpenSans-Regular.ttf", "OpenSansRegular"); });
 
-        var environment = EnvironmentOverrides.Read(Environment.GetEnvironmentVariable);
+        var environment = EnvironmentOverrides.Read(Environment.GetEnvironmentVariable, TestProfileBuild.IsEnabled);
         var dataDirectory = environment.ProfileDirectory ?? Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "SonglistSpinner");

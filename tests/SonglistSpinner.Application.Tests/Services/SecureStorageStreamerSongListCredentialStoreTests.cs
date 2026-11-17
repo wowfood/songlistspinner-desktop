@@ -105,10 +105,12 @@ public class SecureStorageStreamerSongListCredentialStoreTests
         new(
             secrets,
             preferences,
-            EnvironmentOverrides.Read(name => name switch
-            {
-                EnvironmentOverrides.AccessTokenVariable => EnvironmentCredential.Token,
-                EnvironmentOverrides.TokenTypeVariable => "streamer",
-                _ => null
-            }));
+            EnvironmentOverrides.Read(
+                name => name switch
+                {
+                    EnvironmentOverrides.AccessTokenVariable => EnvironmentCredential.Token,
+                    EnvironmentOverrides.TokenTypeVariable => "streamer",
+                    _ => null
+                },
+                allowTestProfile: false));
 }
