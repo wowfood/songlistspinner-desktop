@@ -1,5 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using SonglistSpinner.Services;
 using SonglistSpinner.Testing;
@@ -40,9 +42,11 @@ public class LocalOverlayServerTests
         Assert.Equal($"http://localhost:{server.Port}/overlay", server.OverlayUrl);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html; charset=utf-8", response.Content.Headers.ContentType?.ToString());
+        // frame-ancestors: only the app's own pages (the Settings preview) may show the overlay in a frame.
         Assert.Equal(
             "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; " +
-            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'",
+            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'; " +
+            "frame-ancestors https://0.0.0.1",
             Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
         Assert.Equal(
             DesktopWebAssets.Read("overlay/Overlay.html"),
@@ -232,15 +236,81 @@ public class LocalOverlayServerTests
         Assert.Equal([LocalOverlayServerState.Starting, LocalOverlayServerState.Running], observedStates);
     }
 
+    [Fact]
+    public async Task Given_TheServerIsRunning_When_ItsListenerFailsUnderneathIt_Then_HealthReportsTheFailureAndItIsLogged()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var logger = new RecordingLogger();
+        await using var server = new LocalOverlayServer(new OverlayStateService(), logger, FreeLoopbackPort());
+        server.Start();
+        var failed = WaitForHealth(server, health => health.ServerState == LocalOverlayServerState.Failed);
+
+        CloseTheListenerUnderneath(server);
+        await failed.WaitAsync(WaitLimit, cancellationToken);
+
+        Assert.False(string.IsNullOrWhiteSpace(server.GetHealth().Error));
+        var entry = Assert.Single(logger.Entries, entry => entry.Level == LogLevel.Error);
+        Assert.Equal(
+            $"The local overlay server stopped accepting connections on port {server.Port}",
+            entry.Message);
+        Assert.NotNull(entry.Exception);
+    }
+
     /// <summary>Completes when the server reports <paramref name="expected"/>, however many changes that takes.</summary>
-    private static Task WaitForHealth(LocalOverlayServer server, LocalOverlayHealth expected)
+    private static Task WaitForHealth(LocalOverlayServer server, LocalOverlayHealth expected) =>
+        WaitForHealth(server, health => health == expected);
+
+    private static Task WaitForHealth(LocalOverlayServer server, Func<LocalOverlayHealth, bool> isExpected)
     {
         var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         server.HealthChanged += (_, _) =>
         {
-            if (server.GetHealth() == expected) reached.TrySetResult();
+            if (isExpected(server.GetHealth())) reached.TrySetResult();
         };
         return reached.Task;
+    }
+
+    /// <summary>
+    /// Closes the server's HttpListener without telling the server, which is how a failure inside HTTP.sys looks
+    /// to its accept loop. Nothing reachable from outside the class makes a listener fail, so this reaches the
+    /// private field; the test asserts only what the server then reports.
+    /// </summary>
+    private static void CloseTheListenerUnderneath(LocalOverlayServer server)
+    {
+        var field = typeof(LocalOverlayServer).GetField("_listener", BindingFlags.Instance | BindingFlags.NonPublic)
+                    ?? throw new InvalidOperationException("LocalOverlayServer no longer keeps its listener in _listener.");
+        var listener = (HttpListener?)field.GetValue(server)
+                       ?? throw new InvalidOperationException("The server has no listener; it was not started.");
+        listener.Close();
+    }
+
+    private sealed class RecordingLogger : ILogger<LocalOverlayServer>
+    {
+        private readonly List<(LogLevel Level, string Message, Exception? Exception)> _entries = [];
+
+        public IReadOnlyList<(LogLevel Level, string Message, Exception? Exception)> Entries
+        {
+            get
+            {
+                lock (_entries)
+                    return [.. _entries];
+            }
+        }
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            lock (_entries)
+                _entries.Add((logLevel, formatter(state, exception), exception));
+        }
     }
 
     /// <summary>

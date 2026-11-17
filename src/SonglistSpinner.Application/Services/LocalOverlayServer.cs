@@ -26,6 +26,13 @@ public class LocalOverlayServer : IAsyncDisposable
     private static readonly Lazy<byte[]> InteropScript = new(() =>
         LoadEmbeddedResource(InteropResourceName, "The embedded wheel interop script is missing."));
 
+    /// <summary>
+    /// The origin of the app's own pages in MAUI's BlazorWebView on Windows. The Settings page shows the overlay
+    /// in a frame as its live preview, and no other site may: OBS loads the overlay as a page of its own. If a
+    /// MAUI release changes this origin the preview goes blank, which the end-to-end preview tests catch.
+    /// </summary>
+    private const string AppPageOrigin = "https://0.0.0.1";
+
     private readonly CancellationTokenSource _cts = new();
     private readonly OverlayStateService _overlay;
     private readonly ILogger<LocalOverlayServer> _logger;
@@ -119,26 +126,30 @@ public class LocalOverlayServer : IAsyncDisposable
 
     private async Task AcceptConnectionsAsync(CancellationToken ct)
     {
-        string? failure = null;
+        Exception? failure = null;
         while (!ct.IsCancellationRequested && _listener?.IsListening == true)
         {
             HttpListenerContext context;
+            var nextRequest = _listener.GetContextAsync();
             try
             {
-                context = await _listener.GetContextAsync().WaitAsync(ct);
+                context = await nextRequest.WaitAsync(ct);
             }
             catch (OperationCanceledException)
             {
+                // Stopping abandons the pending accept, which then faults when the listener closes.
+                nextRequest.ObserveFaults(
+                    ex => _logger.LogDebug(ex, "The pending overlay request ended when the server stopped"));
                 break;
             }
             catch (HttpListenerException ex)
             {
-                if (!ct.IsCancellationRequested) failure = ex.Message;
+                if (!ct.IsCancellationRequested) failure = ex;
                 break;
             }
             catch (ObjectDisposedException ex)
             {
-                if (!ct.IsCancellationRequested) failure = ex.Message;
+                if (!ct.IsCancellationRequested) failure = ex;
                 break;
             }
 
@@ -148,9 +159,11 @@ public class LocalOverlayServer : IAsyncDisposable
 
         if (!ct.IsCancellationRequested)
         {
+            // Nothing restarts the listener, so OBS shows nothing more until the app restarts.
+            _logger.LogError(failure, "The local overlay server stopped accepting connections on port {Port}", Port);
             SetHealth(
                 LocalOverlayServerState.Failed,
-                failure ?? "The local overlay server stopped unexpectedly.");
+                failure?.Message ?? "The local overlay server stopped unexpectedly.");
         }
     }
 
@@ -260,7 +273,8 @@ public class LocalOverlayServer : IAsyncDisposable
         context.Response.AddHeader(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; " +
-            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'");
+            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'; " +
+            $"frame-ancestors {AppPageOrigin}");
         context.Response.ContentLength64 = bytes.Length;
         await context.Response.OutputStream.WriteAsync(bytes);
         context.Response.Close();
@@ -308,11 +322,12 @@ public class LocalOverlayServer : IAsyncDisposable
         context.Response.Close();
     }
 
-    private static bool IsAllowedHost(string? host)
+    internal static bool IsAllowedHost(string? host)
     {
+        // Uri.Host, which callers pass, writes the IPv6 loopback address in brackets.
         return string.Equals(host, "localhost", StringComparison.OrdinalIgnoreCase) ||
                string.Equals(host, "127.0.0.1", StringComparison.OrdinalIgnoreCase) ||
-               string.Equals(host, "::1", StringComparison.OrdinalIgnoreCase);
+               string.Equals(host, "[::1]", StringComparison.OrdinalIgnoreCase);
     }
 
     private static byte[] LoadEmbeddedResource(string resourceName, string missingResourceMessage)

@@ -755,7 +755,11 @@ function updateSongs(data) {
 }
 
 window.addEventListener('message', event => {
+    // Only the page that frames this preview drives it. A site that opens the preview address in a window of
+    // its own is not its parent, and the server's frame-ancestors policy stops other sites framing it.
     if (!_isSettingsPreview ||
+        window.parent === window ||
+        event.source !== window.parent ||
         !event.data ||
         event.data.type !== _spinnerContracts.messageTypes.settingsPreview ||
         !event.data.payload) return

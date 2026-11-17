@@ -36,8 +36,9 @@ function createElement(id = null) {
 
 // Loads the overlay the way OBS does: the contracts, the wheel library, the shared interop and the
 // page's inline scripts in one global scope, with only the elements Overlay.html declares.
-// `search` is the page's query string; `reducedMotion` is what prefers-reduced-motion reports.
-function loadOverlayPage({ search = '', reducedMotion = true } = {}) {
+// `search` is the page's query string; `reducedMotion` is what prefers-reduced-motion reports; `framedBy` is the
+// window whose page shows the overlay in a frame (the Settings preview), or nothing for a page of its own.
+function loadOverlayPage({ search = '', reducedMotion = true, framedBy = null } = {}) {
     const elements = new Map(
         [...overlayHtml.matchAll(/\bid="([^"]+)"/g)].map(match => [match[1], createElement(match[1])]));
     const windowListeners = {};
@@ -75,6 +76,8 @@ function loadOverlayPage({ search = '', reducedMotion = true } = {}) {
         console: { error: message => errors.push(message), warn() { }, log() { } }
     };
     context.window = context;
+    // A window that no page frames is its own parent.
+    context.parent = framedBy ?? context;
     vm.createContext(context);
 
     vm.runInContext(fs.readFileSync(path.join(webRoot, 'overlay/SongSpinner.contracts.js'), 'utf8'), context);
@@ -332,15 +335,65 @@ test('Overlay: a dropped event connection reconnects after three seconds and res
 });
 
 test('Overlay: the Settings preview ignores the event stream and applies only preview messages', () => {
-    const { elements, context, eventSources, windowListeners } = loadOverlayPage({ search: '?preview=1' });
+    const settingsPage = {};
+    const { elements, context, eventSources, windowListeners } =
+        loadOverlayPage({ search: '?preview=1', framedBy: settingsPage });
     const settingsPreview = context.SonglistSpinnerContracts.messageTypes.settingsPreview;
 
-    windowListeners.message({ data: { type: 'something-else', payload: initialState({ streamer: 'ignored' }) } });
-    windowListeners.message({ data: { type: settingsPreview, payload: initialState({ streamer: 'draft-channel' }) } });
+    windowListeners.message({
+        source: settingsPage,
+        data: { type: 'something-else', payload: initialState({ streamer: 'ignored' }) }
+    });
+    windowListeners.message({
+        source: settingsPage,
+        data: { type: settingsPreview, payload: initialState({ streamer: 'draft-channel' }) }
+    });
 
     assert.equal(eventSources.length, 0);
     assert.equal(context.document.body.classList.contains('settings-preview-mode'), true);
     assert.equal(elements.get('streamerLabel').textContent, 'draft-channel');
+});
+
+test('Overlay: the Settings preview ignores preview messages from any window but the page framing it', () => {
+    const settingsPage = {};
+    const anotherWindow = {};
+    const { elements, context, windowListeners } = loadOverlayPage({ search: '?preview=1', framedBy: settingsPage });
+    const settingsPreview = context.SonglistSpinnerContracts.messageTypes.settingsPreview;
+    windowListeners.message({
+        source: settingsPage,
+        data: { type: settingsPreview, payload: initialState({ streamer: 'draft-channel' }) }
+    });
+
+    windowListeners.message({
+        source: anotherWindow,
+        data: { type: settingsPreview, payload: initialState({ streamer: 'injected-channel' }) }
+    });
+
+    assert.equal(elements.get('streamerLabel').textContent, 'draft-channel');
+});
+
+test('Overlay: a preview page that no page frames ignores preview messages', () => {
+    // A site can open the preview address in a window of its own and post to it; it is then not its parent.
+    const opener = {};
+    const { elements, context, windowListeners } = loadOverlayPage({ search: '?preview=1' });
+    const before = elements.get('streamerLabel').textContent;
+
+    windowListeners.message({
+        source: opener,
+        data: {
+            type: context.SonglistSpinnerContracts.messageTypes.settingsPreview,
+            payload: initialState({ streamer: 'injected-channel' })
+        }
+    });
+    windowListeners.message({
+        source: context,
+        data: {
+            type: context.SonglistSpinnerContracts.messageTypes.settingsPreview,
+            payload: initialState({ streamer: 'injected-channel' })
+        }
+    });
+
+    assert.equal(elements.get('streamerLabel').textContent, before);
 });
 
 test('Overlay: the live OBS overlay ignores Settings preview messages', () => {
