@@ -53,6 +53,7 @@ New-Item -ItemType Directory -Path $outputDirectory | Out-Null
     --runtime win-x64 `
     --self-contained true `
     --output $outputDirectory `
+    -p:EnableTestProfile=false `
     -p:Version=$ReleaseVersion `
     -p:ApplicationDisplayVersion=$ReleaseVersion `
     -p:ApplicationVersion=$BuildNumber

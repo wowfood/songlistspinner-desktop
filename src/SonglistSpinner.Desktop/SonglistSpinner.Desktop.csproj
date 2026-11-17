@@ -47,6 +47,16 @@
     <ItemGroup Condition="'$(EnableTestProfile)' == 'true'">
         <AssemblyMetadata Include="SonglistSpinner.TestProfile" Value="enabled"/>
     </ItemGroup>
+    <!--
+      MSBuild also takes EnableTestProfile from an environment variable of that name, so a publish refuses to go
+      ahead with it on however it was set. scripts/publish-single-file.ps1 passes -p:EnableTestProfile=false,
+      which overrides the environment.
+    -->
+    <Target Name="RefuseToPublishWithTheTestProfile"
+            BeforeTargets="PrepareForPublish"
+            Condition="'$(EnableTestProfile)' == 'true'">
+        <Error Text="EnableTestProfile is true, so this build honours the test-profile variables and must not be published. Publish with -p:EnableTestProfile=false."/>
+    </Target>
 
     <!-- RID-specific settings apply only when the publish command supplies win-x64. -->
     <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' == 'win-x64'">
