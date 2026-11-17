@@ -233,6 +233,10 @@ public partial class Dashboard
         _dotNetRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef, nameof(PublishPlayedListWidth));
 
+        // The page can be disposed during the script calls above, and disposal also disposes the wheel's
+        // cancellation source, which the rest of this method reads.
+        if (_lifetimeCts.IsCancellationRequested) return;
+
         var activeSession = StreamerSession.GetSnapshot();
         if (activeSession.HasChannel)
         {
@@ -395,6 +399,9 @@ public partial class Dashboard
         try
         {
             await StreamerSession.ClearAsync(_config);
+            // The session is cleared either way; a page disposed meanwhile has nothing left to redraw.
+            if (_lifetimeCts.IsCancellationRequested) return;
+
             _showStreamerInput = true;
             _channel = null;
             StreamerInput = "";
