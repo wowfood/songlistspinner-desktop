@@ -14,6 +14,9 @@ public class SecureStorageStreamerSongListCredentialStoreTests
     private static readonly StreamerSongListCredential EnvironmentCredential =
         new(StreamerSongListCredentialKind.Streamer, "simulator-token");
 
+    private static readonly StreamerSongListCredential OAuthFallback =
+        new(StreamerSongListCredentialKind.OAuthBearer, "oauth-token", "client-id");
+
     [Theory]
     [InlineData(null)]
     [InlineData("   ")]
@@ -117,6 +120,40 @@ public class SecureStorageStreamerSongListCredentialStoreTests
     }
 
     [Fact]
+    public async Task Given_AnOAuthFallbackWithAClientId_When_SavingItWithPadding_Then_NothingIsStored()
+    {
+        var secrets = new InMemorySecretStore();
+        var preferences = new InMemoryKeyValueStore();
+        var store = CreateStore(secrets, preferences, OAuthFallback);
+
+        await store.SaveCredentialAsync(
+            new StreamerSongListCredential(StreamerSongListCredentialKind.OAuthBearer, " oauth-token ", " client-id "),
+            TestContext.Current.CancellationToken);
+
+        Assert.Empty(secrets.Values);
+        Assert.Empty(preferences.Values);
+    }
+
+    [Theory]
+    // The user changed something about the credential, so it is theirs now and is saved like any other.
+    [InlineData(StreamerSongListCredentialKind.OAuthBearer, "another-client")]
+    [InlineData(StreamerSongListCredentialKind.OAuthBearer, null)]
+    [InlineData(StreamerSongListCredentialKind.User, "client-id")]
+    public async Task Given_AnOAuthFallback_When_SavingItsTokenWithAnotherKindOrClientId_Then_TheEditedCredentialIsStored(
+        StreamerSongListCredentialKind kind,
+        string? clientId)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = CreateStore(new InMemorySecretStore(), new InMemoryKeyValueStore(), OAuthFallback);
+        var edited = new StreamerSongListCredential(kind, "oauth-token", clientId);
+
+        await store.SaveCredentialAsync(edited, cancellationToken);
+        var credential = await store.GetCredentialAsync(cancellationToken);
+
+        Assert.Equal(edited, credential);
+    }
+
+    [Fact]
     public async Task Given_ASavedCredential_When_Cleared_Then_ItsKeysAreRemovedAndTheEnvironmentFallbackApplies()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -137,16 +174,22 @@ public class SecureStorageStreamerSongListCredentialStoreTests
 
     private static SecureStorageStreamerSongListCredentialStore CreateStore(
         InMemorySecretStore secrets,
-        InMemoryKeyValueStore preferences) =>
-        new(
+        InMemoryKeyValueStore preferences,
+        StreamerSongListCredential? fallback = null)
+    {
+        fallback ??= EnvironmentCredential;
+        return new SecureStorageStreamerSongListCredentialStore(
             secrets,
             preferences,
             EnvironmentOverrides.Read(
                 name => name switch
                 {
-                    EnvironmentOverrides.AccessTokenVariable => EnvironmentCredential.Token,
-                    EnvironmentOverrides.TokenTypeVariable => "streamer",
+                    EnvironmentOverrides.AccessTokenVariable => fallback.Token,
+                    EnvironmentOverrides.TokenTypeVariable =>
+                        fallback.Kind == StreamerSongListCredentialKind.OAuthBearer ? "bearer" : "streamer",
+                    EnvironmentOverrides.ClientIdVariable => fallback.ClientId,
                     _ => null
                 },
                 allowTestProfile: false));
+    }
 }

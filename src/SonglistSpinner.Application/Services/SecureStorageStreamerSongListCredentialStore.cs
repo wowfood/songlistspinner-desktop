@@ -5,7 +5,8 @@ namespace SonglistSpinner.Services;
 /// <summary>
 /// Keeps the StreamerSongList API token in Windows secure storage and its kind and client id in preferences.
 /// While none is stored, the environment's fallback credential is used. The fallback itself is never stored:
-/// saving it clears the store instead.
+/// saving it clears the store instead. A credential that differs from it in kind or client id is the user's
+/// own, and is stored even when its token is the fallback's.
 /// </summary>
 public sealed class SecureStorageStreamerSongListCredentialStore(
     ISecretStore secureStorage,

@@ -121,14 +121,45 @@ public sealed class DiagnosticFileLoggerProviderTests : IDisposable
         {
             logger.LogInformation("{Filler}", new string('x', roomLeft));
             logger.LogInformation("After the limit");
+            logger.LogInformation("And again");
         }
 
         provider.Dispose();
 
+        // The oversized log is kept and added to: nothing in it is lost, and nothing replaced the previous log.
+        Assert.True(new FileInfo(LogPath).Length > DiagnosticFileLoggerProvider.MaximumLogBytes);
         Assert.Equal(
-            "2026-10-03T12:00:00.0000000+00:00 [Information] SonglistSpinner.Tests: After the limit",
-            File.ReadLines(LogPath).Last());
+            [
+                "2026-10-03T12:00:00.0000000+00:00 [Information] SonglistSpinner.Tests: After the limit",
+                "2026-10-03T12:00:00.0000000+00:00 [Information] SonglistSpinner.Tests: And again"
+            ],
+            File.ReadLines(LogPath).TakeLast(2));
         Assert.Equal(10, new FileInfo(PreviousLogPath).Length);
+    }
+
+    [Fact]
+    public void Given_TheLogCanNeitherBeMovedNorReopened_When_AnEntryTakesItToTheSizeLimit_Then_LoggingSwitchesOffWithoutFailingTheCaller()
+    {
+        const int roomLeft = 4096;
+        WriteLogOfLength(LogPath, DiagnosticFileLoggerProvider.MaximumLogBytes - roomLeft);
+        WriteLogOfLength(PreviousLogPath, 10);
+        var provider = new DiagnosticFileLoggerProvider(_logDirectory, _timeProvider);
+        provider.SetEnabled(true);
+        var logger = provider.CreateLogger("SonglistSpinner.Tests");
+        // Writing through the handle already open still works; opening the file again for writing does not.
+        File.SetAttributes(LogPath, FileAttributes.ReadOnly);
+        try
+        {
+            using (File.Open(PreviousLogPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                logger.LogInformation("{Filler}", new string('x', roomLeft));
+
+            Assert.False(provider.IsEnabled);
+        }
+        finally
+        {
+            File.SetAttributes(LogPath, FileAttributes.Normal);
+            provider.Dispose();
+        }
     }
 
     [Fact]
