@@ -269,6 +269,8 @@ public partial class Dashboard
         try
         {
             await ChannelLoader.LoadAsync(name, _config, _lifetimeCts.Token);
+            // The session finishes a start it has begun, so the load can complete after this page was disposed.
+            if (_lifetimeCts.IsCancellationRequested) return;
             // Session changes are ignored while the channel loads, so take the started session's state here.
             ApplySessionSnapshot(StreamerSession.GetSnapshot());
             await RebuildWheel(_wheelCts.Token);

@@ -22,4 +22,10 @@ public sealed class TimerTrackingTimeProvider : FakeTimeProvider
     /// <summary>Waits for the next timer to be created and returns its due time.</summary>
     public ValueTask<TimeSpan> WaitForTimerAsync(CancellationToken cancellationToken) =>
         _createdTimers.Reader.ReadAsync(cancellationToken);
+
+    /// <summary>
+    /// Takes a timer that was created but not yet waited for. Once the code under test has stopped running,
+    /// false shows that it started no further delay.
+    /// </summary>
+    public bool TryTakeCreatedTimer(out TimeSpan dueTime) => _createdTimers.Reader.TryRead(out dueTime);
 }

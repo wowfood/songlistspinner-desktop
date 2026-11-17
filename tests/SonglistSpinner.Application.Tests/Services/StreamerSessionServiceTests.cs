@@ -37,6 +37,29 @@ public class StreamerSessionServiceTests
     }
 
     [Fact]
+    public async Task Given_RealtimeRefreshTimesOut_When_NoFurtherEventArrives_Then_ReportsTheFailureAndRetriesUntilRefreshSucceeds()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new TimerTrackingTimeProvider();
+        var api = new ScriptedStreamerSongListClient();
+        // How an HttpClient timeout arrives: a cancellation the session's own token did not ask for.
+        api.QueueResponses.Enqueue(_ => throw new TaskCanceledException("The request timed out.", new TimeoutException()));
+        api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41)));
+        var events = new ChannelEventSource();
+        await using var session = new StreamerSessionService(api, events, new OverlayStateService(), time);
+        var recovered = WaitForRecoveryAfterFailure(session);
+        await session.StartAsync(1, Streamer, new SpinnerConfig(), [], [], null, cancellationToken);
+
+        events.Publish(StreamerSongListEventKind.QueueChanged);
+        await AdvancePastNextTimerAsync(time, cancellationToken);
+        await AdvancePastNextTimerAsync(time, cancellationToken);
+        var snapshot = await recovered.WaitAsync(WaitLimit, cancellationToken);
+
+        Assert.Equal(2, api.QueueFetches);
+        Assert.Equal([41], snapshot.AvailableSongs.Select(song => song.QueueId));
+    }
+
+    [Fact]
     public async Task Given_RealtimeRefreshKeepsFailing_When_Retrying_Then_DelayDoublesFromOneSecondUpToThirtySeconds()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
@@ -187,7 +210,11 @@ public class StreamerSessionServiceTests
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41)));
         var events = new ChannelEventSource();
         await using var session = new StreamerSessionService(api, events, new OverlayStateService(), time);
-        var refreshed = WaitForChange(session, change => change.Snapshot.AvailableSongs.Length == 1);
+        // The events loop records health and the refresh loop publishes the songs, so wait for both.
+        var refreshed = WaitForChange(
+            session,
+            change => change.Snapshot.AvailableSongs.Length == 1 &&
+                      change.Snapshot.RealtimeHealth == StreamerSessionHealth.Healthy);
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [], [], null, cancellationToken);
 
         events.Publish(StreamerSongListEventKind.Connected);
@@ -305,9 +332,14 @@ public class StreamerSessionServiceTests
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [], [], null, cancellationToken);
         var debounce = await AdvancePastNextTimerAsync(time, cancellationToken);
         await refreshed.WaitAsync(WaitLimit, cancellationToken);
+        // Clearing waits for the refresh loop to end. A loop that debounces again for a leftover signal has
+        // normally created that timer by then; one cancelled first creates none, so this check can miss a
+        // regression on some runs but never fails without one.
+        await session.ClearAsync(new SpinnerConfig());
 
         Assert.Equal(TimeSpan.FromMilliseconds(300), debounce);
         Assert.Equal(1, api.QueueFetches);
+        Assert.False(time.TryTakeCreatedTimer(out _), "The burst started a second debounce.");
     }
 
     [Fact]
@@ -371,6 +403,99 @@ public class StreamerSessionServiceTests
 
         Assert.NotNull(refreshed);
         Assert.Equal([41], refreshed.AvailableSongs.Select(song => song.QueueId));
+    }
+
+    [Fact]
+    public async Task Given_ALoadedChannel_When_StartingAnotherIsAlreadyCancelled_Then_ThePreviousChannelKeepsItsSubscription()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var events = new ChannelEventSource();
+        await using var session = new StreamerSessionService(
+            new ScriptedStreamerSongListClient(),
+            events,
+            new OverlayStateService(),
+            new FakeTimeProvider());
+        await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => session.StartAsync(
+            2,
+            "another-channel",
+            new SpinnerConfig(),
+            [],
+            [],
+            null,
+            new CancellationToken(canceled: true)));
+
+        Assert.Equal(Streamer, session.GetSnapshot().Streamer);
+        Assert.False(events.SubscriptionEnded.IsCompleted);
+    }
+
+    [Fact]
+    public async Task Given_ALoadedChannel_When_StartingAnotherIsCancelledWhileThePreviousSubscriptionStops_Then_TheNewChannelIsLive()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var previousSubscriptionHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ChannelEventSource { HoldSubscriptionEnd = previousSubscriptionHeld.Task };
+        await using var session = new StreamerSessionService(
+            new ScriptedStreamerSongListClient(),
+            events,
+            new OverlayStateService(),
+            new FakeTimeProvider());
+        await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
+        var live = WaitForChange(
+            session,
+            change => change.Snapshot.Streamer == "another-channel" &&
+                      change.Snapshot.RealtimeHealth == StreamerSessionHealth.Healthy);
+        using var callerLifetime = new CancellationTokenSource();
+
+        Task start;
+        try
+        {
+            start = session.StartAsync(2, "another-channel", new SpinnerConfig(), [], [], null, callerLifetime.Token);
+            await events.SubscriptionEnded.WaitAsync(WaitLimit, cancellationToken);
+            callerLifetime.Cancel();
+        }
+        finally
+        {
+            previousSubscriptionHeld.TrySetResult();
+        }
+
+        await start.WaitAsync(WaitLimit, cancellationToken);
+        events.Publish(StreamerSongListEventKind.Connected);
+        await live.WaitAsync(WaitLimit, cancellationToken);
+
+        Assert.Equal("another-channel", session.GetSnapshot().Streamer);
+    }
+
+    [Fact]
+    public async Task Given_AStartIsStillStoppingThePreviousSubscription_When_TheSessionIsCleared_Then_TheClearTakesEffectAfterTheStart()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var previousSubscriptionHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ChannelEventSource { HoldSubscriptionEnd = previousSubscriptionHeld.Task };
+        await using var session = new StreamerSessionService(
+            new ScriptedStreamerSongListClient(),
+            events,
+            new OverlayStateService(),
+            new FakeTimeProvider());
+        await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
+
+        Task start;
+        Task clear;
+        try
+        {
+            start = session.StartAsync(2, "another-channel", new SpinnerConfig(), [], [], null, cancellationToken);
+            await events.SubscriptionEnded.WaitAsync(WaitLimit, cancellationToken);
+            clear = session.ClearAsync(new SpinnerConfig());
+        }
+        finally
+        {
+            previousSubscriptionHeld.TrySetResult();
+        }
+
+        await Task.WhenAll(start, clear).WaitAsync(WaitLimit, cancellationToken);
+
+        Assert.False(session.GetSnapshot().HasChannel);
     }
 
     [Fact]

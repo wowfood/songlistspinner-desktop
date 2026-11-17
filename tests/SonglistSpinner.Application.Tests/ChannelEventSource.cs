@@ -14,6 +14,9 @@ internal sealed class ChannelEventSource : IStreamerSongListEventSource
     /// <summary>Completes when a subscriber stops reading, whether it was cancelled or the stream ended.</summary>
     public Task SubscriptionEnded => _subscriptionEnded.Task;
 
+    /// <summary>When set, a subscriber that has stopped reading does not finish unwinding until this completes.</summary>
+    public Task? HoldSubscriptionEnd { get; init; }
+
     public void Publish(StreamerSongListEventKind kind, string? error = null) =>
         _events.Writer.TryWrite(new StreamerSongListEvent(kind, Error: error));
 
@@ -38,6 +41,7 @@ internal sealed class ChannelEventSource : IStreamerSongListEventSource
         finally
         {
             _subscriptionEnded.TrySetResult();
+            if (HoldSubscriptionEnd is { } hold) await hold;
         }
     }
 }

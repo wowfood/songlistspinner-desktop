@@ -25,6 +25,10 @@ public sealed class StreamerSessionService : IAsyncDisposable
     private readonly ILogger<StreamerSessionService> _logger;
     private readonly CancellationTokenSource _lifetimeCts = new();
     private readonly SemaphoreSlim _refreshGate = new(1, 1);
+
+    // A start or clear waits here while another stops the previous subscription, so a later request cannot be
+    // overwritten by an earlier one that finishes afterwards.
+    private readonly SemaphoreSlim _channelChangeGate = new(1, 1);
     private readonly object _stateGate = new();
 
     private CancellationTokenSource? _subscriptionCts;
@@ -56,6 +60,12 @@ public sealed class StreamerSessionService : IAsyncDisposable
             return _snapshot;
     }
 
+    /// <summary>
+    /// Replaces the loaded channel and starts its realtime subscription.
+    /// <paramref name="cancellationToken"/> is honoured only before the previous subscription is stopped: a
+    /// start that has stopped it always finishes, so the session never shows a channel nothing is subscribed to.
+    /// Starts and clears take effect one at a time, in the order they were requested.
+    /// </summary>
     public async Task StartAsync(
         int streamerId,
         string streamer,
@@ -65,9 +75,26 @@ public sealed class StreamerSessionService : IAsyncDisposable
         SpinnerQueueItem? nowPlaying,
         CancellationToken cancellationToken = default)
     {
-        await StopSubscriptionAsync();
-        cancellationToken.ThrowIfCancellationRequested();
+        await _channelChangeGate.WaitAsync(cancellationToken);
+        try
+        {
+            await StopSubscriptionAsync();
+            StartSubscription(streamerId, streamer, config, availableSongs, playedSongs, nowPlaying);
+        }
+        finally
+        {
+            _channelChangeGate.Release();
+        }
+    }
 
+    private void StartSubscription(
+        int streamerId,
+        string streamer,
+        SpinnerConfig config,
+        IReadOnlyCollection<SpinnerQueueItem> availableSongs,
+        IReadOnlyCollection<PlayHistoryItem> playedSongs,
+        SpinnerQueueItem? nowPlaying)
+    {
         lock (_stateGate)
         {
             _snapshot = new StreamerSessionSnapshot(
@@ -237,15 +264,23 @@ public sealed class StreamerSessionService : IAsyncDisposable
 
     public async Task ClearAsync(SpinnerConfig config)
     {
-        await StopSubscriptionAsync();
-        lock (_stateGate)
+        await _channelChangeGate.WaitAsync();
+        try
         {
-            _refreshSuspended = false;
-            _snapshot = StreamerSessionSnapshot.Empty with { Config = config };
-        }
+            await StopSubscriptionAsync();
+            lock (_stateGate)
+            {
+                _refreshSuspended = false;
+                _snapshot = StreamerSessionSnapshot.Empty with { Config = config };
+            }
 
-        _overlayService.UpdateState(config, [], [], null, "");
-        RaiseChanged();
+            _overlayService.UpdateState(config, [], [], null, "");
+            RaiseChanged();
+        }
+        finally
+        {
+            _channelChangeGate.Release();
+        }
     }
 
     private async Task RunEventsAsync(
@@ -260,11 +295,12 @@ public sealed class StreamerSessionService : IAsyncDisposable
             {
                 if (notification.Kind == StreamerSongListEventKind.Connected)
                 {
-                    refreshSignals.TryWrite(true);
+                    // Health first: the refresh this signals publishes a snapshot, which must already say Healthy.
                     UpdateRealtimeHealth(
                         StreamerSessionHealth.Healthy,
                         "Receiving live queue and history events.",
                         wasDisconnected ? "Realtime updates reconnected." : null);
+                    refreshSignals.TryWrite(true);
                     wasDisconnected = false;
                     continue;
                 }
@@ -460,7 +496,17 @@ public sealed class StreamerSessionService : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         _lifetimeCts.Cancel();
-        await StopSubscriptionAsync();
+        await _channelChangeGate.WaitAsync();
+        try
+        {
+            await StopSubscriptionAsync();
+        }
+        finally
+        {
+            _channelChangeGate.Release();
+        }
+
+        _channelChangeGate.Dispose();
         _refreshGate.Dispose();
         _lifetimeCts.Dispose();
         GC.SuppressFinalize(this);
