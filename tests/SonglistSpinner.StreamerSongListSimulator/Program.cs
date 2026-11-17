@@ -46,7 +46,8 @@ Console.WriteLine($"""
       $env:SONGLISTSPINNER_OVERLAY_PORT = "5151"
       $env:SONGLISTSPINNER_UPDATE_RELEASE_URL = "{simulator.ApiBaseAddress}_simulator/no-releases"
     Without the profile, a token saved in Settings is sent instead (and rejected), and Settings saves into
-    your real profile.
+    your real profile. Only a Debug build of the app, or one built with -p:EnableTestProfile=true, uses the
+    profile folder: a released app ignores SONGLISTSPINNER_PROFILE_DIR.
     {(seed == "demo" ? $"Seeded channel: '{DemoSeed.ChannelName}' on twitch (streamer {DemoSeed.StreamerId})." : "No channels seeded.")}
     Add a request:  POST {simulator.ApiBaseAddress}_simulator/requests?streamer_id=<id>&artist=<a>&title=<t>&requester=<r>
     Drop events:    POST {simulator.ApiBaseAddress}_simulator/events/drop
