@@ -79,6 +79,10 @@ embedded product version before succeeding.
 Before merging `develop` into `main`:
 
 - Confirm the pull request workflow and all tests passed.
+- Run the end-to-end tests from a desktop session with `./scripts/run-e2e.ps1` and
+  confirm they pass. They are skipped in every ordinary CI run, and they are the
+  only automated tests of the Dashboard, Settings and Setup pages. The promotion
+  pull request also runs them in CI (the `End-to-end tests` job).
 - Download and launch the CI artifact on a clean Windows account or test
   machine; automated startup and overlay smoke testing do not replace
   interactive QA.

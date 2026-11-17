@@ -10,6 +10,11 @@ on:
       - main
       - develop
   workflow_dispatch:
+    inputs:
+      end_to_end:
+        description: Also run the end-to-end tests (about ten minutes)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -177,6 +182,33 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+  # The suite opens real app windows and takes about ten minutes, so it runs only for a release (the pull
+  # request that promotes develop to main) or when a manual run asks for it. The release job does not wait
+  # for it: this job is skipped on the push to main, and a skipped dependency would skip the release.
+  end-to-end:
+    name: End-to-end tests
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.end_to_end)
+    runs-on: windows-2022
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET and MAUI Windows
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          workloads: maui-windows
+
+      - name: Run the end-to-end tests
+        shell: pwsh
+        run: .\scripts\run-e2e.ps1
 
   release:
     name: Publish GitHub release

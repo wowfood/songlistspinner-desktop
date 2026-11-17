@@ -60,8 +60,9 @@ dotnet test --project tests/SonglistSpinner.IntegrationTests
 
 ### End-to-end tests
 
-The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run (and CI) every
-one reports as skipped. Run them from a desktop session and leave the windows alone until they finish (the full
+The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run every one reports
+as skipped. CI runs them only for the pull request that promotes `develop` to `main`, or when a manual run of the
+workflow ticks `end_to_end`. Run them from a desktop session and leave the windows alone until they finish (the full
 suite, 147 tests, takes about ten minutes, mostly app launches):
 
 ```powershell
