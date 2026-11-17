@@ -62,10 +62,10 @@ dotnet test --project tests/SonglistSpinner.IntegrationTests
 ### End-to-end tests
 
 The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run every one that
-starts the app reports as skipped (the few that test the harness itself, such as `TestProfileStampTests`, always
-run). CI runs them only for the pull request that promotes `develop` to `main`, or when a manual run of the
-workflow ticks `end_to_end`. Run them from a desktop session and leave the windows alone until they finish (the full
-suite, 147 tests, takes about ten minutes, mostly app launches):
+starts the app reports as skipped (`TestProfileStampTests`, which tests the harness itself and starts no app,
+always runs). CI runs them only for the pull request that promotes `develop` to `main`, or when a manual run of the
+workflow ticks `end_to_end`. Run them from a desktop session and leave the windows alone until they finish (the
+147 tests that start the app take about ten minutes, mostly app launches):
 
 ```powershell
 ./scripts/run-e2e.ps1
@@ -192,7 +192,8 @@ Debug builds, and in a Release build made with `-p:EnableTestProfile=true` (`scr
 plain Release build ignores both, so a variable left in a user's environment cannot move their credential into a
 plain-text file or open a debugging port. MSBuild would also take the property from an environment variable
 named `EnableTestProfile`, so `scripts/publish-single-file.ps1` passes `-p:EnableTestProfile=false` and the
-project refuses to publish with it on. The other `SONGLISTSPINNER_*` variables work in every build.
+project refuses to publish with it on, or with `--no-build`, which would package whatever an earlier build
+left. The other `SONGLISTSPINNER_*` variables work in every build.
 
 ## Conventions
 

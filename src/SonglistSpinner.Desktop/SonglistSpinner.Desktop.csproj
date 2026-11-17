@@ -57,6 +57,16 @@
             Condition="'$(EnableTestProfile)' == 'true'">
         <Error Text="EnableTestProfile is true, so this build honours the test-profile variables and must not be published. Publish with -p:EnableTestProfile=false."/>
     </Target>
+    <!--
+      The check above reads the property of this publish, not what an earlier build compiled in, and a publish
+      that skips the build would package whatever is already there (scripts/run-e2e.ps1 leaves a test-profile
+      build in the same folder). So a publish always builds.
+    -->
+    <Target Name="RefuseToPublishWithoutBuilding"
+            BeforeTargets="PrepareForPublish"
+            Condition="'$(NoBuild)' == 'true'">
+        <Error Text="Publishing without building is not supported: the existing build may honour the test-profile variables. Publish without --no-build."/>
+    </Target>
 
     <!-- RID-specific settings apply only when the publish command supplies win-x64. -->
     <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' == 'win-x64'">
