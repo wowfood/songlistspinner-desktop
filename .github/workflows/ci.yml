@@ -39,12 +39,14 @@ jobs:
       - name: Require develop as the source branch for a pull request
         if: github.event_name == 'pull_request'
         shell: bash
-        # A branch name is chosen by whoever opens the pull request, so it reaches the script as data.
+        # The branch and repository names are chosen by whoever opens the pull request, so they reach the script
+        # as data. A fork can name a branch develop, so the repository must be this one too.
         env:
           HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "$HEAD_REF" != "develop" ]]; then
-            echo "Pull requests into main must come from develop."
+          if [[ "$HEAD_REF" != "develop" || "$HEAD_REPOSITORY" != "$GITHUB_REPOSITORY" ]]; then
+            echo "Pull requests into main must come from this repository's develop branch."
             exit 1
           fi
 
@@ -60,7 +62,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "repos/$GH_REPO/commits/$GITHUB_SHA/pulls" \
-              --jq '[.[] | select(.merged_at != null and .base.ref == "main" and .head.ref == "develop")] | length'
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main" and .head.ref == "develop" and .head.repo.full_name == .base.repo.full_name)] | length'
           )"
 
           if [[ "$matching_pull_requests" -lt 1 ]]; then
