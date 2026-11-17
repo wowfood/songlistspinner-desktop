@@ -65,13 +65,57 @@ public class PreferencesSettingsServiceTests
     }
 
     [Fact]
-    public void Given_UnreadableSavedSettingsThatCannotBeKeptAside_When_Loading_Then_TheDefaultsAreStillReturned()
+    public void Given_UnreadableSavedSettingsThatCannotBeKeptAside_When_Loading_Then_TheDefaultsAreStillReturnedAndBothFailuresLogged()
     {
-        var settings = new PreferencesSettingsService(new ReadOnlyStore(savedSettings: "{ not json"));
+        var logger = new FakeLogger<PreferencesSettingsService>();
+        var settings = new PreferencesSettingsService(new ReadOnlyStore(savedSettings: "{ not json"), logger);
 
         var loaded = settings.LoadSettings();
 
         Assert.Equal(Json(new SettingsDto()), Json(loaded));
+        var entry = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        var failures = Assert.IsType<AggregateException>(entry.Exception).InnerExceptions;
+        Assert.Equal([typeof(JsonException), typeof(IOException)], failures.Select(failure => failure.GetType()));
+    }
+
+    [Fact]
+    public void Given_TheSameUnreadableSavedSettings_When_LoadedAgain_Then_TheCopyIsNotWrittenASecondTime()
+    {
+        var store = new CountingStore { Values = { [SettingsKey] = "{ not json" } };
+        var settings = new PreferencesSettingsService(store);
+
+        settings.LoadSettings();
+        settings.LoadSettings();
+
+        Assert.Equal(1, store.Writes);
+    }
+
+    [Fact]
+    public void Given_UnreadableSettingsWereKeptAsideEarlier_When_ReportingThem_Then_AWarningSaysWhereTheyAre()
+    {
+        var store = new InMemoryKeyValueStore { Values = { [UnreadableSettingsKey] = "{ not json" } };
+        var logger = new FakeLogger<PreferencesSettingsService>();
+        var settings = new PreferencesSettingsService(store, logger);
+
+        settings.LogKeptUnreadableSettings();
+
+        var entry = Assert.Single(logger.Collector.GetSnapshot());
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Equal(
+            "Saved settings that could not be read were replaced by the defaults; they are kept under local_settings.unreadable",
+            entry.Message);
+    }
+
+    [Fact]
+    public void Given_NoUnreadableSettingsWereKeptAside_When_ReportingThem_Then_NothingIsLogged()
+    {
+        var logger = new FakeLogger<PreferencesSettingsService>();
+        var settings = new PreferencesSettingsService(new InMemoryKeyValueStore(), logger);
+
+        settings.LogKeptUnreadableSettings();
+
+        Assert.Empty(logger.Collector.GetSnapshot());
     }
 
     [Fact]
@@ -97,6 +141,24 @@ public class PreferencesSettingsServiceTests
     }
 
     private static string Json(SettingsDto settings) => JsonSerializer.Serialize(settings);
+
+    /// <summary>Saved values held in memory that count how often one is written.</summary>
+    private sealed class CountingStore : IKeyValueStore
+    {
+        public Dictionary<string, string> Values { get; } = [];
+
+        public int Writes { get; private set; }
+
+        public string? GetValue(string key) => Values.GetValueOrDefault(key);
+
+        public void SetValue(string key, string value)
+        {
+            Writes++;
+            Values[key] = value;
+        }
+
+        public void Remove(string key) => Values.Remove(key);
+    }
 
     /// <summary>Saved values that can be read but not written, as when the preferences file is locked.</summary>
     private sealed class ReadOnlyStore(string savedSettings) : IKeyValueStore

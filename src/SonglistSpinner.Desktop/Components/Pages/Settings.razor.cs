@@ -200,7 +200,9 @@ public partial class Settings
             _vm.ApplyToDto(_dto);
             LocalSettings.SaveSettings(_dto);
             RefreshSeparatorChoices();
+            var switchingLogOn = _dto.DebugMode && !DiagnosticLog.IsEnabled;
             DiagnosticLog.SetEnabled(_dto.DebugMode);
+            if (switchingLogOn) LocalSettings.LogKeptUnreadableSettings();
             StreamerSession.UpdateConfig(SettingsDtoConverter.ToSpinnerConfig(_dto));
 
             var credential = CredentialDraft.ToCredential(

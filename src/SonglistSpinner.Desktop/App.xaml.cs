@@ -15,6 +15,8 @@ public partial class App
     {
         _overlayServer = overlayServer;
         diagnosticLog.SetEnabled(localSettings.LoadSettings().DebugMode);
+        // The load above warns about unreadable settings before the log is on, so say it again now that it may be.
+        localSettings.LogKeptUnreadableSettings();
         AppDomain.CurrentDomain.UnhandledException += (_, args) =>
             logger.LogCritical(
                 args.ExceptionObject as Exception,
