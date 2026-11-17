@@ -9,8 +9,10 @@ namespace SonglistSpinner.Services;
 /// logging (the Settings debug-mode toggle) is enabled, and drops them while it is disabled.
 /// </summary>
 /// <remarks>
-/// Enabling moves a log of <see cref="MaximumLogBytes"/> or more to <see cref="PreviousLogFileName"/>,
-/// replacing the older one, so the folder never holds more than two logs. The file is best-effort: if it
+/// A log of <see cref="MaximumLogBytes"/> or more is moved to <see cref="PreviousLogFileName"/>, replacing
+/// the older one, both when logging is enabled and when an entry takes the open log to that size, so the
+/// folder never holds more than two logs. A log that cannot be moved while it is being written, because
+/// another program has it open, keeps growing until logging is next enabled. The file is best-effort: if it
 /// cannot be opened or written, logging switches off rather than failing the caller.
 /// </remarks>
 public sealed class DiagnosticFileLoggerProvider : ILoggerProvider
@@ -22,6 +24,7 @@ public sealed class DiagnosticFileLoggerProvider : ILoggerProvider
     private readonly object _gate = new();
     private readonly TimeProvider _timeProvider;
     private StreamWriter? _writer;
+    private bool _rotateWhileLogging;
 
     public DiagnosticFileLoggerProvider(string logDirectory, TimeProvider timeProvider)
     {
@@ -56,10 +59,7 @@ public sealed class DiagnosticFileLoggerProvider : ILoggerProvider
 
             try
             {
-                Directory.CreateDirectory(LogDirectory);
-                var logPath = Path.Combine(LogDirectory, LogFileName);
-                RotateIfNeeded(logPath);
-                _writer = new StreamWriter(logPath, append: true, Encoding.UTF8) { AutoFlush = true };
+                OpenLogFile();
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
@@ -102,12 +102,44 @@ public sealed class DiagnosticFileLoggerProvider : ILoggerProvider
         try
         {
             _writer!.WriteLine(entry.ToString());
+            // A long run can log a stack trace for every failed retry, so the limit applies while logging too.
+            if (_rotateWhileLogging && _writer.BaseStream.Length >= MaximumLogBytes)
+                StartNewLogFile();
         }
-        catch (IOException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             // A full or failing disk must not break the operation being logged; stop logging instead.
             CloseWriter();
         }
+    }
+
+    // Callers hold _gate with the writer closed.
+    private void OpenLogFile()
+    {
+        Directory.CreateDirectory(LogDirectory);
+        var logPath = Path.Combine(LogDirectory, LogFileName);
+        RotateIfNeeded(logPath);
+        _writer = new StreamWriter(logPath, append: true, Encoding.UTF8) { AutoFlush = true };
+        _rotateWhileLogging = true;
+    }
+
+    // Callers hold _gate with the writer open.
+    private void StartNewLogFile()
+    {
+        CloseWriter();
+        var logPath = Path.Combine(LogDirectory, LogFileName);
+        try
+        {
+            RotateIfNeeded(logPath);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // A log viewer has one of the two files open, which is likely while someone diagnoses a problem.
+            // Keep writing to the oversized log rather than lose entries; the next enable moves it aside.
+            _rotateWhileLogging = false;
+        }
+
+        _writer = new StreamWriter(logPath, append: true, Encoding.UTF8) { AutoFlush = true };
     }
 
     private void RotateIfNeeded(string logPath)

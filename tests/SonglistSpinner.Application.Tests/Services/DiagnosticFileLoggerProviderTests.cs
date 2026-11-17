@@ -88,6 +88,50 @@ public sealed class DiagnosticFileLoggerProviderTests : IDisposable
     }
 
     [Fact]
+    public void Given_EnabledLog_When_AnEntryTakesItToTheSizeLimit_Then_MovesItToThePreviousLogAndLaterEntriesStartANewOne()
+    {
+        const int roomLeft = 4096;
+        WriteLogOfLength(LogPath, DiagnosticFileLoggerProvider.MaximumLogBytes - roomLeft);
+        var provider = new DiagnosticFileLoggerProvider(_logDirectory, _timeProvider);
+        provider.SetEnabled(true);
+        var logger = provider.CreateLogger("SonglistSpinner.Tests");
+
+        logger.LogInformation("{Filler}", new string('x', roomLeft));
+        logger.LogInformation("After the limit");
+        provider.Dispose();
+
+        Assert.True(new FileInfo(PreviousLogPath).Length >= DiagnosticFileLoggerProvider.MaximumLogBytes);
+        Assert.Equal(
+            ["2026-10-03T12:00:00.0000000+00:00 [Information] SonglistSpinner.Tests: After the limit"],
+            File.ReadAllLines(LogPath));
+    }
+
+    [Fact]
+    public void Given_ThePreviousLogIsOpenElsewhere_When_AnEntryTakesTheLogToTheSizeLimit_Then_LaterEntriesAreStillWritten()
+    {
+        const int roomLeft = 4096;
+        WriteLogOfLength(LogPath, DiagnosticFileLoggerProvider.MaximumLogBytes - roomLeft);
+        WriteLogOfLength(PreviousLogPath, 10);
+        var provider = new DiagnosticFileLoggerProvider(_logDirectory, _timeProvider);
+        provider.SetEnabled(true);
+        var logger = provider.CreateLogger("SonglistSpinner.Tests");
+
+        // A log viewer reading the previous log stops the current one from replacing it.
+        using (File.Open(PreviousLogPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            logger.LogInformation("{Filler}", new string('x', roomLeft));
+            logger.LogInformation("After the limit");
+        }
+
+        provider.Dispose();
+
+        Assert.Equal(
+            "2026-10-03T12:00:00.0000000+00:00 [Information] SonglistSpinner.Tests: After the limit",
+            File.ReadLines(LogPath).Last());
+        Assert.Equal(10, new FileInfo(PreviousLogPath).Length);
+    }
+
+    [Fact]
     public void Given_LogBelowTheSizeLimit_When_Enabled_Then_AppendsToIt()
     {
         File.WriteAllLines(EnsureDirectory(LogPath), ["earlier entry"]);
