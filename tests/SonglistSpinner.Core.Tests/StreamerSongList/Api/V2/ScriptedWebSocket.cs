@@ -113,7 +113,14 @@ internal sealed class ScriptedWebSocket : WebSocket
         return Task.CompletedTask;
     }
 
-    public override void Abort() => _state = WebSocketState.Aborted;
+    /// <summary>Whether the client aborted the connection, which ends a receive it is no longer waiting for.</summary>
+    public bool WasAborted { get; private set; }
+
+    public override void Abort()
+    {
+        WasAborted = true;
+        _state = WebSocketState.Aborted;
+    }
 
     public override void Dispose()
     {

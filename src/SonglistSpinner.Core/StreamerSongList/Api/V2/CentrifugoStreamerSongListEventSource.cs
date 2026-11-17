@@ -244,19 +244,30 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         CancellationToken cancellationToken)
     {
         var buffer = ArrayPool<byte>.Shared.Rent(ReceiveBufferBytes);
+        var receivePending = false;
         try
         {
             using var message = new MemoryStream();
             WebSocketReceiveResult result;
             do
             {
+                var receive = socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
                 try
                 {
-                    result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken)
-                        .WaitAsync(_options.ReceiveIdleTimeout, _timeProvider, cancellationToken);
+                    result = await receive.WaitAsync(_options.ReceiveIdleTimeout, _timeProvider, cancellationToken);
                 }
                 catch (TimeoutException)
                 {
+                    // The receive is still running and may yet write to the buffer, so the buffer is kept out of
+                    // the pool. Aborting ends the receive, and its failure is observed here because nothing
+                    // awaits it any more.
+                    receivePending = true;
+                    socket.Abort();
+                    _ = receive.ContinueWith(
+                        static abandoned => _ = abandoned.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
                     throw new WebSocketException(
                         $"No StreamerSongList event data was received for {_options.ReceiveIdleTimeout.TotalSeconds:0} seconds.");
                 }
@@ -273,7 +284,7 @@ public sealed class CentrifugoStreamerSongListEventSource : IStreamerSongListEve
         }
         finally
         {
-            ArrayPool<byte>.Shared.Return(buffer);
+            if (!receivePending) ArrayPool<byte>.Shared.Return(buffer);
         }
     }
 

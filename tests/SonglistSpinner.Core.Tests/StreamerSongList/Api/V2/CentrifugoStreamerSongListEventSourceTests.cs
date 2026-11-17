@@ -270,6 +270,8 @@ public class CentrifugoStreamerSongListEventSourceTests
                 StreamerSongListEventKind.Reconnecting,
                 Error: "No StreamerSongList event data was received for 300 seconds."),
             events.Current);
+        // The receive that timed out is still pending, so the connection is aborted to end it.
+        Assert.True(socket.WasAborted);
         Assert.True(socket.IsDisposed);
     }
 
