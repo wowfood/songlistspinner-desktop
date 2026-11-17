@@ -61,8 +61,9 @@ dotnet test --project tests/SonglistSpinner.IntegrationTests
 
 ### End-to-end tests
 
-The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run every one reports
-as skipped. CI runs them only for the pull request that promotes `develop` to `main`, or when a manual run of the
+The end-to-end tests open real SonglistSpinner windows, so they are opt-in: in the default run every one that
+starts the app reports as skipped (the few that test the harness itself, such as `TestProfileStampTests`, always
+run). CI runs them only for the pull request that promotes `develop` to `main`, or when a manual run of the
 workflow ticks `end_to_end`. Run them from a desktop session and leave the windows alone until they finish (the full
 suite, 147 tests, takes about ten minutes, mostly app launches):
 
@@ -127,10 +128,11 @@ dotnet test --solution SonglistSpinner.Desktop.sln -c Release --coverage --cover
 ```
 
 Each test project writes its own `TestResults/<guid>.cobertura.xml` at the repository root (ignored by git).
-Core is exercised by all three .NET test projects and Application by two, so read the reports together, taking
-the higher hit count for each line, rather than one project's figure. `tests/coverage.settings.xml` names the
-two measured assemblies; without it the report is empty. Desktop (Razor pages, MAUI services) is not measured,
-because no test project references it, and the JavaScript has no coverage tool.
+Core and Application are exercised by several of the test projects, so read the reports together, taking the
+higher hit count for each line, rather than one project's figure. `tests/coverage.settings.xml` names the two
+measured assemblies; without it the report is empty. Desktop (Razor pages, MAUI services) is not measured:
+no test project references it, and the few Desktop files that `SonglistSpinner.Desktop.Tests` compiles are
+excluded with the rest of that test assembly. The JavaScript has no coverage tool.
 
 ## StreamerSongList simulator
 
@@ -166,9 +168,10 @@ $env:SONGLISTSPINNER_SSL_TOKEN_TYPE = "streamer"
 
 The two URLs replace the production endpoints. An unencrypted address (`http`, `ws`) is accepted only on this
 machine, because the saved token is sent to the API address; anything else keeps the production endpoint. The
-token is only a fallback, and saving it in Settings stores nothing: a token saved in Settings (Windows secure
-storage) takes precedence and would be sent to the simulator, which rejects it, so clear the saved token first,
-or keep your own profile out of it with a test profile:
+token is only a fallback, and saving it unchanged in Settings stores nothing (saved with a different type or
+client id it is the user's own credential and is stored). A token saved in Settings (Windows secure storage)
+takes precedence and would be sent to the simulator, which rejects it, so clear the saved token first, or keep
+your own profile out of it with a test profile:
 
 ```powershell
 $env:SONGLISTSPINNER_PROFILE_DIR = "$env:TEMP\songlistspinner-test"   # a full path
@@ -186,9 +189,10 @@ end-to-end tests open the DevTools port with it, because the WebView ignores Web
 
 Those two variables are compiled in only when the `EnableTestProfile` MSBuild property is true: by default in
 Debug builds, and in a Release build made with `-p:EnableTestProfile=true` (`scripts/run-e2e.ps1` does this). A
-plain Release build, and so every published executable, ignores both, so a variable left in a user's
-environment cannot move their credential into a plain-text file or open a debugging port. The other
-`SONGLISTSPINNER_*` variables work in every build.
+plain Release build ignores both, so a variable left in a user's environment cannot move their credential into a
+plain-text file or open a debugging port. MSBuild would also take the property from an environment variable
+named `EnableTestProfile`, so `scripts/publish-single-file.ps1` passes `-p:EnableTestProfile=false` and the
+project refuses to publish with it on. The other `SONGLISTSPINNER_*` variables work in every build.
 
 ## Conventions
 
