@@ -88,6 +88,9 @@ public class GitHubReleaseUpdateCheckerTests
     [Theory]
     [InlineData("release-1.2.0", "https://github.com/wowfood/songlistspinner-desktop/releases/tag/release-1.2.0")]
     [InlineData("v1.2.0", "https://example.com/wowfood/songlistspinner-desktop/releases/tag/v1.2.0")]
+    // A browser reads encoded dot segments as "..", which would leave this repository's releases.
+    [InlineData("v1.2.0", "https://github.com/wowfood/songlistspinner-desktop/releases/%2e%2e/%2e%2e/%2e%2e/another/repository")]
+    [InlineData("v1.2.0", "https://github.com/wowfood/songlistspinner-desktop/releases/../../../another/repository")]
     public async Task Given_InvalidReleaseMetadata_When_Checking_Then_ReturnsNoUpdate(
         string tag,
         string releaseUrl)
