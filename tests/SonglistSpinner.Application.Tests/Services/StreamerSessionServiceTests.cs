@@ -210,11 +210,9 @@ public class StreamerSessionServiceTests
         api.QueueResponses.Enqueue(_ => Task.FromResult(QueueWith(41)));
         var events = new ChannelEventSource();
         await using var session = new StreamerSessionService(api, events, new OverlayStateService(), time);
-        // The events loop records health and the refresh loop publishes the songs, so wait for both.
-        var refreshed = WaitForChange(
-            session,
-            change => change.Snapshot.AvailableSongs.Length == 1 &&
-                      change.Snapshot.RealtimeHealth == StreamerSessionHealth.Healthy);
+        // The session records realtime health before it signals the refresh, so the first change that carries
+        // the refreshed songs must already say Healthy. Waiting on the songs alone is what checks that order.
+        var refreshed = WaitForChange(session, change => change.Snapshot.AvailableSongs.Length == 1);
         await session.StartAsync(1, Streamer, new SpinnerConfig(), [], [], null, cancellationToken);
 
         events.Publish(StreamerSongListEventKind.Connected);
@@ -496,6 +494,44 @@ public class StreamerSessionServiceTests
         await Task.WhenAll(start, clear).WaitAsync(WaitLimit, cancellationToken);
 
         Assert.False(session.GetSnapshot().HasChannel);
+    }
+
+    [Fact]
+    public async Task Given_ClearsQueuedBehindADispose_When_TheSessionIsDisposed_Then_EachFailsWithoutChangingTheSession()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var previousSubscriptionHeld = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var events = new ChannelEventSource { HoldSubscriptionEnd = previousSubscriptionHeld.Task };
+        var session = new StreamerSessionService(
+            new ScriptedStreamerSongListClient(),
+            events,
+            new OverlayStateService(),
+            new FakeTimeProvider());
+        await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
+
+        Task start;
+        Task dispose;
+        Task firstClear;
+        Task secondClear;
+        try
+        {
+            // The start holds the session while the previous subscription stops; the rest queue behind it.
+            start = session.StartAsync(2, "another-channel", new SpinnerConfig(), [], [], null, cancellationToken);
+            await events.SubscriptionEnded.WaitAsync(WaitLimit, cancellationToken);
+            dispose = session.DisposeAsync().AsTask();
+            firstClear = session.ClearAsync(new SpinnerConfig());
+            secondClear = session.ClearAsync(new SpinnerConfig());
+        }
+        finally
+        {
+            previousSubscriptionHeld.TrySetResult();
+        }
+
+        await Task.WhenAll(start, dispose).WaitAsync(WaitLimit, cancellationToken);
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => firstClear.WaitAsync(WaitLimit, cancellationToken));
+        await Assert.ThrowsAsync<ObjectDisposedException>(() => secondClear.WaitAsync(WaitLimit, cancellationToken));
+
+        Assert.Equal("another-channel", session.GetSnapshot().Streamer);
     }
 
     [Fact]

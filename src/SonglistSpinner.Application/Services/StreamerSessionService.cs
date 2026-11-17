@@ -38,6 +38,9 @@ public sealed class StreamerSessionService : IAsyncDisposable
     private StreamerSessionSnapshot _snapshot = StreamerSessionSnapshot.Empty;
     private bool _refreshSuspended;
 
+    // Set and read only while holding _channelChangeGate.
+    private bool _disposed;
+
     public StreamerSessionService(
         IStreamerSongListClient songListClient,
         IStreamerSongListEventSource eventSource,
@@ -78,6 +81,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         await _channelChangeGate.WaitAsync(cancellationToken);
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             await StopSubscriptionAsync();
             StartSubscription(streamerId, streamer, config, availableSongs, playedSongs, nowPlaying);
         }
@@ -267,6 +271,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         await _channelChangeGate.WaitAsync();
         try
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
             await StopSubscriptionAsync();
             lock (_stateGate)
             {
@@ -499,6 +504,7 @@ public sealed class StreamerSessionService : IAsyncDisposable
         await _channelChangeGate.WaitAsync();
         try
         {
+            _disposed = true;
             await StopSubscriptionAsync();
         }
         finally
@@ -506,7 +512,8 @@ public sealed class StreamerSessionService : IAsyncDisposable
             _channelChangeGate.Release();
         }
 
-        _channelChangeGate.Dispose();
+        // The channel-change gate is deliberately left undisposed: a start or clear already waiting on it
+        // must still be able to take it, see that the session is disposed, and release it for the next one.
         _refreshGate.Dispose();
         _lifetimeCts.Dispose();
         GC.SuppressFinalize(this);
