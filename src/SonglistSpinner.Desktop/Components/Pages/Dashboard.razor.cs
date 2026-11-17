@@ -182,6 +182,10 @@ public partial class Dashboard
                 credential = null;
             }
 
+            // The page can be disposed while the credential is read. A disposed page must not send the user to
+            // Setup, and anything it subscribed to from here on would never be unsubscribed.
+            if (_lifetimeCts.IsCancellationRequested) return;
+
             if (credential is null)
             {
                 Navigation.NavigateTo("/setup", replace: true);
@@ -192,6 +196,8 @@ public partial class Dashboard
             OverlayServer.HealthChanged += OnOverlayHealthChanged;
             _overlayHealthSubscribed = true;
             await JS.InvokeVoidAsync("document.body.classList.add", "spinner-page");
+            if (_lifetimeCts.IsCancellationRequested) return;
+
             var settings = LocalSettings.LoadSettings();
             _config = SettingsDtoConverter.ToSpinnerConfig(settings);
             _preferMarkWinnerPlayed = settings.UpdateQueueAfterSpin && !settings.DisplayNowPlaying;
@@ -382,16 +388,28 @@ public partial class Dashboard
     private async Task ChangeStreamer()
     {
         if (IsBusy) return;
-        await StreamerSession.ClearAsync(_config);
-        _showStreamerInput = true;
-        _channel = null;
-        StreamerInput = "";
-        _nowPlaying = null;
-        _availableSongs = [];
-        _playedSongs = [];
-        _winnerQueueId = null;
-        _winnerQueuePosition = null;
-        await RebuildWheel(_wheelCts.Token);
+
+        // Busy until the session is cleared, so a Spin pressed meanwhile cannot draw from the channel being left
+        // and put its songs back on the overlay.
+        _activity = DashboardActivity.ChangingChannel;
+        try
+        {
+            await StreamerSession.ClearAsync(_config);
+            _showStreamerInput = true;
+            _channel = null;
+            StreamerInput = "";
+            _nowPlaying = null;
+            _availableSongs = [];
+            _playedSongs = [];
+            _winnerQueueId = null;
+            _winnerQueuePosition = null;
+            await RebuildWheel(_wheelCts.Token);
+        }
+        finally
+        {
+            _activity = DashboardActivity.Idle;
+        }
+
         StateHasChanged();
     }
 
