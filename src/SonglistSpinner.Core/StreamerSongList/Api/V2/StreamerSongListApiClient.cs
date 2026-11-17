@@ -342,15 +342,14 @@ public sealed class StreamerSongListApiClient : IStreamerSongListClient
             var body = await content.ReadAsStringAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(body)) return null;
             using var document = JsonDocument.Parse(body);
+            // A proxy or captive portal can answer with JSON of any shape; only a problem object has details.
+            if (document.RootElement.ValueKind != JsonValueKind.Object) return null;
+
             var details = new List<string>();
             foreach (var propertyName in new[] { "message", "detail", "error" })
             {
-                if (document.RootElement.TryGetProperty(propertyName, out var property) &&
-                    property.ValueKind == JsonValueKind.String)
-                {
-                    var value = property.GetString();
-                    if (!string.IsNullOrWhiteSpace(value)) details.Add(value);
-                }
+                var value = ReadText(document.RootElement, propertyName);
+                if (!string.IsNullOrWhiteSpace(value)) details.Add(value);
             }
 
             if (document.RootElement.TryGetProperty("errors", out var errors) &&
@@ -358,12 +357,10 @@ public sealed class StreamerSongListApiClient : IStreamerSongListClient
             {
                 foreach (var error in errors.EnumerateArray())
                 {
-                    var location = error.TryGetProperty("location", out var locationProperty)
-                        ? locationProperty.GetString()
-                        : null;
-                    var message = error.TryGetProperty("message", out var messageProperty)
-                        ? messageProperty.GetString()
-                        : null;
+                    if (error.ValueKind != JsonValueKind.Object) continue;
+
+                    var location = ReadText(error, "location");
+                    var message = ReadText(error, "message");
                     if (string.IsNullOrWhiteSpace(message)) continue;
                     details.Add(string.IsNullOrWhiteSpace(location) ? message : $"{location}: {message}");
                 }
@@ -379,4 +376,9 @@ public sealed class StreamerSongListApiClient : IStreamerSongListClient
 
         return null;
     }
+
+    private static string? ReadText(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var property) && property.ValueKind == JsonValueKind.String
+            ? property.GetString()
+            : null;
 }

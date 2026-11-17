@@ -532,6 +532,50 @@ public class StreamerSongListApiClientTests
         Assert.Equal("StreamerSongList returned HTTP 502 (Bad Gateway).", exception.Message);
     }
 
+    [Theory]
+    [InlineData("[]")]
+    [InlineData("\"gateway error\"")]
+    [InlineData("42")]
+    [InlineData("""{"errors":["not an object"]}""")]
+    [InlineData("""{"errors":[{"location":"query.limit","message":7}]}""")]
+    public async Task Given_ErrorResponseWhoseJsonIsNotAProblemObject_When_FetchQueueSnapshotAsync_Then_ReportsTheStatusWithoutTheBody(
+        string body)
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.BadGateway)
+        {
+            Content = new StringContent(body, Encoding.UTF8, "application/json")
+        });
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.FetchQueueSnapshotAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal(HttpStatusCode.BadGateway, exception.StatusCode);
+        Assert.Equal("StreamerSongList returned HTTP 502 (Bad Gateway).", exception.Message);
+    }
+
+    [Fact]
+    public async Task Given_ValidationErrorWhoseLocationIsNotText_When_FetchQueueSnapshotAsync_Then_ReportsItsMessageWithoutALocation()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.UnprocessableEntity)
+        {
+            Content = new StringContent(
+                """{"errors":[{"location":7,"message":"must be positive"}]}""",
+                Encoding.UTF8,
+                "application/problem+json")
+        });
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.FetchQueueSnapshotAsync(
+                new StreamerSongListChannel("wowfood"),
+                TestContext.Current.CancellationToken));
+
+        Assert.Equal("StreamerSongList returned HTTP 422 (Unprocessable Entity). must be positive", exception.Message);
+    }
+
     [Fact]
     public async Task Given_SuccessResponseThatIsNotApiJson_When_FetchQueueSnapshotAsync_Then_ReportsAnApiMismatch()
     {
