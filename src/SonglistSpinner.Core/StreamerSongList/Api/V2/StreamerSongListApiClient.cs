@@ -112,10 +112,9 @@ public sealed class StreamerSongListApiClient : IStreamerSongListClient
         using var request = new HttpRequestMessage(HttpMethod.Get, BuildUri(relativeUrl));
         await AddCredentialAsync(request, cancellationToken);
 
-        using var response = await _http.SendAsync(
-            request,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
+        // The whole body is read inside SendAsync, so HttpClient.Timeout also bounds a body that stalls after its
+        // headers. Reading it afterwards would wait on the caller's token alone.
+        using var response = await _http.SendAsync(request, cancellationToken);
         LogResponse(request, response);
 
         if (!response.IsSuccessStatusCode)
@@ -143,10 +142,7 @@ public sealed class StreamerSongListApiClient : IStreamerSongListClient
         using var request = new HttpRequestMessage(method, BuildUri(relativeUrl));
         await AddCredentialAsync(request, cancellationToken);
 
-        using var response = await _http.SendAsync(
-            request,
-            HttpCompletionOption.ResponseHeadersRead,
-            cancellationToken);
+        using var response = await _http.SendAsync(request, cancellationToken);
         LogResponse(request, response);
         if (!response.IsSuccessStatusCode)
             throw await CreateApiExceptionAsync(response, cancellationToken);

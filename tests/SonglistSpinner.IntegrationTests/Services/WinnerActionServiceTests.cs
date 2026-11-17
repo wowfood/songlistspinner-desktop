@@ -1,5 +1,7 @@
+using System.Net;
 using Microsoft.Extensions.Time.Testing;
 using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.StreamerSongList.Api.V2;
 using SonglistSpinner.Simulator;
 using Xunit;
 
@@ -37,6 +39,33 @@ public class WinnerActionServiceTests
         Assert.NotNull(refreshed);
         Assert.Equal([other.QueueId], refreshed.AvailableSongs.Select(song => song.QueueId));
         Assert.Equal(["Africa"], refreshed.PlayedSongs.Select(song => song.Song?.Title));
+    }
+
+    [Fact]
+    public async Task Given_TheApiFailsTheChange_When_MarkPlayedAsync_Then_TheFailureIsThrownAndTheWinnerStaysQueuedAfterOneRequest()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var clock = new FakeTimeProvider(Now);
+        await using var simulator = await StreamerSongListSimulator.StartAsync(
+            new StreamerSongListSimulatorOptions { TimeProvider = clock },
+            cancellationToken);
+        var channel = simulator.AddChannel(Streamer);
+        var winner = await channel.RequestSongAsync("Toto", "Africa", "long_time_fan");
+        await using var app = new SessionHarness(simulator, clock, new FakeTimeProvider(Now));
+        await app.Loader.LoadAsync(Streamer, new SpinnerConfig(), cancellationToken);
+        simulator.FailNextRequests(
+            HttpMethod.Post,
+            "/queue/played",
+            HttpStatusCode.InternalServerError,
+            "database unavailable");
+
+        var failure = await Assert.ThrowsAsync<StreamerSongListApiException>(
+            () => app.WinnerActions.MarkPlayedAsync(winner.QueueId, cancellationToken));
+
+        Assert.Equal(HttpStatusCode.InternalServerError, failure.StatusCode);
+        Assert.Equal([winner.QueueId], channel.Queue.Select(entry => entry.QueueId));
+        Assert.Empty(channel.PlayHistory);
+        Assert.Single(simulator.RequestsTo(HttpMethod.Post, "/queue/played"));
     }
 
     [Fact]

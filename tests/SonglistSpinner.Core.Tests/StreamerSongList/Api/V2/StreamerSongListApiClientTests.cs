@@ -11,6 +11,13 @@ namespace SonglistSpinner.Core.Tests.StreamerSongList.Api.V2;
 
 public class StreamerSongListApiClientTests
 {
+    /// <summary>Bounds a request that would otherwise hang, so a missing timeout fails the test instead of the run.</summary>
+    /// <remarks>
+    /// The stalled-body tests wait on the real clock, the one exception to this repository's rule: the
+    /// behaviour under test is <see cref="HttpClient.Timeout"/>, which cannot take a <see cref="TimeProvider"/>.
+    /// </remarks>
+    private static readonly TimeSpan StalledBodyWaitLimit = TimeSpan.FromSeconds(5);
+
     [Fact]
     public void Given_DefaultOptions_When_ReadingBaseAddress_Then_UsesProductionApiEndpoint()
     {
@@ -293,6 +300,42 @@ public class StreamerSongListApiClientTests
     }
 
     [Fact]
+    public async Task Given_TheApiRejectsTheChange_When_MarkQueueItemAsPlayedAsync_Then_ReportsTheRejectionAfterOneRequest()
+    {
+        var handler = RejectingHandler();
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.MarkQueueItemAsPlayedAsync(new QueueEntryId(91), TestContext.Current.CancellationToken));
+
+        AssertRejectionReportedAfterOneRequest(exception, handler);
+    }
+
+    [Fact]
+    public async Task Given_TheApiRejectsTheChange_When_MarkNowPlayingAsPlayedAsync_Then_ReportsTheRejectionAfterOneRequest()
+    {
+        var handler = RejectingHandler();
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.MarkNowPlayingAsPlayedAsync(new StreamerId(314), TestContext.Current.CancellationToken));
+
+        AssertRejectionReportedAfterOneRequest(exception, handler);
+    }
+
+    [Fact]
+    public async Task Given_TheApiRejectsTheChange_When_PromoteQueueItemToNowPlayingAsync_Then_ReportsTheRejectionAfterOneRequest()
+    {
+        var handler = RejectingHandler();
+        var client = CreateClient(handler);
+
+        var exception = await Assert.ThrowsAsync<StreamerSongListApiException>(() =>
+            client.PromoteQueueItemToNowPlayingAsync(new QueueEntryId(91), TestContext.Current.CancellationToken));
+
+        AssertRejectionReportedAfterOneRequest(exception, handler);
+    }
+
+    [Fact]
     public async Task Given_DefaultStreamerId_When_MarkNowPlayingAsPlayedAsync_Then_RejectsRequest()
     {
         var handler = new RecordingHandler(_ => JsonResponse("{}"));
@@ -508,6 +551,40 @@ public class StreamerSongListApiClientTests
     }
 
     [Fact]
+    public async Task Given_AResponseBodyThatStallsAfterItsHeaders_When_FetchQueueSnapshotAsync_Then_TheHttpTimeoutEndsTheRequest()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.OK)
+        {
+            Content = new StalledContent()
+        });
+        var client = CreateClient(handler, httpTimeout: TimeSpan.FromMilliseconds(50));
+
+        var exception = await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            client.FetchQueueSnapshotAsync(
+                    new StreamerSongListChannel("wowfood"),
+                    TestContext.Current.CancellationToken)
+                .WaitAsync(StalledBodyWaitLimit, TestContext.Current.CancellationToken));
+
+        Assert.IsType<TimeoutException>(exception.InnerException);
+    }
+
+    [Fact]
+    public async Task Given_AnErrorBodyThatStallsAfterItsHeaders_When_MarkQueueItemAsPlayedAsync_Then_TheHttpTimeoutEndsTheRequest()
+    {
+        var handler = new RecordingHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
+        {
+            Content = new StalledContent()
+        });
+        var client = CreateClient(handler, httpTimeout: TimeSpan.FromMilliseconds(50));
+
+        var exception = await Assert.ThrowsAsync<TaskCanceledException>(() =>
+            client.MarkQueueItemAsPlayedAsync(new QueueEntryId(91), TestContext.Current.CancellationToken)
+                .WaitAsync(StalledBodyWaitLimit, TestContext.Current.CancellationToken));
+
+        Assert.IsType<TimeoutException>(exception.InnerException);
+    }
+
+    [Fact]
     public async Task Given_NoCredential_When_FetchQueueSnapshotAsync_Then_FailsBeforeSendingRequest()
     {
         var handler = new RecordingHandler(_ => JsonResponse("{}"));
@@ -648,11 +725,14 @@ public class StreamerSongListApiClientTests
         StreamerSongListCredentialKind kind = StreamerSongListCredentialKind.Streamer,
         string? clientId = null,
         TimeProvider? timeProvider = null,
-        ILogger<StreamerSongListApiClient>? logger = null)
+        ILogger<StreamerSongListApiClient>? logger = null,
+        TimeSpan? httpTimeout = null)
     {
         var credential = new StreamerSongListCredential(kind, "test-token", clientId);
+        var http = new HttpClient(handler);
+        if (httpTimeout is { } timeout) http.Timeout = timeout;
         return new StreamerSongListApiClient(
-            new HttpClient(handler),
+            http,
             new StubCredentialProvider(credential),
             Options(),
             timeProvider,
@@ -662,6 +742,23 @@ public class StreamerSongListApiClientTests
     private static StreamerSongListApiOptions Options()
     {
         return new StreamerSongListApiOptions { BaseAddress = new Uri("https://example.test/") };
+    }
+
+    /// <summary>An API that answers every queue change with a server error.</summary>
+    private static RecordingHandler RejectingHandler() =>
+        new(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)
+        {
+            Content = new StringContent("""{"detail":"queue is locked"}""", Encoding.UTF8, "application/problem+json")
+        });
+
+    /// <summary>A queue change changes the streamer's queue, so a rejected one is reported, never sent again.</summary>
+    private static void AssertRejectionReportedAfterOneRequest(
+        StreamerSongListApiException exception,
+        RecordingHandler handler)
+    {
+        Assert.Equal(HttpStatusCode.InternalServerError, exception.StatusCode);
+        Assert.Equal("StreamerSongList returned HTTP 500 (Internal Server Error). queue is locked", exception.Message);
+        Assert.Equal(1, handler.RequestCount);
     }
 
     private static HttpResponseMessage JsonResponse(string json)
@@ -703,6 +800,28 @@ public class StreamerSongListApiClientTests
                 ? values.Single()
                 : null;
             return Task.FromResult(responseFactory(request));
+        }
+    }
+
+    /// <summary>
+    /// A body whose headers arrived but whose bytes never do, as when the connection dies silently. The read
+    /// ends only when its token is cancelled.
+    /// </summary>
+    private sealed class StalledContent : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
+            SerializeToStreamAsync(stream, context, CancellationToken.None);
+
+        protected override Task SerializeToStreamAsync(
+            Stream stream,
+            TransportContext? context,
+            CancellationToken cancellationToken) =>
+            Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
         }
     }
 
