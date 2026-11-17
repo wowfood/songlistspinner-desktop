@@ -42,15 +42,36 @@ public class LocalOverlayServerTests
         Assert.Equal($"http://localhost:{server.Port}/overlay", server.OverlayUrl);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("text/html; charset=utf-8", response.Content.Headers.ContentType?.ToString());
-        // frame-ancestors: only the app's own pages (the Settings preview) may show the overlay in a frame.
+        // No frame-ancestors: a streamer may show the live overlay inside a page of their own.
+        Assert.Equal(
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; " +
+            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'",
+            Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
+        Assert.Equal(
+            DesktopWebAssets.Read("overlay/Overlay.html"),
+            await response.Content.ReadAsStringAsync(cancellationToken));
+    }
+
+    [Theory]
+    [InlineData("?preview=1")]
+    // Any query is treated as a possible preview, so no spelling of one slips past the restriction.
+    [InlineData("?preview=2&preview=1")]
+    [InlineData("?v=2")]
+    public async Task Given_TheServerIsRunning_When_OpeningTheOverlayWithAQuery_Then_OnlyTheAppsOwnPagesMayFrameIt(
+        string query)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = StartServer(new OverlayStateService());
+        using var http = CreateHttpClient();
+
+        using var response = await http.GetAsync(server.OverlayUrl + query, cancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(
             "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; " +
             "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'; " +
             "frame-ancestors https://0.0.0.1",
             Assert.Single(response.Headers.GetValues("Content-Security-Policy")));
-        Assert.Equal(
-            DesktopWebAssets.Read("overlay/Overlay.html"),
-            await response.Content.ReadAsStringAsync(cancellationToken));
     }
 
     [Theory]
@@ -214,7 +235,8 @@ public class LocalOverlayServerTests
         {
             waitLimit.Token.ThrowIfCancellationRequested();
             overlay.BroadcastCloseWinner();
-            await Task.Yield();
+            // The pause only spaces out the broadcasts; the loop ends on the condition, not on the time.
+            await Task.WhenAny(noOverlayConnected, Task.Delay(TimeSpan.FromMilliseconds(10), waitLimit.Token));
         }
 
         Assert.Equal(0, overlay.ConnectedClientCount);
@@ -243,6 +265,8 @@ public class LocalOverlayServerTests
         var logger = new RecordingLogger();
         await using var server = new LocalOverlayServer(new OverlayStateService(), logger, FreeLoopbackPort());
         server.Start();
+        // Another process can take the port first; say so at once rather than time out below.
+        Assert.Equal(LocalOverlayServerState.Running, server.GetHealth().ServerState);
         var failed = WaitForHealth(server, health => health.ServerState == LocalOverlayServerState.Failed);
 
         CloseTheListenerUnderneath(server);

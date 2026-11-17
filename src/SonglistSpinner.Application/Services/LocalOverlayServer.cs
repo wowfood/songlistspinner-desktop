@@ -28,8 +28,8 @@ public class LocalOverlayServer : IAsyncDisposable
 
     /// <summary>
     /// The origin of the app's own pages in MAUI's BlazorWebView on Windows. The Settings page shows the overlay
-    /// in a frame as its live preview, and no other site may: OBS loads the overlay as a page of its own. If a
-    /// MAUI release changes this origin the preview goes blank, which the end-to-end preview tests catch.
+    /// in a frame as its live preview, and no other site may frame that preview. If a MAUI release changes this
+    /// origin the preview goes blank, which the end-to-end preview tests catch.
     /// </summary>
     private const string AppPageOrigin = "https://0.0.0.1";
 
@@ -130,24 +130,21 @@ public class LocalOverlayServer : IAsyncDisposable
         while (!ct.IsCancellationRequested && _listener?.IsListening == true)
         {
             HttpListenerContext context;
-            var nextRequest = _listener.GetContextAsync();
+            Task<HttpListenerContext>? nextRequest = null;
             try
             {
+                // Inside the try: a listener that is stopped, closed or broken throws from this call itself.
+                nextRequest = _listener.GetContextAsync();
                 context = await nextRequest.WaitAsync(ct);
             }
             catch (OperationCanceledException)
             {
                 // Stopping abandons the pending accept, which then faults when the listener closes.
-                nextRequest.ObserveFaults(
+                nextRequest?.ObserveFaults(
                     ex => _logger.LogDebug(ex, "The pending overlay request ended when the server stopped"));
                 break;
             }
-            catch (HttpListenerException ex)
-            {
-                if (!ct.IsCancellationRequested) failure = ex;
-                break;
-            }
-            catch (ObjectDisposedException ex)
+            catch (Exception ex) when (ex is HttpListenerException or ObjectDisposedException or InvalidOperationException)
             {
                 if (!ct.IsCancellationRequested) failure = ex;
                 break;
@@ -273,8 +270,8 @@ public class LocalOverlayServer : IAsyncDisposable
         context.Response.AddHeader(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; " +
-            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'; " +
-            $"frame-ancestors {AppPageOrigin}");
+            "img-src 'self' data: blob: https: http:; connect-src 'self'; object-src 'none'; base-uri 'none'" +
+            (MayBeSettingsPreview(context.Request) ? $"; frame-ancestors {AppPageOrigin}" : ""));
         context.Response.ContentLength64 = bytes.Length;
         await context.Response.OutputStream.WriteAsync(bytes);
         context.Response.Close();
@@ -321,6 +318,14 @@ public class LocalOverlayServer : IAsyncDisposable
         await context.Response.OutputStream.WriteAsync(bytes);
         context.Response.Close();
     }
+
+    /// <summary>
+    /// Whether the page may run as the Settings preview, which takes its content from the page framing it. The
+    /// page decides that from its query, so every request with a query is restricted to the app's own frames;
+    /// the plain overlay address stays free for a streamer to frame in a page of their own.
+    /// </summary>
+    private static bool MayBeSettingsPreview(HttpListenerRequest request) =>
+        !string.IsNullOrEmpty(request.Url?.Query);
 
     internal static bool IsAllowedHost(string? host)
     {
