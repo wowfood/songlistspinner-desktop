@@ -41,6 +41,9 @@ public sealed class StreamerSessionService : IAsyncDisposable
     // Set and read only while holding _channelChangeGate.
     private bool _disposed;
 
+    // Disposing twice is harmless: only the first call does anything.
+    private int _disposeStarted;
+
     public StreamerSessionService(
         IStreamerSongListClient songListClient,
         IStreamerSongListEventSource eventSource,
@@ -500,6 +503,8 @@ public sealed class StreamerSessionService : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposeStarted, 1) != 0) return;
+
         _lifetimeCts.Cancel();
         await _channelChangeGate.WaitAsync();
         try

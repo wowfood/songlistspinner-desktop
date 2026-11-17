@@ -120,7 +120,8 @@ internal sealed class ScriptedWebSocket : WebSocket
     {
         WasAborted = true;
         _state = WebSocketState.Aborted;
-        // As with a real socket, a receive still waiting when the connection is aborted fails.
+        // A real socket ends a receive that is still waiting when the connection is aborted. Here it ends by
+        // failing, which is the case the event source has to observe.
         _incoming.Writer.TryComplete(new WebSocketException("The connection was aborted."));
     }
 

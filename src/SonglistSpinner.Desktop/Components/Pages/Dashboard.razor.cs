@@ -229,13 +229,22 @@ public partial class Dashboard
             new[] { new { label = "Enter streamer name above" } },
             _config.WheelColors);
 
+        // The page can be disposed during any of these script calls. Disposal has by then removed the page's
+        // script bindings, so nothing more is set up for it, and it has disposed the wheel's cancellation
+        // source, which the rest of this method reads.
+        if (_lifetimeCts.IsCancellationRequested) return;
+
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeObserver);
+        if (_lifetimeCts.IsCancellationRequested) return;
+
         _dotNetRef = DotNetObjectReference.Create(this);
         await JS.InvokeVoidAsync(SpinnerInteropMethods.SetupResizeHandlers, _dotNetRef, nameof(PublishPlayedListWidth));
-
-        // The page can be disposed during the script calls above, and disposal also disposes the wheel's
-        // cancellation source, which the rest of this method reads.
-        if (_lifetimeCts.IsCancellationRequested) return;
+        if (_lifetimeCts.IsCancellationRequested)
+        {
+            _dotNetRef.Dispose();
+            _dotNetRef = null;
+            return;
+        }
 
         var activeSession = StreamerSession.GetSnapshot();
         if (activeSession.HasChannel)

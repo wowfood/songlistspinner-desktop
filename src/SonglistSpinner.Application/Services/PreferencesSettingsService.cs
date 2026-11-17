@@ -52,8 +52,10 @@ public sealed class PreferencesSettingsService(
     {
         if (string.IsNullOrEmpty(preferences.GetValue(UnreadableSettingsKey))) return;
 
+        // The copy is never removed, so this is said on every start with the log on. It is worded as history
+        // for that reason: the settings in use now may have been saved since.
         _logger.LogWarning(
-            "Saved settings that could not be read were replaced by the defaults; they are kept under {UnreadableSettingsKey}",
+            "Settings that could not be read on an earlier start were replaced by the defaults then; a copy is kept under {UnreadableSettingsKey}",
             UnreadableSettingsKey);
     }
 

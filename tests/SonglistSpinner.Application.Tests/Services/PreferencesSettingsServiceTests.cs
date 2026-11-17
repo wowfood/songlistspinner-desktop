@@ -103,7 +103,7 @@ public class PreferencesSettingsServiceTests
         var entry = Assert.Single(logger.Collector.GetSnapshot());
         Assert.Equal(LogLevel.Warning, entry.Level);
         Assert.Equal(
-            "Saved settings that could not be read were replaced by the defaults; they are kept under local_settings.unreadable",
+            "Settings that could not be read on an earlier start were replaced by the defaults then; a copy is kept under local_settings.unreadable",
             entry.Message);
     }
 

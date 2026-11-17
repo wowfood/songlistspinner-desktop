@@ -535,6 +535,23 @@ public class StreamerSessionServiceTests
     }
 
     [Fact]
+    public async Task Given_ADisposedSession_When_DisposedAgain_Then_NothingHappens()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var session = new StreamerSessionService(
+            new ScriptedStreamerSongListClient(),
+            new ChannelEventSource(),
+            new OverlayStateService(),
+            new FakeTimeProvider());
+        await session.StartAsync(1, Streamer, new SpinnerConfig(), [Song(7)], [], null, cancellationToken);
+        await session.DisposeAsync();
+
+        await session.DisposeAsync();
+
+        Assert.Equal(Streamer, session.GetSnapshot().Streamer);
+    }
+
+    [Fact]
     public async Task Given_AnObserverThrows_When_TheSessionChanges_Then_LaterObserversAreStillNotified()
     {
         var cancellationToken = TestContext.Current.CancellationToken;
