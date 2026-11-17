@@ -190,6 +190,6 @@ public class SecureStorageStreamerSongListCredentialStoreTests
                     EnvironmentOverrides.ClientIdVariable => fallback.ClientId,
                     _ => null
                 },
-                allowTestProfile: false));
+                allowDevelopmentOverrides: true));
     }
 }

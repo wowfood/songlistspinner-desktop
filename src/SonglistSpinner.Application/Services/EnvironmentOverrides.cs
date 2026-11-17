@@ -9,8 +9,8 @@ namespace SonglistSpinner.Services;
 /// Startup configuration for development and testing, read once from the SONGLISTSPINNER_* environment
 /// variables. A missing or invalid value keeps the production behaviour: the real StreamerSongList and GitHub
 /// endpoints, overlay port <see cref="LocalOverlayServer.DefaultPort"/> and the user's own profile. The fallback
-/// credential is used only while secure storage holds none. The test profile and its WebView arguments are read
-/// only by builds that allow them; see <see cref="Read"/>.
+/// credential is used only while secure storage holds none. Only development builds read these variables; a
+/// released build takes the overlay port alone. See <see cref="Read"/>.
 /// </summary>
 public sealed record EnvironmentOverrides(
     StreamerSongListApiOptions Api,
@@ -30,7 +30,7 @@ public sealed record EnvironmentOverrides(
     /// <summary>
     /// A test-only folder that holds every value the app saves (settings, the API credential in plain text, logs
     /// and WebView data) instead of the user's profile; null for the normal profile. Only a rooted path is used,
-    /// and only in a build that allows the test profile.
+    /// and only in a development build.
     /// </summary>
     public string? ProfileDirectory { get; init; }
 
@@ -52,13 +52,29 @@ public sealed record EnvironmentOverrides(
     public string? WebViewBrowserArguments { get; init; }
 
     /// <param name="readVariable">Returns an environment variable's value, or null when it is not set.</param>
-    /// <param name="allowTestProfile">
-    /// Whether this build honours <see cref="ProfileDirectoryVariable"/> and, with it,
-    /// <see cref="WebViewBrowserArgumentsVariable"/>. A released build passes false, so a variable left in a
-    /// user's environment can neither move their credential into a plain-text file nor open a debugging port.
+    /// <param name="allowDevelopmentOverrides">
+    /// Whether this build honours the variables that exist for development and testing: every one but
+    /// <see cref="OverlayPortVariable"/>. A released build passes false, so a variable left in a user's
+    /// environment cannot send their saved token to another server, supply a token of its own, move their
+    /// credential into a plain-text file, open a debugging port or redirect the update check.
     /// </param>
-    public static EnvironmentOverrides Read(Func<string, string?> readVariable, bool allowTestProfile)
+    public static EnvironmentOverrides Read(Func<string, string?> readVariable, bool allowDevelopmentOverrides)
     {
+        var overlayPort = int.TryParse(readVariable(OverlayPortVariable), NumberStyles.None, CultureInfo.InvariantCulture,
+            out var configuredPort) && configuredPort is > 0 and <= ushort.MaxValue
+            ? configuredPort
+            : LocalOverlayServer.DefaultPort;
+        if (!allowDevelopmentOverrides)
+        {
+            return new EnvironmentOverrides(
+                new StreamerSongListApiOptions { BaseAddress = StreamerSongListApiOptions.ProductionBaseAddress },
+                new StreamerSongListEventsOptions { Endpoint = StreamerSongListEventsOptions.ProductionEndpoint },
+                FallbackCredential: null)
+            {
+                OverlayPort = overlayPort
+            };
+        }
+
         var apiBaseAddress = TryReadEndpoint(readVariable(ApiBaseUrlVariable), Uri.UriSchemeHttps, Uri.UriSchemeHttp)
                              ?? StreamerSongListApiOptions.ProductionBaseAddress;
         var eventsEndpoint = TryReadEndpoint(readVariable(EventsUrlVariable), Uri.UriSchemeWss, Uri.UriSchemeWs)
@@ -73,16 +89,11 @@ public sealed record EnvironmentOverrides(
                 readVariable(ClientIdVariable));
 
         // A relative path would follow the working directory, which differs between launches.
-        var profileDirectory = allowTestProfile
-                               && readVariable(ProfileDirectoryVariable) is { } directory
+        var profileDirectory = readVariable(ProfileDirectoryVariable) is { } directory
                                && Path.IsPathFullyQualified(directory)
             ? directory
             : null;
         var webViewBrowserArguments = readVariable(WebViewBrowserArgumentsVariable);
-        var overlayPort = int.TryParse(readVariable(OverlayPortVariable), NumberStyles.None, CultureInfo.InvariantCulture,
-            out var configuredPort) && configuredPort is > 0 and <= ushort.MaxValue
-            ? configuredPort
-            : LocalOverlayServer.DefaultPort;
         var updateReleaseEndpoint =
             Uri.TryCreate(readVariable(UpdateReleaseUrlVariable), UriKind.Absolute, out var configuredReleaseEndpoint)
                 ? configuredReleaseEndpoint

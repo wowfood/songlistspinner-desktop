@@ -35,7 +35,7 @@ Tokens entered on the Settings page are stored using Windows secure storage. The
 
 Use **Save and test connection** on the Settings page after entering a token, streamer name, and platform. The result reports the active API endpoint and either the number of queue entries returned or the API error. Dashboard request and refresh failures are also shown on screen and written to the debugger output without logging the token.
 
-Environment-variable fallback is available for development:
+Environment-variable fallback is available in development builds (a released app ignores these variables):
 
 ```text
 SONGLISTSPINNER_SSL_API_BASE_URL=https://api.streamersonglist.com/

@@ -199,22 +199,51 @@ public class EnvironmentOverridesTests
     }
 
     [Fact]
-    public void Given_ABuildWithoutTheTestProfile_When_Reading_Then_TheProfileDirectoryAndWebViewArgumentsAreIgnored()
+    public void Given_AReleasedBuild_When_Reading_Then_TheTestProfileAndWebViewArgumentsAreIgnored()
     {
-        var overrides = Read(
-            new()
-            {
-                [EnvironmentOverrides.ProfileDirectoryVariable] = Path.Combine(Path.GetTempPath(), "songlistspinner-e2e"),
-                [EnvironmentOverrides.WebViewBrowserArgumentsVariable] = "--remote-debugging-port=9222",
-                [EnvironmentOverrides.OverlayPortVariable] = "51999"
-            },
-            allowTestProfile: false);
+        var overrides = ReadAsAReleasedBuild(new()
+        {
+            [EnvironmentOverrides.ProfileDirectoryVariable] = Path.Combine(Path.GetTempPath(), "songlistspinner-e2e"),
+            [EnvironmentOverrides.WebViewBrowserArgumentsVariable] = "--remote-debugging-port=9222"
+        });
 
         Assert.Null(overrides.ProfileDirectory);
         Assert.Null(overrides.WebViewBrowserArguments);
+    }
+
+    [Fact]
+    public void Given_AReleasedBuild_When_Reading_Then_ItStillTalksToStreamerSongListAndGitHubWithNoFallbackToken()
+    {
+        // A variable left in a user's environment must not send their saved token, or anything else, elsewhere.
+        var overrides = ReadAsAReleasedBuild(new()
+        {
+            [EnvironmentOverrides.ApiBaseUrlVariable] = "https://staging.example.test/",
+            [EnvironmentOverrides.EventsUrlVariable] = "wss://staging.example.test/connection/websocket",
+            [EnvironmentOverrides.AccessTokenVariable] = "leftover-token",
+            [EnvironmentOverrides.TokenTypeVariable] = "bearer",
+            [EnvironmentOverrides.ClientIdVariable] = "leftover-client",
+            [EnvironmentOverrides.UpdateReleaseUrlVariable] = "https://staging.example.test/releases/latest"
+        });
+
+        Assert.Equal(StreamerSongListApiOptions.ProductionBaseAddress, overrides.Api.BaseAddress);
+        Assert.Equal(StreamerSongListEventsOptions.ProductionEndpoint, overrides.Events.Endpoint);
+        Assert.Null(overrides.FallbackCredential);
+        Assert.Equal(GitHubReleaseUpdateChecker.LatestReleaseEndpoint, overrides.UpdateReleaseEndpoint);
+    }
+
+    [Fact]
+    public void Given_AReleasedBuild_When_Reading_Then_TheOverlayPortIsStillTaken()
+    {
+        // The one setting a streamer may need: a port of their own when 5150 is in use.
+        var overrides = ReadAsAReleasedBuild(new() { [EnvironmentOverrides.OverlayPortVariable] = "51999" });
+
         Assert.Equal(51999, overrides.OverlayPort);
     }
 
-    private static EnvironmentOverrides Read(Dictionary<string, string?> variables, bool allowTestProfile = true) =>
-        EnvironmentOverrides.Read(name => variables.GetValueOrDefault(name), allowTestProfile);
+    /// <summary>Reads as a development build does, which honours every variable.</summary>
+    private static EnvironmentOverrides Read(Dictionary<string, string?> variables) =>
+        EnvironmentOverrides.Read(name => variables.GetValueOrDefault(name), allowDevelopmentOverrides: true);
+
+    private static EnvironmentOverrides ReadAsAReleasedBuild(Dictionary<string, string?> variables) =>
+        EnvironmentOverrides.Read(name => variables.GetValueOrDefault(name), allowDevelopmentOverrides: false);
 }

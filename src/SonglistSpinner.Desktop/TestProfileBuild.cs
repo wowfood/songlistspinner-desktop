@@ -1,9 +1,11 @@
 namespace SonglistSpinner;
 
 /// <summary>
-/// Whether this build of the app honours the test-profile variables (<c>SONGLISTSPINNER_PROFILE_DIR</c> and
-/// <c>SONGLISTSPINNER_WEBVIEW_ARGS</c>). They keep the API credential in a plain-text file and can open a
-/// browser debugging port, so only builds made for development and testing compile them in.
+/// Whether this build of the app honours the development variables: the test profile
+/// (<c>SONGLISTSPINNER_PROFILE_DIR</c>, <c>SONGLISTSPINNER_WEBVIEW_ARGS</c>), the StreamerSongList address and
+/// token overrides (<c>SONGLISTSPINNER_SSL_*</c>) and <c>SONGLISTSPINNER_UPDATE_RELEASE_URL</c>. Between them
+/// they can keep the API credential in a plain-text file, open a browser debugging port and send the saved token
+/// to another server, so only builds made for development and testing compile them in.
 /// </summary>
 /// <remarks>
 /// The <c>EnableTestProfile</c> MSBuild property decides: true for Debug builds and for builds that pass

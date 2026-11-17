@@ -12,7 +12,7 @@ namespace SonglistSpinner.Desktop.Tests.Services;
 public class StreamerSongListServiceCollectionExtensionsTests
 {
     private static readonly EnvironmentOverrides NoOverrides =
-        EnvironmentOverrides.Read(_ => null, allowTestProfile: false);
+        EnvironmentOverrides.Read(_ => null, allowDevelopmentOverrides: false);
 
     [Fact]
     public void Given_NoTestProfile_When_TheAppsServicesAreRegistered_Then_TheTokenIsKeptInSecureStorage()

@@ -412,7 +412,15 @@ The output is written to:
 artifacts\win-x64\SonglistSpinner.Desktop.exe
 ```
 
-Development and automation can override connection values with:
+The released app reads one environment variable:
+
+| Environment variable | Purpose |
+| --- | --- |
+| `SONGLISTSPINNER_OVERLAY_PORT` | Overlay server port instead of 5150, for a second instance |
+
+A development build (a Debug build, or one built with `-p:EnableTestProfile=true`) also reads these, for
+development and automation. A released app ignores them, so a variable left in your environment cannot send
+your saved token to another server:
 
 | Environment variable | Purpose |
 | --- | --- |
@@ -421,10 +429,9 @@ Development and automation can override connection values with:
 | `SONGLISTSPINNER_SSL_ACCESS_TOKEN` | Credential fallback when Windows secure storage is empty |
 | `SONGLISTSPINNER_SSL_TOKEN_TYPE` | `streamer`, `user`, or `bearer` |
 | `SONGLISTSPINNER_SSL_CLIENT_ID` | Client ID used with an OAuth bearer token |
-| `SONGLISTSPINNER_PROFILE_DIR` | Development builds only (a released app ignores it): a full folder path that holds the settings, the credential (in plain text), the logs and the WebView data instead of your profile |
-| `SONGLISTSPINNER_OVERLAY_PORT` | Overlay server port instead of 5150, for a second instance |
+| `SONGLISTSPINNER_PROFILE_DIR` | A full folder path that holds the settings, the credential (in plain text), the logs and the WebView data instead of your profile |
 | `SONGLISTSPINNER_UPDATE_RELEASE_URL` | Where the update check asks for the latest release instead of GitHub |
-| `SONGLISTSPINNER_WEBVIEW_ARGS` | Development builds only: extra WebView2 browser arguments; used only with `SONGLISTSPINNER_PROFILE_DIR` |
+| `SONGLISTSPINNER_WEBVIEW_ARGS` | Extra WebView2 browser arguments; used only with `SONGLISTSPINNER_PROFILE_DIR` |
 
 Do not commit tokens, local environment files, or screenshots containing
 credentials.

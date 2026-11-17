@@ -156,8 +156,9 @@ fails the integration tests; keep it in step with `docs/API_V2.md` and the clien
   channel is `demo` on Twitch, streamer 1001. `POST /_simulator/requests?streamer_id=1001&artist=..&title=..`
   adds a viewer request and `POST /_simulator/events/drop` drops the event sockets.
 
-Point the app at the running simulator by starting it from a shell with these variables
-(`EnvironmentOverrides` reads them once at startup):
+Point a development build of the app (Debug, or built with `-p:EnableTestProfile=true`; a released build
+ignores these variables, as explained below) at the running simulator by starting it from a shell with these
+variables (`EnvironmentOverrides` reads them once at startup):
 
 ```powershell
 $env:SONGLISTSPINNER_SSL_API_BASE_URL = "http://127.0.0.1:5199/"
@@ -187,13 +188,14 @@ end-to-end tests open the DevTools port with it, because the WebView ignores Web
 `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS` in this app. Windows' shared Direct3D shader cache
 (`%LOCALAPPDATA%\D3DSCache`) is still written, as by any app that draws with the GPU.
 
-Those two variables are compiled in only when the `EnableTestProfile` MSBuild property is true: by default in
-Debug builds, and in a Release build made with `-p:EnableTestProfile=true` (`scripts/run-e2e.ps1` does this). A
-plain Release build ignores both, so a variable left in a user's environment cannot move their credential into a
-plain-text file or open a debugging port. MSBuild would also take the property from an environment variable
-named `EnableTestProfile`, so `scripts/publish-single-file.ps1` passes `-p:EnableTestProfile=false` and the
-project refuses to publish with it on, or with `--no-build`, which would package whatever an earlier build
-left. The other `SONGLISTSPINNER_*` variables work in every build.
+Every variable above except `SONGLISTSPINNER_OVERLAY_PORT` is read only when the `EnableTestProfile` MSBuild
+property is true: by default in Debug builds, and in a Release build made with `-p:EnableTestProfile=true`
+(`scripts/run-e2e.ps1` does this). A plain Release build ignores them, so a variable left in a user's
+environment cannot send their saved token to another server, supply a token of its own, move their credential
+into a plain-text file, open a debugging port or redirect the update check. MSBuild would also take the
+property from an environment variable named `EnableTestProfile`, so `scripts/publish-single-file.ps1` passes
+`-p:EnableTestProfile=false` and the project refuses to publish with it on, or with `--no-build`, which would
+package whatever an earlier build left. `SONGLISTSPINNER_OVERLAY_PORT` works in every build.
 
 ## Conventions
 

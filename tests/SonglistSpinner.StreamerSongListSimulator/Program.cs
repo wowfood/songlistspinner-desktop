@@ -36,7 +36,9 @@ if (seed == "demo") await DemoSeed.ApplyAsync(simulator, TimeProvider.System);
 
 Console.WriteLine($"""
     StreamerSongList simulator listening on {simulator.ApiBaseAddress}
-    Point the app at it (PowerShell), then start the app from the same shell:
+    Point a development build of the app at it (PowerShell), then start the app from the same shell. A released
+    app ignores every variable below but the overlay port; use a Debug build, or one built with
+    -p:EnableTestProfile=true:
       $env:SONGLISTSPINNER_SSL_API_BASE_URL = "{simulator.ApiBaseAddress}"
       $env:SONGLISTSPINNER_SSL_EVENTS_URL = "{simulator.EventsEndpoint}"
       $env:SONGLISTSPINNER_SSL_ACCESS_TOKEN = "{token}"
@@ -46,8 +48,7 @@ Console.WriteLine($"""
       $env:SONGLISTSPINNER_OVERLAY_PORT = "5151"
       $env:SONGLISTSPINNER_UPDATE_RELEASE_URL = "{simulator.ApiBaseAddress}_simulator/no-releases"
     Without the profile, a token saved in Settings is sent instead (and rejected), and Settings saves into
-    your real profile. Only a Debug build of the app, or one built with -p:EnableTestProfile=true, uses the
-    profile folder: a released app ignores SONGLISTSPINNER_PROFILE_DIR.
+    your real profile.
     {(seed == "demo" ? $"Seeded channel: '{DemoSeed.ChannelName}' on twitch (streamer {DemoSeed.StreamerId})." : "No channels seeded.")}
     Add a request:  POST {simulator.ApiBaseAddress}_simulator/requests?streamer_id=<id>&artist=<a>&title=<t>&requester=<r>
     Drop events:    POST {simulator.ApiBaseAddress}_simulator/events/drop
