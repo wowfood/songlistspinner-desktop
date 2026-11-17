@@ -99,6 +99,50 @@ public class OverlayStateServiceTests
     }
 
     [Fact]
+    public async Task Given_ConnectedOverlay_When_TwoWritersChangeTheStateAtOnce_Then_TheLastEventReceivedIsTheCurrentState()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        // The heartbeat never fires on this clock, so every event read is a broadcast.
+        var overlay = new OverlayStateService(new FakeTimeProvider());
+        await using var events = overlay.SubscribeAsync(cancellationToken).GetAsyncEnumerator(cancellationToken);
+        Assert.True(await events.MoveNextAsync());
+        using var bothWritersReady = new Barrier(2);
+
+        // A race probe. While each change is broadcast under the state lock, no round can fail. Broadcast
+        // outside it, two writers' events can leave in the opposite order to their changes, and some round
+        // among these catches that.
+        for (var round = 0; round < 2000; round++)
+        {
+            var oneWidth = $"{round}a";
+            var otherWidth = $"{round}b";
+            await Task.WhenAll(
+                Task.Run(
+                    () =>
+                    {
+                        bothWritersReady.SignalAndWait(cancellationToken);
+                        overlay.UpdatePlayedListWidth(oneWidth, "");
+                    },
+                    cancellationToken),
+                Task.Run(
+                    () =>
+                    {
+                        bothWritersReady.SignalAndWait(cancellationToken);
+                        overlay.UpdatePlayedListWidth(otherWidth, "");
+                    },
+                    cancellationToken));
+
+            // Bounded, so a lost broadcast fails the test instead of hanging the run.
+            Assert.True(await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15), cancellationToken));
+            Assert.True(await events.MoveNextAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(15), cancellationToken));
+            using var lastEvent = ParseEventData(events.Current, OverlayEventNames.SetPlayedListWidth);
+            using var state = await ReadInitialStateAsync(overlay);
+            Assert.Equal(
+                state.RootElement.GetProperty("playedListWidth").GetString(),
+                lastEvent.RootElement.GetProperty("width").GetString());
+        }
+    }
+
+    [Fact]
     public async Task Given_NoQueueYet_When_OverlayConnects_Then_InitialStateCarriesTheStateAndLayoutReplay()
     {
         var overlay = new OverlayStateService();

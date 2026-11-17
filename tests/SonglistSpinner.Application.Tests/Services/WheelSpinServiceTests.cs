@@ -155,6 +155,24 @@ public class WheelSpinServiceTests
     }
 
     [Fact]
+    public async Task Given_QueuePositionLookupFails_When_Revealing_Then_WinnerIsRevealedWithoutAPosition()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var time = new FakeTimeProvider();
+        var api = new ScriptedStreamerSongListClient();
+        await using var spin = await DrawWinnerAsync(api, time, showQueuePosition: true);
+        api.QueueResponses.Enqueue(_ => Task.FromException<SpinnerQueueSnapshot>(
+            new HttpRequestException("StreamerSongList is unreachable")));
+
+        var reveal = spin.Spins.RevealWinnerAsync(spin.Draw, cancellationToken);
+        time.Advance(WheelSpinService.SpinDuration + WheelSpinService.WinnerRevealDelay);
+        var winner = await reveal.WaitAsync(WaitLimit, cancellationToken);
+
+        Assert.Null(winner.QueuePosition);
+        Assert.Equal(2, api.QueueFetches);
+    }
+
+    [Fact]
     public async Task Given_AnotherChannelLoadedDuringTheSpin_When_Revealing_Then_WinnerIsShownWithoutAPosition()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

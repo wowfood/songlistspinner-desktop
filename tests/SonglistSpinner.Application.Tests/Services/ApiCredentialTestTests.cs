@@ -45,6 +45,26 @@ public class ApiCredentialTestTests
     }
 
     [Fact]
+    public async Task Given_CandidateWasStored_When_TheConnectionTestTimesOutWithoutTheCallerCancelling_Then_PreviousCredentialIsRestored()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var store = new InMemoryCredentialStore(Previous);
+        var credentialTest = new ApiCredentialTest(store);
+        // How an HttpClient timeout arrives: a cancellation the caller's token did not ask for.
+        var timeout = new TaskCanceledException("The request timed out.", new TimeoutException());
+
+        var failure = await Assert.ThrowsAsync<ApiCredentialTestFailedException>(() => credentialTest.RunAsync(
+            Previous,
+            Candidate,
+            StoreCandidate(store, thenFailWith: timeout),
+            cancellationToken));
+
+        Assert.Equal(Previous, store.Credential);
+        Assert.True(failure.PreviousRestored);
+        Assert.Same(timeout, failure.InnerException);
+    }
+
+    [Fact]
     public async Task Given_NoCredentialBeforeTheTest_When_TheConnectionTestFails_Then_StoredCredentialIsCleared()
     {
         var cancellationToken = TestContext.Current.CancellationToken;

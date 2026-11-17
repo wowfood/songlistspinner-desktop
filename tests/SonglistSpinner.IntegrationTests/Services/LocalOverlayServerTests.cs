@@ -145,6 +145,121 @@ public class LocalOverlayServerTests
         Assert.False(string.IsNullOrWhiteSpace(health.Error));
     }
 
+    [Fact]
+    public async Task Given_TheServerIsRunning_When_Stopped_Then_HealthIsStoppedAndThePortIsFreeAgain()
+    {
+        await using var server = StartServer(new OverlayStateService());
+
+        server.Stop();
+
+        Assert.Equal(new LocalOverlayHealth(LocalOverlayServerState.Stopped, 0, null), server.GetHealth());
+        using var nextOwner = new HttpListener();
+        nextOwner.Prefixes.Add($"http://localhost:{server.Port}/");
+        nextOwner.Start();
+        Assert.True(nextOwner.IsListening);
+    }
+
+    [Fact]
+    public async Task Given_AnOverlayIsConnectedToTheEventStream_When_TheServerStops_Then_TheStreamEndsAndNoOverlayIsCounted()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var server = StartServer(new OverlayStateService());
+        using var http = CreateHttpClient();
+        using var response = await http.GetAsync(
+            $"http://localhost:{server.Port}/overlay/events",
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        using var events = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken));
+        await ReadEventAsync(events, cancellationToken);
+        var stoppedWithNoOverlay = WaitForHealth(
+            server,
+            new LocalOverlayHealth(LocalOverlayServerState.Stopped, 0, null));
+
+        server.Stop();
+
+        await stoppedWithNoOverlay.WaitAsync(WaitLimit, cancellationToken);
+        await ReadToTheEndOfTheStreamAsync(events, cancellationToken);
+    }
+
+    [Fact]
+    public async Task Given_AnOverlayIsConnectedToTheEventStream_When_ItDisconnects_Then_ALaterChangeStopsCountingIt()
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var overlay = new OverlayStateService();
+        await using var server = StartServer(overlay);
+        var noOverlayConnected = WaitForHealth(
+            server,
+            new LocalOverlayHealth(LocalOverlayServerState.Running, 0, null));
+        using (var http = CreateHttpClient())
+        using (var response = await http.GetAsync(
+                   $"http://localhost:{server.Port}/overlay/events",
+                   HttpCompletionOption.ResponseHeadersRead,
+                   cancellationToken))
+        using (var events = new StreamReader(await response.Content.ReadAsStreamAsync(cancellationToken)))
+        {
+            await ReadEventAsync(events, cancellationToken);
+            Assert.Equal(1, server.GetHealth().ConnectedClients);
+        }
+
+        // The server only learns that an overlay has gone when it next writes to it, and the first write after
+        // the connection closed can still be accepted, so keep changing the state until the server notices. A
+        // server that never notices ends the test at the wait limit instead of hanging the run.
+        using var waitLimit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        waitLimit.CancelAfter(WaitLimit);
+        while (!noOverlayConnected.IsCompleted)
+        {
+            waitLimit.Token.ThrowIfCancellationRequested();
+            overlay.BroadcastCloseWinner();
+            await Task.Yield();
+        }
+
+        Assert.Equal(0, overlay.ConnectedClientCount);
+    }
+
+    [Fact]
+    public async Task Given_AHealthObserverThrows_When_TheServerStarts_Then_LaterObserversStillSeeItRunning()
+    {
+        await using var server = new LocalOverlayServer(
+            new OverlayStateService(),
+            NullLogger<LocalOverlayServer>.Instance,
+            FreeLoopbackPort());
+        var observedStates = new List<LocalOverlayServerState>();
+        server.HealthChanged += (_, _) => throw new InvalidOperationException("Observer failed");
+        server.HealthChanged += (_, _) => observedStates.Add(server.GetHealth().ServerState);
+
+        server.Start();
+
+        Assert.Equal([LocalOverlayServerState.Starting, LocalOverlayServerState.Running], observedStates);
+    }
+
+    /// <summary>Completes when the server reports <paramref name="expected"/>, however many changes that takes.</summary>
+    private static Task WaitForHealth(LocalOverlayServer server, LocalOverlayHealth expected)
+    {
+        var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        server.HealthChanged += (_, _) =>
+        {
+            if (server.GetHealth() == expected) reached.TrySetResult();
+        };
+        return reached.Task;
+    }
+
+    /// <summary>
+    /// Returns once the event stream has no more to read, whether it closed cleanly or was cut off. A stream
+    /// that stays open fails the test with a timeout.
+    /// </summary>
+    private static async Task ReadToTheEndOfTheStreamAsync(StreamReader events, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (await events.ReadLineAsync(cancellationToken).AsTask().WaitAsync(WaitLimit, cancellationToken) is not null)
+            {
+            }
+        }
+        catch (Exception ex) when (ex is IOException or HttpRequestException)
+        {
+        }
+    }
+
     private static LocalOverlayServer StartServer(OverlayStateService overlay)
     {
         var server = new LocalOverlayServer(overlay, NullLogger<LocalOverlayServer>.Instance, FreeLoopbackPort());
