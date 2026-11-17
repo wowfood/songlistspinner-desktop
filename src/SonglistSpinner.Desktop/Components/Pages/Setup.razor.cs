@@ -154,10 +154,15 @@ public partial class Setup
             return;
         }
 
+        // Leaving Setup disposes the page and its cancellation source, which the remaining checks would then
+        // read, so each one runs only while the page is still shown.
         await InvokeAsync(StateHasChanged);
+        if (_lifetimeCts.IsCancellationRequested) return;
         await VerifyRealtimeAsync(resolvedStreamer.Id);
+        if (_lifetimeCts.IsCancellationRequested) return;
         await InvokeAsync(StateHasChanged);
         await VerifyOverlayAsync();
+        if (_lifetimeCts.IsCancellationRequested) return;
 
         _busy = false;
         if (_eventsState == VerificationState.Passed && _overlayState == VerificationState.Passed)

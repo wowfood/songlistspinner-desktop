@@ -2,6 +2,7 @@
 @layout MainLayout
 @inject PreferencesSettingsService LocalSettings
 @inject IStreamerSongListCredentialStore CredentialStore
+@inject EnvironmentOverrides Overrides
 @inject ApiCredentialTest CredentialTest
 @inject IStreamerSongListClient SongListClient
 @inject IStreamerSongListEventSource EventSource
@@ -42,9 +43,13 @@
                 {
                     <div class="ss-field-hint">A credential is already configured. Leave this blank to keep using it.</div>
                 }
-                else
+                else if (Overrides.ProfileDirectory is null)
                 {
                     <div class="ss-field-hint">The token is stored in Windows secure storage.</div>
+                }
+                else
+                {
+                    <div class="ss-field-hint">Test profile: the token is stored in plain text in the profile folder.</div>
                 }
             </div>
 

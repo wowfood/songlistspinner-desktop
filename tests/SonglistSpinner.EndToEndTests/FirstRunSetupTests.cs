@@ -15,6 +15,7 @@ namespace SonglistSpinner.EndToEndTests;
 public class FirstRunSetupTests
 {
     private const string Token = "simulator-token";
+    private const string TestProfileTokenHint = "Test profile: the token is stored in plain text in the profile folder.";
 
     [Fact(Timeout = 180_000)]
     public async Task Given_NoSavedCredential_When_TheAppStarts_Then_ItOpensTheSetupWizardAtTheAccessStep()
@@ -27,7 +28,8 @@ public class FirstRunSetupTests
         var setup = scenario.Setup;
         await Expect(setup.Heading).ToBeVisibleAsync();
         await Expect(setup.StepHeading).ToHaveTextAsync("StreamerSongList access");
-        await Expect(setup.TokenHint).ToHaveTextAsync("The token is stored in Windows secure storage.");
+        // The app under test runs on a test profile, which keeps the token in a plain-text file and says so.
+        await Expect(setup.TokenHint).ToHaveTextAsync(TestProfileTokenHint);
         await Expect(setup.CurrentStep).ToHaveTextAsync(new Regex("Access$"));
     }
 
@@ -84,7 +86,7 @@ public class FirstRunSetupTests
         await scenario.Page.GetByRole(AriaRole.Link, new() { Name = "Dashboard", Exact = true }).ClickAsync();
         await Expect(scenario.Page).ToHaveURLAsync(new Regex("/setup$"));
         await Expect(setup.CurrentStep).ToHaveTextAsync(new Regex("Access$"));
-        await Expect(setup.TokenHint).ToHaveTextAsync("The token is stored in Windows secure storage.");
+        await Expect(setup.TokenHint).ToHaveTextAsync(TestProfileTokenHint);
     }
 
     [Fact(Timeout = 180_000)]

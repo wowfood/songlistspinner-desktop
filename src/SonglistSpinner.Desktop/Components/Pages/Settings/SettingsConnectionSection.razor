@@ -1,4 +1,5 @@
 @inject NavigationManager Navigation
+@inject EnvironmentOverrides Overrides
 
 <div class="ss-settings-section-heading">
     <span>Connection</span>
@@ -47,7 +48,14 @@
         <label for="apiToken">API Token</label>
         <InputText id="apiToken" Value="CredentialToken" ValueChanged="CredentialTokenChanged" ValueExpression="CredentialTokenExpression" type="password"
                    autocomplete="off" placeholder="Leave blank to keep the saved token"/>
-        <div class="ss-field-hint">Stored in Windows secure storage and never written to the repository.</div>
+        @if (Overrides.ProfileDirectory is null)
+        {
+            <div class="ss-field-hint">Stored in Windows secure storage and never written to the repository.</div>
+        }
+        else
+        {
+            <div class="ss-field-hint">Test profile: stored in plain text in the profile folder.</div>
+        }
     </div>
     @if (CredentialKind == StreamerSongListCredentialKind.OAuthBearer)
     {
