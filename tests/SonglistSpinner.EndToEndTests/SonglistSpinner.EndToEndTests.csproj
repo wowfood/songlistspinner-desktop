@@ -22,6 +22,11 @@
             Edge (the msedge channel), so no Playwright browser download is needed.
         -->
         <PackageReference Include="Microsoft.Playwright" Version="1.54.0"/>
+        <!--
+            The coverage command in AGENTS.md passes its options to every test project in the solution, and a
+            project without this extension rejects them and fails the whole run.
+        -->
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2"/>
         <PackageReference Include="xunit.v3" Version="4.0.0"/>
     </ItemGroup>
     <ItemGroup>

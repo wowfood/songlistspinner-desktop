@@ -88,6 +88,10 @@ public class SpinTests(SharedApp sharedApp) : IClassFixture<SharedApp>
         await new ChannelSeed("failing_spin_streamer").WithQueued(SongCatalog.TakeOnMe).ApplyAsync(scenario.Simulator);
         await dashboard.LoadChannelAndSettleAsync("failing_spin_streamer", scenario.Simulator, cancellationToken);
         var callsBeforeSpin = scenario.Simulator.Requests.Count;
+        // The failed draw ends the spin, which resumes the queue refreshes the spin suspended, and that refresh
+        // puts API health back within a moment. It is held here so the failed state can be seen first.
+        var drawFetch = scenario.Simulator.HoldNextRequest(HttpMethod.Get, "/queue");
+        var resumedRefresh = scenario.Simulator.HoldNextRequest(HttpMethod.Get, "/queue");
         scenario.Simulator.FailNextRequests(
             HttpMethod.Get,
             "/queue",
@@ -95,11 +99,14 @@ public class SpinTests(SharedApp sharedApp) : IClassFixture<SharedApp>
             "database unavailable");
 
         await dashboard.SpinButton.ClickAsync();
+        await drawFetch.Arrived.WaitAsync(cancellationToken);
+        drawFetch.Release();
+        await resumedRefresh.Arrived.WaitAsync(cancellationToken);
 
         await Expect(dashboard.Status).ToHaveTextAsync($"Error: {ApiError}");
+        await Expect(dashboard.Health.Api).ToHaveTextAsync("Error");
         await Expect(dashboard.Winner.Root).ToBeHiddenAsync();
-        // The failed draw ends the spin, which resumes the queue refreshes the spin suspended. API health reads
-        // "Error" only until that refresh succeeds a moment later, so the lasting state is what is asserted.
+        resumedRefresh.Release();
         await Expect(dashboard.Health.Api).ToHaveTextAsync("Connected");
         var callsSinceSpin = scenario.Simulator.Requests.Skip(callsBeforeSpin).ToList();
         Assert.Single(
