@@ -65,8 +65,12 @@ function loadOverlayPage({ search = '', reducedMotion = true, framedBy = null } 
         },
         spinWheel: {
             Wheel: class {
-                constructor(container, options) { this.items = options.items; this.spins = []; wheels.push(this); }
-                spinToItem(index, duration) { this.spins.push({ index, duration }); }
+                constructor(container, options) {
+                    this.items = options.items;
+                    // The interop styles the canvas of every wheel it builds.
+                    this.canvas = { style: {} };
+                    wheels.push(this);
+                }
                 remove() { }
             }
         },
@@ -82,6 +86,10 @@ function loadOverlayPage({ search = '', reducedMotion = true, framedBy = null } 
 
     vm.runInContext(fs.readFileSync(path.join(webRoot, 'overlay/SongSpinner.contracts.js'), 'utf8'), context);
     vm.runInContext(fs.readFileSync(path.join(webRoot, 'spinner/SongSpinner.interop.js'), 'utf8'), context);
+    // The page's part of a spin is the call it makes to the shared interop; how the interop then turns the
+    // wheel is the subject of wheel-spin.test.cjs.
+    const spins = [];
+    context.SpinnerInterop.spinToItem = (index, duration) => { spins.push({ index, duration }); };
     for (const match of overlayHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
         vm.runInContext(match[1], context);
     }
@@ -90,7 +98,7 @@ function loadOverlayPage({ search = '', reducedMotion = true, framedBy = null } 
     // Events go to the newest connection, which is the live one after a reconnect.
     const send = (eventName, data) => eventSources.at(-1).listeners[eventName]({ data: JSON.stringify(data) });
     const currentWheel = () => wheels.at(-1);
-    return { elements, send, context, eventSources, currentWheel, timers, errors, windowListeners };
+    return { elements, send, context, eventSources, currentWheel, spins, timers, errors, windowListeners };
 }
 
 function initialState(overrides = {}) {
@@ -214,23 +222,23 @@ test('Overlay: no winner on connect keeps the winner dialog closed', () => {
 });
 
 test('Overlay: a spin command spins to the winner by queue id when the wheel order differs', () => {
-    const { send, currentWheel } = loadOverlayPage();
+    const { send, spins } = loadOverlayPage();
     send('init_state', initialState({
         wheelItems: [{ queueId: 5, label: 'First' }, { queueId: 9, label: 'Second' }]
     }));
 
     send('spin_command', { winnerIndex: 0, winnerQueueId: 9, duration: 5000 });
 
-    assert.deepEqual(currentWheel().spins, [{ index: 1, duration: 5000 }]);
+    assert.deepEqual(spins, [{ index: 1, duration: 5000 }]);
 });
 
 test('Overlay: a spin command for a winner missing from the wheel does not spin', () => {
-    const { send, currentWheel, errors } = loadOverlayPage();
+    const { send, spins, errors } = loadOverlayPage();
     send('init_state', initialState({ wheelItems: [{ queueId: 5, label: 'First' }] }));
 
     send('spin_command', { winnerIndex: 0, winnerQueueId: 9, duration: 5000 });
 
-    assert.deepEqual(currentWheel().spins, []);
+    assert.deepEqual(spins, []);
     assert.deepEqual(errors, ['The selected winner is not present in the overlay wheel.']);
 });
 

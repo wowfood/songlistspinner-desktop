@@ -22,6 +22,10 @@ window.SpinnerInterop = (function () {
     let _winnerReturnFocus = null
     let _wheelItems = []
     let _wheelColors = []
+    // The spin in flight: the turn, in degrees, applied to the wheel's canvas goes from `from` to `to`.
+    let _spin = null
+    // The turn the last spin left on the wheel's canvas.
+    let _turnAtRest = 0
 
     const wheelLabelRadius = 0.9
     const wheelLabelRadiusMax = 0.08
@@ -88,6 +92,53 @@ window.SpinnerInterop = (function () {
             radius: 0.95,
             isInteractive: false
         })
+    }
+
+    // A spin turns the canvas the wheel is already drawn on instead of animating the wheel library. The
+    // library redraws every label at a new angle each frame, which the browser cannot cache: 200 songs drew
+    // about three frames a second. Turning the finished drawing costs the same whatever the queue size.
+    //
+    // The canvas stays turned where the spin stops, so the wheel library still holds the rotation the wheel was
+    // drawn at. Drawing the wheel at the angle it stopped and taking the turn off cannot be relied on to reach
+    // the screen in one frame: the wheel showed at a wrong angle for a frame in between.
+    function spinTurnAt(spin, now) {
+        const progress = spin.duration > 0
+            ? Math.min(1, Math.max(0, (now - spin.start) / spin.duration))
+            : 1
+        // The wheel library's default easing, so the spin keeps its feel.
+        return spin.from + (spin.to - spin.from) * Math.sin(progress * Math.PI / 2)
+    }
+
+    function stopSpin() {
+        if (_spin) cancelAnimationFrame(_spin.frame)
+        _spin = null
+    }
+
+    function drawSpinFrame(now) {
+        const spin = _spin
+        if (now < spin.start + spin.duration) {
+            spin.wheel.canvas.style.transform = `rotate(${spinTurnAt(spin, now)}deg)`
+            spin.frame = requestAnimationFrame(drawSpinFrame)
+            return
+        }
+
+        _spin = null
+        _turnAtRest = spin.to
+        spin.wheel.canvas.style.transform = `rotate(${spin.to}deg)`
+    }
+
+    function startSpin(wheel, index, duration) {
+        const now = performance.now()
+        const from = _spin ? spinTurnAt(_spin, now) : _turnAtRest
+        stopSpin()
+
+        // As the wheel library's spinToItem lands it: clockwise to the middle of the item, plus one revolution.
+        const item = wheel.items[index]
+        const pastPointer = Number(
+            ((((wheel.rotation + from) % 360) + item.getCenterAngle() - wheel.pointerAngle) % 360).toFixed(9))
+        const to = from + ((360 - pastPointer) % 360) + 360
+
+        _spin = { wheel, from, to, start: now, duration, frame: requestAnimationFrame(drawSpinFrame) }
     }
 
     function resetResizeInteraction() {
@@ -227,6 +278,10 @@ window.SpinnerInterop = (function () {
                 container.textContent = 'The wheel component could not be loaded.'
                 return
             }
+            // The new wheel takes the turn the old one has, so a wheel rebuilt after a spin stays on the winner
+            // instead of snapping back to where the wheel began.
+            if (_spin) _turnAtRest = spinTurnAt(_spin, performance.now())
+            stopSpin()
             if (_wheel) {
                 _wheel.remove();
                 _wheel = null
@@ -234,10 +289,13 @@ window.SpinnerInterop = (function () {
             _wheelItems = Array.isArray(items) ? items : []
             _wheelColors = Array.isArray(colors) ? colors : []
             _wheel = buildWheel(container)
+            _wheel.canvas.style.transform = `rotate(${_turnAtRest}deg)`
+            // A turned square reaches past its own box, over the Spin button below it.
+            _wheel.canvas.style.pointerEvents = 'none'
         },
 
         spinToItem(index, duration) {
-            if (_wheel) _wheel.spinToItem(index, duration)
+            if (_wheel) startSpin(_wheel, index, duration)
         },
 
 

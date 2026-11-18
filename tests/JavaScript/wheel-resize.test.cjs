@@ -1,54 +1,31 @@
-const fs = require('node:fs');
-const path = require('node:path');
-const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
+const { loadWheelPage, canvasTurn, itemUnderPointer } = require('./wheel-page.cjs');
 
-// The dashboard and the OBS overlay both load this one script.
-const interopPath = path.resolve(__dirname, '../../src/SonglistSpinner.Desktop/wwwroot/spinner/SongSpinner.interop.js');
-
+// The dashboard and the OBS overlay both load SongSpinner.interop.js, which redraws the wheel when its
+// container changes size.
 test('SongSpinner.interop.js: resizing preserves the spinning wheel and final rotation', () => {
-    const source = fs.readFileSync(interopPath, 'utf8');
-    let observer, timer;
-    const wheels = [];
-    class Wheel {
-        constructor() { this.rotation = 0; this.resizes = 0; wheels.push(this); }
-        remove() { this.removed = true; }
-        spinToItem(index) { this.target = index; this.spinning = true; }
-        resize() { this.resizes++; }
-        draw() { }
-    }
-    const container = {};
-    const context = {
-        window: { spinWheel: { Wheel }, ResizeObserver: true, SonglistSpinnerContracts: {} },
-        spinWheel: { Wheel },
-        document: {
-            getElementById: () => container,
-            createElement: () => ({ getContext: () => ({ measureText: () => ({ width: 10 }) }) })
-        },
-        ResizeObserver: class { constructor(callback) { observer = callback; } observe() { } },
-        setTimeout(callback) { timer = callback; },
-        clearTimeout() { },
-        performance: { now: () => 1000 }
-    };
-    vm.createContext(context);
-    vm.runInContext(source, context);
-    const interop = context.window.SpinnerInterop;
-    interop.createWheel([{ label: 'First request' }, { label: 'Second request' }], []);
-    interop.setupResizeObserver();
-    interop.spinToItem(1, 5000);
-    const original = wheels[0];
-    original.rotation = 123;
-    observer(); timer();
-    assert.equal(wheels.length, 1);
-    assert.equal(original.removed, undefined);
-    assert.equal(original.target, 1);
-    assert.equal(original.spinning, true);
-    assert.equal(original.rotation, 123);
-    original.spinning = false;
-    original.rotation = 270;
-    observer(); timer();
-    assert.equal(wheels.length, 1);
-    assert.equal(original.rotation, 270);
-    assert.equal(original.resizes, 2);
+    const page = loadWheelPage();
+    page.interop.createWheel([{ label: 'First request' }, { label: 'Second request' }], []);
+    page.frame(0);
+    page.interop.setupResizeObserver();
+    const wheel = page.currentWheel();
+    page.setTime(1000);
+    page.interop.spinToItem(1, 5000);
+    page.frame(3500);
+    const turnBeforeResize = canvasTurn(wheel);
+
+    page.resizeContainer(300);
+    page.frame(4000);
+    const turnAfterResize = canvasTurn(wheel);
+    page.frame(6000);
+    const turnAtRest = canvasTurn(wheel);
+    page.resizeContainer(400);
+    page.frame(6500);
+
+    assert.equal(page.wheels.length, 1);
+    assert.ok(turnAfterResize > turnBeforeResize, 'the spin carries on after the resize');
+    assert.equal(wheel.canvas.width, 400);
+    assert.equal(canvasTurn(wheel), turnAtRest);
+    assert.equal(itemUnderPointer(wheel), 1);
 });
