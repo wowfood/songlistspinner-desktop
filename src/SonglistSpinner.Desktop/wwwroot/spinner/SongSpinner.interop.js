@@ -1,8 +1,12 @@
-const _spinnerContracts = window.SonglistSpinnerContracts
-
+// The wheel, resize and theme interop shared by the dashboard (index.html) and the OBS overlay
+// (Overlay.html, served by LocalOverlayServer from an embedded copy). The exported method names are the
+// C# contract in SpinnerInteropMethods; page-specific behaviour stays in each page.
 window.SpinnerInterop = (function () {
+    const _spinnerContracts = window.SonglistSpinnerContracts
+
     let _wheel = null
     let _isResizing = false
+    let _resizePointerId = null
     let _savedWidth = null
     let _savedMinWidth = null
     let _resizeTimeout = null
@@ -10,6 +14,12 @@ window.SpinnerInterop = (function () {
     let _resizeHandle = null
     let _resizePlayedList = null
     let _resizeDotNetRef = null
+    let _resizeEndMethodName = null
+    let _winnerDialog = null
+    let _winnerDialogCancelHandler = null
+    let _winnerDialogDotNetRef = null
+    let _winnerDialogCancelledMethodName = null
+    let _winnerReturnFocus = null
     let _wheelItems = []
     let _wheelColors = []
 
@@ -17,6 +27,9 @@ window.SpinnerInterop = (function () {
     const wheelLabelRadiusMax = 0.08
     const wheelLabelFontSizeMin = 12
     const wheelLabelFontSizeMax = 28
+    const resizeMinPixels = 300
+    const resizeMaxPixels = 800
+    const resizeKeyboardStepPixels = 24
 
     function calculateWheelLabelFontSize(itemCount) {
         if (itemCount <= 1) return wheelLabelFontSizeMax
@@ -79,31 +92,86 @@ window.SpinnerInterop = (function () {
 
     function resetResizeInteraction() {
         _isResizing = false
+        _resizePointerId = null
         document.body.style.cursor = 'default'
         document.body.style.userSelect = 'auto'
     }
 
     function detachResizeHandlers() {
         if (_resizeHandle) {
-            _resizeHandle.removeEventListener('mousedown', handleResizeMouseDown)
+            _resizeHandle.removeEventListener('pointerdown', handleResizePointerDown)
+            _resizeHandle.removeEventListener('keydown', handleResizeKeyDown)
         }
-        document.removeEventListener('mousemove', handleResizeMouseMove)
-        document.removeEventListener('mouseup', handleResizeMouseUp)
+        document.removeEventListener('pointermove', handleResizePointerMove)
+        document.removeEventListener('pointerup', handleResizePointerUp)
+        document.removeEventListener('pointercancel', handleResizePointerUp)
         _resizeHandle = null
         _resizePlayedList = null
         _resizeDotNetRef = null
+        _resizeEndMethodName = null
         resetResizeInteraction()
     }
 
-    function handleResizeMouseDown(e) {
+    function cleanupWinnerDialog(restoreFocus) {
+        const dialog = _winnerDialog || document.getElementById('winnerModal')
+        const returnFocus = _winnerReturnFocus
+
+        if (dialog && _winnerDialogCancelHandler) {
+            dialog.removeEventListener('cancel', _winnerDialogCancelHandler)
+        }
+        if (dialog && dialog.open) dialog.close()
+
+        _winnerDialog = null
+        _winnerDialogCancelHandler = null
+        _winnerDialogDotNetRef = null
+        _winnerDialogCancelledMethodName = null
+        _winnerReturnFocus = null
+
+        if (!restoreFocus) return
+        const fallback = document.getElementById('spinButton') || document.getElementById('playedListSpinButton')
+        const target = returnFocus && returnFocus.isConnected && !returnFocus.disabled
+            ? returnFocus
+            : fallback
+        if (target && !target.disabled) target.focus({ preventScroll: true })
+    }
+
+    function applyPlayedListWidth(newWidth) {
+        if (!_resizePlayedList || !_resizeHandle) return false
+        const container = document.getElementById('container')
+        if (!container) return false
+        const containerWidth = container.getBoundingClientRect().width
+        if (containerWidth <= 0 || newWidth < resizeMinPixels || newWidth > resizeMaxPixels) return false
+
+        const roundedWidth = Math.round(newWidth)
+        _resizePlayedList.style.width = `${(newWidth / containerWidth) * 100}%`
+        _resizePlayedList.style.minWidth = `${resizeMinPixels}px`
+        _resizeHandle.setAttribute('aria-valuenow', `${roundedWidth}`)
+        _resizeHandle.setAttribute('aria-valuetext', `${roundedWidth} pixels`)
+        return true
+    }
+
+    function synchronizePlayedListWidth() {
+        if (!_resizePlayedList || !_resizeDotNetRef || !_resizeEndMethodName) return
+        const width = _resizePlayedList.style.width
+        const minWidth = _resizePlayedList.style.minWidth
+        if (!width) return
+
+        _resizeDotNetRef.invokeMethodAsync(_resizeEndMethodName, width, minWidth)
+            .catch(error => console.warn('Unable to synchronize the played-list width.', error))
+    }
+
+    function handleResizePointerDown(e) {
+        if (e.button !== 0 || !_resizeHandle) return
         e.preventDefault()
         _isResizing = true
+        _resizePointerId = e.pointerId
+        _resizeHandle.setPointerCapture(e.pointerId)
         document.body.style.cursor = 'ew-resize'
         document.body.style.userSelect = 'none'
     }
 
-    function handleResizeMouseMove(e) {
-        if (!_isResizing || !_resizePlayedList) return
+    function handleResizePointerMove(e) {
+        if (!_isResizing || e.pointerId !== _resizePointerId || !_resizePlayedList) return
         const container = document.getElementById('container')
         if (!container) return
 
@@ -113,28 +181,41 @@ window.SpinnerInterop = (function () {
         const newWidth = position === _spinnerContracts.playedListPositions.left
             ? e.clientX - containerRect.left - 10
             : containerRect.right - e.clientX - 10
-        const minPx = 300, maxPx = 800
-        if (newWidth >= minPx && newWidth <= maxPx) {
-            const pct = (newWidth / containerRect.width) * 100
-            _resizePlayedList.style.width = `${pct}%`
-            _resizePlayedList.style.minWidth = `${minPx}px`
-        }
+        applyPlayedListWidth(newWidth)
     }
 
-    async function handleResizeMouseUp() {
-        if (!_isResizing || !_resizePlayedList) return
-
-        const playedList = _resizePlayedList
-        const dotNetRef = _resizeDotNetRef
+    function handleResizePointerUp(e) {
+        if (!_isResizing || e.pointerId !== _resizePointerId || !_resizeHandle) return
+        if (_resizeHandle.hasPointerCapture(e.pointerId)) {
+            _resizeHandle.releasePointerCapture(e.pointerId)
+        }
         resetResizeInteraction()
-        const width = playedList.style.width
-        const minWidth = playedList.style.minWidth
-        if (!width || !dotNetRef) return
+        synchronizePlayedListWidth()
+    }
 
-        try {
-            await dotNetRef.invokeMethodAsync('OnResizeEnd', width, minWidth)
-        } catch (error) {
-            console.warn('Unable to synchronize the played-list width.', error)
+    function handleResizeKeyDown(e) {
+        if (!_resizePlayedList) return
+        const supportedKeys = ['ArrowLeft', 'ArrowRight', 'Home', 'End']
+        if (!supportedKeys.includes(e.key)) return
+
+        e.preventDefault()
+        const position = _resizePlayedList.dataset.position || _spinnerContracts.playedListPositions.default
+        const currentWidth = _resizePlayedList.getBoundingClientRect().width
+        let newWidth
+        if (e.key === 'Home') {
+            newWidth = resizeMinPixels
+        } else if (e.key === 'End') {
+            newWidth = resizeMaxPixels
+        } else {
+            const separatorDirection = e.key === 'ArrowRight' ? 1 : -1
+            const panelDirection = position === _spinnerContracts.playedListPositions.left
+                ? separatorDirection
+                : -separatorDirection
+            newWidth = currentWidth + panelDirection * resizeKeyboardStepPixels
+        }
+
+        if (applyPlayedListWidth(Math.max(resizeMinPixels, Math.min(resizeMaxPixels, newWidth)))) {
+            synchronizePlayedListWidth()
         }
     }
 
@@ -159,9 +240,6 @@ window.SpinnerInterop = (function () {
             if (_wheel) _wheel.spinToItem(index, duration)
         },
 
-        getItems() {
-            return _wheel ? _wheel.items : []
-        },
 
         setupResizeObserver() {
             const container = document.getElementById('wheelContainer')
@@ -172,8 +250,9 @@ window.SpinnerInterop = (function () {
                     clearTimeout(_resizeTimeout)
                     _resizeTimeout = setTimeout(() => {
                         if (_wheel) {
-                            _wheel.remove()
-                            _wheel = buildWheel(container)
+                            // Preserve the current rotation and in-flight spin.
+                            _wheel.resize()
+                            _wheel.draw(performance.now())
                         }
                     }, 200)
                 }
@@ -181,7 +260,7 @@ window.SpinnerInterop = (function () {
             _resizeObserver.observe(container)
         },
 
-        setupResizeHandlers(dotNetRef) {
+        setupResizeHandlers(dotNetRef, resizeEndMethodName) {
             detachResizeHandlers()
             const handle = document.getElementById('resizeHandle')
             const playedList = document.getElementById('playedList')
@@ -190,13 +269,54 @@ window.SpinnerInterop = (function () {
             _resizeHandle = handle
             _resizePlayedList = playedList
             _resizeDotNetRef = dotNetRef
-            _resizeHandle.addEventListener('mousedown', handleResizeMouseDown)
-            document.addEventListener('mousemove', handleResizeMouseMove)
-            document.addEventListener('mouseup', handleResizeMouseUp)
+            _resizeEndMethodName = resizeEndMethodName
+            const currentWidth = Math.round(playedList.getBoundingClientRect().width)
+            _resizeHandle.setAttribute('aria-valuenow', `${currentWidth}`)
+            _resizeHandle.setAttribute('aria-valuetext', `${currentWidth} pixels`)
+            _resizeHandle.addEventListener('pointerdown', handleResizePointerDown)
+            _resizeHandle.addEventListener('keydown', handleResizeKeyDown)
+            document.addEventListener('pointermove', handleResizePointerMove)
+            document.addEventListener('pointerup', handleResizePointerUp)
+            document.addEventListener('pointercancel', handleResizePointerUp)
+        },
+
+        openWinnerDialog(preferredActionId, dotNetRef, cancelledMethodName) {
+            cleanupWinnerDialog(false)
+            const dialog = document.getElementById('winnerModal')
+            if (!(dialog instanceof HTMLDialogElement)) {
+                throw new Error('The winner dialog is unavailable.')
+            }
+
+            _winnerDialog = dialog
+            _winnerDialogDotNetRef = dotNetRef
+            _winnerDialogCancelledMethodName = cancelledMethodName
+            _winnerReturnFocus = document.activeElement instanceof HTMLElement
+                ? document.activeElement
+                : null
+            _winnerDialogCancelHandler = event => {
+                event.preventDefault()
+                if (!_winnerDialogDotNetRef || !_winnerDialogCancelledMethodName) return
+                _winnerDialogDotNetRef.invokeMethodAsync(_winnerDialogCancelledMethodName)
+                    .catch(error => console.warn('Unable to close the winner dialog.', error))
+            }
+            dialog.addEventListener('cancel', _winnerDialogCancelHandler)
+            dialog.showModal()
+
+            const preferredAction = document.getElementById(preferredActionId)
+            const firstEnabledAction = dialog.querySelector('button:not(:disabled)')
+            const focusTarget = preferredAction && !preferredAction.disabled
+                ? preferredAction
+                : firstEnabledAction
+            if (focusTarget) focusTarget.focus({ preventScroll: true })
+        },
+
+        closeWinnerDialog() {
+            cleanupWinnerDialog(true)
         },
 
         disposeDashboardBindings() {
             detachResizeHandlers()
+            cleanupWinnerDialog(false)
             if (_resizeObserver) {
                 _resizeObserver.disconnect()
                 _resizeObserver = null
@@ -251,23 +371,26 @@ window.SpinnerInterop = (function () {
 
         applyPlayedListPosition(position) {
             const container = document.getElementById('container')
-            const icon = document.getElementById('collapseIcon')
-            if (!container || !icon) return
+            if (!container) return
             const positions = _spinnerContracts.playedListPositions
-            if ((position || positions.default).toLowerCase() === positions.left) {
-                container.classList.add('played-list-left')
-                icon.innerText = '◀'
-            } else {
-                container.classList.remove('played-list-left')
-                icon.innerText = '▶'
-            }
+            const normalizedPosition = (position || positions.default).toLowerCase()
+            const isLeft = normalizedPosition === positions.left
+            container.classList.toggle('played-list-left', isLeft)
+            // The overlay has no collapse button, so it has no icon to update.
+            const icon = document.getElementById('collapseIcon')
+            if (icon) icon.innerText = isLeft ? '◀' : '▶'
+            const playedList = document.getElementById('playedList')
+            if (playedList) playedList.dataset.position = normalizedPosition
         },
 
         runConfetti(colors) {
             const el = document.getElementById('winnerConfetti')
             if (!el) return
             el.innerHTML = ''
-            const palette = colors || ['#ff6b6b', '#4ecdc4', '#45b7d1', '#f9ca24']
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
+            // The palette is the configured wheel colours, sent by the caller.
+            const palette = Array.isArray(colors) ? colors : []
+            if (palette.length === 0) return
             for (let i = 0; i < 36; i++) {
                 const piece = document.createElement('span')
                 piece.className = 'winner-confetti-piece'
@@ -305,13 +428,6 @@ window.SpinnerInterop = (function () {
             }
         },
 
-        setPlayedListWidth(width, minWidth) {
-            const el = document.getElementById('playedList')
-            if (el) {
-                el.style.width = width
-                el.style.minWidth = minWidth
-            }
-        },
 
         updateSettingsPreview(frameId, payload) {
             const frame = document.getElementById(frameId)
@@ -328,6 +444,60 @@ window.SpinnerInterop = (function () {
                 type: _spinnerContracts.messageTypes.settingsPreview,
                 payload
             }, targetOrigin)
+        },
+
+        validateCssSettings(request) {
+            const errors = {}
+            const forbiddenSizingValues = new Set([
+                'auto', 'inherit', 'initial', 'unset', 'revert', 'revert-layer',
+                'fit-content', 'max-content', 'min-content', 'normal'
+            ])
+
+            for (const field of request && request.sizes || []) {
+                const value = String(field.value || '').trim()
+                const property = field.property === 'width' ? 'width' : 'font-size'
+                if (!value) {
+                    errors[field.key] = `Enter a ${field.label.toLowerCase()}.`
+                    continue
+                }
+                if (forbiddenSizingValues.has(value.toLowerCase()) ||
+                    value.toLowerCase().includes('var(') ||
+                    !CSS.supports(property, value)) {
+                    errors[field.key] = `${field.label} must be a concrete CSS size such as ${property === 'width' ? '28rem or 480px' : '1rem or 16px'}.`
+                    continue
+                }
+
+                const probe = document.createElement('div')
+                probe.style.position = 'fixed'
+                probe.style.visibility = 'hidden'
+                probe.style[property] = value
+                document.body.appendChild(probe)
+                const computedValue = Number.parseFloat(getComputedStyle(probe)[property === 'width' ? 'width' : 'fontSize'])
+                probe.remove()
+                if (!Number.isFinite(computedValue) || computedValue <= 0) {
+                    errors[field.key] = `${field.label} must resolve to a size greater than zero.`
+                }
+            }
+
+            for (const field of request && request.colorLists || []) {
+                const values = Array.isArray(field.values) ? field.values : []
+                if (values.length === 0) {
+                    errors[field.key] = `Enter at least one ${field.label.toLowerCase()}.`
+                    continue
+                }
+
+                const invalidLines = values
+                    .map((value, index) => ({ value: String(value || '').trim(), line: index + 1 }))
+                    .filter(item => !item.value ||
+                        item.value.toLowerCase().includes('var(') ||
+                        !CSS.supports('color', item.value))
+                if (invalidLines.length > 0) {
+                    const lines = invalidLines.slice(0, 3).map(item => item.line).join(', ')
+                    errors[field.key] = `Use valid CSS colors on line${invalidLines.length === 1 ? '' : 's'} ${lines}${invalidLines.length > 3 ? ', …' : ''}.`
+                }
+            }
+
+            return errors
         }
     }
 })()

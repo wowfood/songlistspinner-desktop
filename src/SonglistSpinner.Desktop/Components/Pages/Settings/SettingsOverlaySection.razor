@@ -1,0 +1,297 @@
+<div class="ss-settings-section-heading">
+    <span>Overlay Layout</span>
+    <h2>Arrange the information your viewers see</h2>
+    <p>Configure field order, panel placement, and typography across the overlay and winner dialog.</p>
+</div>
+
+<section class="ss-settings-section">
+    <div class="ss-settings-section-title-row">
+        <h3>Played Songs Panel</h3>
+        <button type="button" class="ss-btn-reset-subset"
+                aria-label="Revert Played Songs Panel to default"
+                disabled="@ResetDialogOpen"
+                @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.PlayedSongsPanel))">
+            Revert to default
+        </button>
+    </div>
+    <div class="ss-field">
+        <label>Display Fields</label>
+        <DisplayFieldOrderEditor Items="ViewModel.DisplayFields"
+                                 HelpId="playedFieldsHelp"
+                                 OrderChanged="MovePlayedField"
+                                 SelectionChanged="TogglePlayedField">
+            <HelpContent>
+                Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
+            </HelpContent>
+        </DisplayFieldOrderEditor>
+    </div>
+    <div class="ss-settings-field-grid">
+        <div class="ss-field">
+            <label for="playedListSeparatorChoice">Field Separator</label>
+            <InputSelect id="playedListSeparatorChoice" Value="PlayedListSeparatorChoice" ValueChanged="PlayedListSeparatorChoiceChanged" ValueExpression="PlayedListSeparatorChoiceExpression">
+                @foreach (var option in SettingsOptions.FieldSeparators)
+                {
+                    <option value="@option.Key">@option.Label</option>
+                }
+                <option value="@SettingsOptions.CustomSeparatorKey">Custom</option>
+            </InputSelect>
+            <div class="ss-field-hint">Choose a symbol that will render in both desktop and browser overlays.</div>
+            @if (PlayedListUsesCustomSeparator)
+            {
+                <div class="ss-custom-separator">
+                    <label for="playedListSeparator">Custom Separator</label>
+                    <InputText id="playedListSeparator" @bind-Value="Dto.PlayedListSeparator"
+                               placeholder="Enter a custom separator"/>
+                    <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
+                </div>
+            }
+        </div>
+        <div class="ss-field">
+            <label class="ss-checkbox-label">
+                <InputCheckbox @bind-Value="Dto.PlayedListShowLabels"
+                               disabled="@Dto.PlayedListShowFieldHeaders"/>
+                Show field labels
+            </label>
+            <div class="ss-field-hint">Prefixes each song value with labels such as Artist and Title. A header row replaces these labels while enabled.</div>
+        </div>
+        <div class="ss-field">
+            <label class="ss-checkbox-label">
+                <InputCheckbox @bind-Value="Dto.PlayedListShowFieldHeaders"/>
+                Show field header row
+            </label>
+            <div class="ss-field-hint">Displays the selected field labels once above aligned song values.</div>
+        </div>
+        <div class="ss-field">
+            <label class="ss-checkbox-label">
+                <InputCheckbox @bind-Value="Dto.PlayedListShowNumbers"/>
+                Show sequence numbers
+            </label>
+            <div class="ss-field-hint">Prefixes each displayed song with a number.</div>
+        </div>
+        <div class="ss-field">
+            <label for="playedListNumberingStart">Numbering Starts At</label>
+            <InputSelect id="playedListNumberingStart"
+                         @bind-Value="Dto.PlayedListNumberingStart"
+                         disabled="@(!Dto.PlayedListShowNumbers)">
+                @foreach (var option in SettingsOptions.PlayedListNumberingStarts)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </InputSelect>
+            <div class="ss-field-hint">The displayed history remains newest first.</div>
+        </div>
+        <div class="ss-field">
+            <label for="playedListPosition">Panel Position</label>
+            <InputSelect id="playedListPosition" @bind-Value="Dto.PlayedListPosition">
+                @foreach (var option in SettingsOptions.PlayedListPositions)
+                {
+                    <option value="@option.Value">@option.Label</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="ss-field">
+            <label for="playedListFont">Font Family</label>
+            <InputSelect id="playedListFont" @bind-Value="Dto.PlayedListFontFamily">
+                @foreach (var font in FontChoices)
+                {
+                    <option value="@font.Value">@font.Label</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="ss-field">
+            <label for="playedListFontSize">Font Size</label>
+            <InputText id="playedListFontSize" @bind-Value="Dto.PlayedListFontSize"
+                       class="@CssValidation.FieldClass(nameof(SettingsDto.PlayedListFontSize))"
+                       aria-invalid="@CssValidation.Has(nameof(SettingsDto.PlayedListFontSize))"
+                       aria-describedby="@(CssValidation.Has(nameof(SettingsDto.PlayedListFontSize)) ? "playedListFontSizeError" : null)"
+                       @oninput="@(_ => CssValidationCleared.InvokeAsync(nameof(SettingsDto.PlayedListFontSize)))"
+                       placeholder="0.875rem"/>
+            @if (CssValidation.ErrorFor(nameof(SettingsDto.PlayedListFontSize)) is { } playedListFontSizeError)
+            {
+                <div id="playedListFontSizeError" class="validation-message" role="alert">@playedListFontSizeError</div>
+            }
+        </div>
+        <div class="ss-field">
+            <label for="playedListMaxLines">Maximum Lines per Song</label>
+            <InputNumber id="playedListMaxLines" @bind-Value="Dto.PlayedListMaxLines" min="1" max="5"/>
+        </div>
+    </div>
+</section>
+
+<section class="ss-settings-section @(!Dto.DisplayNowPlaying ? "ss-settings-section-muted" : "")">
+    <div class="ss-settings-section-title-row">
+        <h3>Now Playing Panel</h3>
+        <div class="ss-settings-section-title-actions">
+            <span>@(Dto.DisplayNowPlaying ? "Enabled" : "Disabled")</span>
+            <button type="button" class="ss-btn-reset-subset"
+                    aria-label="Revert Now Playing Panel to default"
+                    disabled="@ResetDialogOpen"
+                    @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.NowPlayingPanel))">
+                Revert to default
+            </button>
+        </div>
+    </div>
+    @if (!Dto.DisplayNowPlaying)
+    {
+        <p class="ss-settings-inline-notice">
+            Enable the Now Playing workflow under Spinner &amp; Queue to show and configure this panel.
+            <button type="button" @onclick="OpenWinnerSettings">Open winner settings</button>
+        </p>
+    }
+    else
+    {
+        <div class="ss-field">
+            <label>Display Fields</label>
+            <DisplayFieldOrderEditor Items="ViewModel.NowPlayingDisplayFields"
+                                     HelpId="nowPlayingFieldsHelp"
+                                     OrderChanged="MoveNowPlayingField"
+                                     SelectionChanged="ToggleNowPlayingField">
+                <HelpContent>
+                    Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
+                </HelpContent>
+            </DisplayFieldOrderEditor>
+        </div>
+        <div class="ss-settings-field-grid">
+            <div class="ss-field">
+                <label for="nowPlayingSeparatorChoice">Field Separator</label>
+                <InputSelect id="nowPlayingSeparatorChoice" Value="NowPlayingSeparatorChoice" ValueChanged="NowPlayingSeparatorChoiceChanged" ValueExpression="NowPlayingSeparatorChoiceExpression">
+                    @foreach (var option in SettingsOptions.FieldSeparators)
+                    {
+                        <option value="@option.Key">@option.Label</option>
+                    }
+                    <option value="@SettingsOptions.CustomSeparatorKey">Custom</option>
+                </InputSelect>
+                <div class="ss-field-hint">Choose a symbol that will render in both desktop and browser overlays.</div>
+                @if (NowPlayingUsesCustomSeparator)
+                {
+                    <div class="ss-custom-separator">
+                        <label for="nowPlayingSeparator">Custom Separator</label>
+                        <InputText id="nowPlayingSeparator" @bind-Value="Dto.NowPlayingSeparator"
+                                   placeholder="Enter a custom separator"/>
+                        <div class="ss-field-hint">Spaces are preserved. Blank values use the default <code> | </code> separator.</div>
+                    </div>
+                }
+            </div>
+            <div class="ss-field">
+                <label class="ss-checkbox-label">
+                    <InputCheckbox @bind-Value="Dto.NowPlayingShowLabels"/>
+                    Show field labels
+                </label>
+                <div class="ss-field-hint">Prefixes values with labels such as Artist and Title.</div>
+            </div>
+            <div class="ss-field">
+                <label for="nowPlayingPosition">Screen Position</label>
+                <InputSelect id="nowPlayingPosition" @bind-Value="Dto.NowPlayingPosition">
+                    @foreach (var option in SettingsOptions.NowPlayingPositions)
+                    {
+                        <option value="@option.Value">@option.Label</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="ss-field">
+                <label for="nowPlayingWidth">Panel Width</label>
+                <InputText id="nowPlayingWidth" @bind-Value="Dto.NowPlayingWidth"
+                           class="@CssValidation.FieldClass(nameof(SettingsDto.NowPlayingWidth))"
+                           aria-invalid="@CssValidation.Has(nameof(SettingsDto.NowPlayingWidth))"
+                           aria-describedby="@(CssValidation.Has(nameof(SettingsDto.NowPlayingWidth)) ? "nowPlayingWidthError" : null)"
+                           @oninput="@(_ => CssValidationCleared.InvokeAsync(nameof(SettingsDto.NowPlayingWidth)))"
+                           placeholder="28rem"/>
+                <div class="ss-field-hint">CSS sizes such as 28rem, 480px, or 40vw.</div>
+                @if (CssValidation.ErrorFor(nameof(SettingsDto.NowPlayingWidth)) is { } nowPlayingWidthError)
+                {
+                    <div id="nowPlayingWidthError" class="validation-message" role="alert">@nowPlayingWidthError</div>
+                }
+            </div>
+            <div class="ss-field">
+                <label for="nowPlayingFont">Font Family</label>
+                <InputSelect id="nowPlayingFont" @bind-Value="Dto.NowPlayingFontFamily">
+                    @foreach (var font in FontChoices)
+                    {
+                        <option value="@font.Value">@font.Label</option>
+                    }
+                </InputSelect>
+            </div>
+            <div class="ss-field">
+                <label for="nowPlayingFontSize">Font Size</label>
+                <InputText id="nowPlayingFontSize" @bind-Value="Dto.NowPlayingFontSize"
+                           class="@CssValidation.FieldClass(nameof(SettingsDto.NowPlayingFontSize))"
+                           aria-invalid="@CssValidation.Has(nameof(SettingsDto.NowPlayingFontSize))"
+                           aria-describedby="@(CssValidation.Has(nameof(SettingsDto.NowPlayingFontSize)) ? "nowPlayingFontSizeError" : null)"
+                           @oninput="@(_ => CssValidationCleared.InvokeAsync(nameof(SettingsDto.NowPlayingFontSize)))"
+                           placeholder="1.125rem"/>
+                @if (CssValidation.ErrorFor(nameof(SettingsDto.NowPlayingFontSize)) is { } nowPlayingFontSizeError)
+                {
+                    <div id="nowPlayingFontSizeError" class="validation-message" role="alert">@nowPlayingFontSizeError</div>
+                }
+            </div>
+        </div>
+    }
+</section>
+
+<section class="ss-settings-section">
+    <div class="ss-settings-section-title-row">
+        <h3>Winner Dialog Settings</h3>
+        <button type="button" class="ss-btn-reset-subset"
+                aria-label="Revert Winner Dialog Settings to default"
+                disabled="@ResetDialogOpen"
+                @onclick="@(() => ResetRequested.InvokeAsync(SettingsResetScope.WinnerDialog))">
+            Revert to default
+        </button>
+    </div>
+    <div class="ss-field">
+        <label>Display Fields</label>
+        <DisplayFieldOrderEditor Items="ViewModel.WinnerDialogDisplayFields"
+                                 HelpId="winnerFieldsHelp"
+                                 OrderChanged="MoveWinnerDialogField"
+                                 SelectionChanged="ToggleWinnerDialogField">
+            <HelpContent>
+                Select a field to include or exclude it. Drag fields or use the move buttons to set their display order.
+                Labels are bold while values have equal weighting.
+            </HelpContent>
+        </DisplayFieldOrderEditor>
+    </div>
+    <div class="ss-settings-field-grid">
+        <div class="ss-field">
+            <label for="winnerDialogWidth">Dialog Width</label>
+            <InputText id="winnerDialogWidth" @bind-Value="Dto.WinnerDialogWidth"
+                       class="@CssValidation.FieldClass(nameof(SettingsDto.WinnerDialogWidth))"
+                       aria-invalid="@CssValidation.Has(nameof(SettingsDto.WinnerDialogWidth))"
+                       aria-describedby="@(CssValidation.Has(nameof(SettingsDto.WinnerDialogWidth)) ? "winnerDialogWidthError" : null)"
+                       @oninput="@(_ => CssValidationCleared.InvokeAsync(nameof(SettingsDto.WinnerDialogWidth)))"
+                       placeholder="36rem"/>
+            <div class="ss-field-hint">CSS sizes such as 36rem, 600px, or 50vw.</div>
+            @if (CssValidation.ErrorFor(nameof(SettingsDto.WinnerDialogWidth)) is { } winnerDialogWidthError)
+            {
+                <div id="winnerDialogWidthError" class="validation-message" role="alert">@winnerDialogWidthError</div>
+            }
+        </div>
+        <div class="ss-field">
+            <label for="winnerDialogFont">Font Family</label>
+            <InputSelect id="winnerDialogFont" @bind-Value="Dto.WinnerDialogFontFamily">
+                @foreach (var font in FontChoices)
+                {
+                    <option value="@font.Value">@font.Label</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="ss-field">
+            <label for="winnerDialogFontSize">Font Size</label>
+            <InputText id="winnerDialogFontSize" @bind-Value="Dto.WinnerDialogFontSize"
+                       class="@CssValidation.FieldClass(nameof(SettingsDto.WinnerDialogFontSize))"
+                       aria-invalid="@CssValidation.Has(nameof(SettingsDto.WinnerDialogFontSize))"
+                       aria-describedby="@(CssValidation.Has(nameof(SettingsDto.WinnerDialogFontSize)) ? "winnerDialogFontSizeError" : null)"
+                       @oninput="@(_ => CssValidationCleared.InvokeAsync(nameof(SettingsDto.WinnerDialogFontSize)))"
+                       placeholder="1rem"/>
+            @if (CssValidation.ErrorFor(nameof(SettingsDto.WinnerDialogFontSize)) is { } winnerDialogFontSizeError)
+            {
+                <div id="winnerDialogFontSizeError" class="validation-message" role="alert">@winnerDialogFontSizeError</div>
+            }
+        </div>
+        <div class="ss-field">
+            <label class="ss-checkbox-label">
+                <InputCheckbox @bind-Value="Dto.WinnerDialogShowQueuePosition"/>
+                Show queue position when available
+            </label>
+        </div>
+    </div>
+</section>

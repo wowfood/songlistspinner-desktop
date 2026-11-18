@@ -1,0 +1,44 @@
+<div class="ss-settings-section-heading">
+    <span>Spinner &amp; Queue</span>
+    <h2>Control what can be selected and what happens next</h2>
+    <p>These options change queue filtering and the explicit actions offered after a spin.</p>
+</div>
+
+<section class="ss-settings-section">
+    <h3>Winner Actions</h3>
+    <div class="ss-field">
+        <label class="ss-checkbox-label">
+            <InputCheckbox @bind-Value="Dto.UpdateQueueAfterSpin"
+                           disabled="@Dto.DisplayNowPlaying"/>
+            Prefer Mark Played in the winner popup
+        </label>
+        <div class="ss-field-hint">Highlights Mark Played as the suggested action. No queue change occurs until an action is chosen.</div>
+    </div>
+    <div class="ss-field">
+        <label class="ss-checkbox-label">
+            <InputCheckbox @bind-Value="Dto.DisplayNowPlaying"/>
+            Enable Now Playing workflow
+        </label>
+        <div class="ss-field-hint">Adds Set Now Playing to the winner popup and enables the configurable overlay panel.</div>
+    </div>
+</section>
+
+<section class="ss-settings-section">
+    <h3>Queue Filtering &amp; History</h3>
+    <div class="ss-field">
+        <label class="ss-checkbox-label">
+            <InputCheckbox @bind-Value="Dto.ExcludePlayedSongs"/>
+            Exclude already-played songs from the wheel
+        </label>
+    </div>
+    <div class="ss-field">
+        <label for="playHistoryPeriod">Play History Period</label>
+        <InputSelect id="playHistoryPeriod" @bind-Value="Dto.PlayHistoryPeriod">
+            @foreach (var option in SettingsOptions.PlayHistoryPeriods)
+            {
+                <option value="@option.Value">@option.Label</option>
+            }
+        </InputSelect>
+        <div class="ss-field-hint">This range supplies the played panel and, when enabled, the wheel exclusion filter.</div>
+    </div>
+</section>

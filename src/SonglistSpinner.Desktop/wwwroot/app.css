@@ -3,6 +3,15 @@
     box-sizing: border-box;
 }
 
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
+
 html {
     height: 100%;
 }
@@ -76,7 +85,8 @@ h1:focus {
 }
 
 .ss-nav__links a,
-.ss-nav__btn {
+.ss-nav__btn,
+.ss-nav__more summary {
     color: #e2d9f3;
     text-decoration: none;
     font-size: 0.95rem;
@@ -86,7 +96,8 @@ h1:focus {
 }
 
 .ss-nav__links a:hover,
-.ss-nav__btn:hover {
+.ss-nav__btn:hover,
+.ss-nav__more summary:hover {
     color: #a78bfa;
     text-decoration: underline;
     text-decoration-thickness: 0.12em;
@@ -94,10 +105,19 @@ h1:focus {
 }
 
 .ss-nav__links a:focus-visible,
-.ss-nav__btn:focus-visible {
+.ss-nav__btn:focus-visible,
+.ss-nav__more summary:focus-visible {
     color: #c4b5fd;
     outline: 3px solid #a78bfa;
     outline-offset: 3px;
+}
+
+.ss-nav__links a.ss-nav__link-active {
+    color: #f4f1fa;
+    font-weight: 600;
+    text-decoration: underline;
+    text-decoration-thickness: 0.12em;
+    text-underline-offset: 0.2em;
 }
 
 .ss-nav__btn {
@@ -110,6 +130,84 @@ h1:focus {
     align-items: center;
     gap: 0.4rem;
     line-height: inherit;
+}
+
+.ss-nav__more {
+    position: relative;
+}
+
+.ss-nav__more summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.ss-nav__more summary::-webkit-details-marker {
+    display: none;
+}
+
+.ss-nav__more summary::after {
+    content: "▾";
+    margin-left: 0.35rem;
+    font-size: 0.75em;
+}
+
+.ss-nav__more[open] summary::after {
+    content: "▴";
+}
+
+.ss-nav__more-menu {
+    position: absolute;
+    top: calc(100% + 0.65rem);
+    right: 0;
+    z-index: 100;
+    display: grid;
+    min-width: 9rem;
+    padding: 0.45rem;
+    border: 1px solid #7c5ead;
+    border-radius: 0.45rem;
+    background: #25123d;
+    box-shadow: 0 0.6rem 1.5rem rgba(16, 6, 28, 0.35);
+}
+
+.ss-nav__more-menu a {
+    padding: 0.55rem 0.65rem;
+    border-radius: 0.25rem;
+}
+
+@media (max-width: 700px) {
+    .ss-nav {
+        padding-inline: 0.75rem;
+        gap: 0.65rem;
+    }
+
+    .ss-nav__brand {
+        font-size: 1rem;
+        letter-spacing: 0;
+    }
+
+    .ss-nav__links {
+        min-width: 0;
+        gap: 0.7rem;
+    }
+
+    .ss-nav__links a,
+    .ss-nav__btn,
+    .ss-nav__more summary {
+        font-size: 0.82rem;
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 560px) {
+    .ss-nav {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .ss-nav__links {
+        width: 100%;
+        justify-content: space-between;
+    }
 }
 
 /* ── Application update notification ── */
@@ -1887,6 +1985,18 @@ body .mud-dialog-actions .mud-button-root {
 
 .validation-message {
     color: #e50000;
+}
+
+.ss-settings-contrast-warning {
+    display: grid;
+    gap: 0.2rem;
+    margin-top: 1rem;
+    padding: 0.75rem 0.9rem;
+    border: 1px solid #c48518;
+    border-radius: 0.45rem;
+    background: #fff7df;
+    color: #5d3b00;
+    font-size: 0.86rem;
 }
 
 /* ── MAUI safe area (iOS notch) ── */

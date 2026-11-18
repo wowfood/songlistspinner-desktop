@@ -1,22 +1,23 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
+        <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
     </PropertyGroup>
     <ItemGroup>
         <AssemblyAttribute Include="System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage"/>
     </ItemGroup>
     <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.8.1"/>
-        <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5">
-            <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-            <PrivateAssets>all</PrivateAssets>
-        </PackageReference>
-        <PackageReference Include="xunit.v3" Version="3.2.2"/>
+        <!-- Saved settings JSON, named for the version that wrote it; the logical name survives folder moves. -->
+        <EmbeddedResource Include="**/Fixtures/*.json" LogicalName="Fixtures.%(Filename)%(Extension)"/>
+    </ItemGroup>
+    <ItemGroup>
+        <!-- Coverage as a diagnostic; the command is in AGENTS.md. -->
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2"/>
+        <PackageReference Include="xunit.v3" Version="4.0.0"/>
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="..\..\src\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
+        <ProjectReference Include="..\SonglistSpinner.Testing\SonglistSpinner.Testing.csproj"/>
     </ItemGroup>
 </Project>

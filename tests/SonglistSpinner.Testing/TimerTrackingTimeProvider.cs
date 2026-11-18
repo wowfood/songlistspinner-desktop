@@ -1,0 +1,31 @@
+using System.Threading.Channels;
+using Microsoft.Extensions.Time.Testing;
+
+namespace SonglistSpinner.Testing;
+
+/// <summary>
+/// A <see cref="FakeTimeProvider"/> that reports each timer as it is created. Advancing the clock before
+/// a background task has started its delay would skip that delay's timer, so a test waits for the timer
+/// first and then advances by exactly its due time.
+/// </summary>
+public sealed class TimerTrackingTimeProvider : FakeTimeProvider
+{
+    private readonly Channel<TimeSpan> _createdTimers = Channel.CreateUnbounded<TimeSpan>();
+
+    public override ITimer CreateTimer(TimerCallback callback, object? state, TimeSpan dueTime, TimeSpan period)
+    {
+        var timer = base.CreateTimer(callback, state, dueTime, period);
+        _createdTimers.Writer.TryWrite(dueTime);
+        return timer;
+    }
+
+    /// <summary>Waits for the next timer to be created and returns its due time.</summary>
+    public ValueTask<TimeSpan> WaitForTimerAsync(CancellationToken cancellationToken) =>
+        _createdTimers.Reader.ReadAsync(cancellationToken);
+
+    /// <summary>
+    /// Takes a timer that was created but not yet waited for. Once the code under test has stopped running,
+    /// false shows that it started no further delay.
+    /// </summary>
+    public bool TryTakeCreatedTimer(out TimeSpan dueTime) => _createdTimers.Reader.TryRead(out dueTime);
+}

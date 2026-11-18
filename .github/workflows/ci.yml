@@ -10,6 +10,11 @@ on:
       - main
       - develop
   workflow_dispatch:
+    inputs:
+      end_to_end:
+        description: Also run the end-to-end tests (about ten minutes)
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,9 +39,14 @@ jobs:
       - name: Require develop as the source branch for a pull request
         if: github.event_name == 'pull_request'
         shell: bash
+        # The branch and repository names are chosen by whoever opens the pull request, so they reach the script
+        # as data. A fork can name a branch develop, so the repository must be this one too.
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
         run: |
-          if [[ "${{ github.head_ref }}" != "develop" ]]; then
-            echo "Pull requests into main must come from develop."
+          if [[ "$HEAD_REF" != "develop" || "$HEAD_REPOSITORY" != "$GITHUB_REPOSITORY" ]]; then
+            echo "Pull requests into main must come from this repository's develop branch."
             exit 1
           fi
 
@@ -52,7 +62,7 @@ jobs:
               -H "Accept: application/vnd.github+json" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
               "repos/$GH_REPO/commits/$GITHUB_SHA/pulls" \
-              --jq '[.[] | select(.merged_at != null and .base.ref == "main" and .head.ref == "develop")] | length'
+              --jq '[.[] | select(.merged_at != null and .base.ref == "main" and .head.ref == "develop" and .head.repo.full_name == .base.repo.full_name)] | length'
           )"
 
           if [[ "$matching_pull_requests" -lt 1 ]]; then
@@ -129,7 +139,7 @@ jobs:
       - name: Set up .NET and MAUI Windows
         uses: actions/setup-dotnet@v6
         with:
-          dotnet-version: 10.0.x
+          global-json-file: global.json
           workloads: maui-windows
 
       - name: Restore
@@ -139,7 +149,15 @@ jobs:
         run: dotnet format SonglistSpinner.Desktop.sln --verify-no-changes --severity warn --no-restore
 
       - name: Test
-        run: dotnet test SonglistSpinner.Desktop.sln --configuration Release --no-restore
+        run: dotnet test --solution SonglistSpinner.Desktop.sln --configuration Release --no-restore
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Test JavaScript
+        run: node --test "tests/JavaScript/**/*.test.cjs"
 
       - name: Build
         run: dotnet build SonglistSpinner.Desktop.sln --configuration Release --no-restore
@@ -169,6 +187,33 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           compression-level: 0
+
+  # The suite opens real app windows and takes about ten minutes, so it runs only for a release (the pull
+  # request that promotes develop to main) or when a manual run asks for it. The release job does not wait
+  # for it: this job is skipped on the push to main, and a skipped dependency would skip the release.
+  end-to-end:
+    name: End-to-end tests
+    if: >-
+      (github.event_name == 'pull_request' && github.base_ref == 'main') ||
+      (github.event_name == 'workflow_dispatch' && inputs.end_to_end)
+    runs-on: windows-2022
+    timeout-minutes: 40
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET and MAUI Windows
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+          workloads: maui-windows
+
+      - name: Run the end-to-end tests
+        shell: pwsh
+        run: .\scripts\run-e2e.ps1
 
   release:
     name: Publish GitHub release

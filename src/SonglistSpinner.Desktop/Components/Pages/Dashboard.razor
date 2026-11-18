@@ -1,38 +1,51 @@
 @page "/"
 @page "/dashboard"
 @layout MainLayout
-@inject ISpinnerApiService ApiService
-@inject IStreamerSongListEventSource EventSource
+@inject IStreamerSongListClient SongListClient
 @inject IStreamerSongListCredentialStore CredentialStore
-@inject ILocalSettingsService LocalSettings
-@inject NowPlayingTransitionService NowPlayingTransitions
+@inject PreferencesSettingsService LocalSettings
 @inject IJSRuntime JS
 @inject OverlayStateService OverlayService
-@inject SonglistSpinner.Core.Api.V2.StreamerSongListApiOptions ApiOptions
+@inject LocalOverlayServer OverlayServer
+@inject StreamerSessionService StreamerSession
+@inject ChannelLoader ChannelLoader
+@inject SonglistSpinner.Core.StreamerSongList.Api.V2.StreamerSongListApiOptions ApiOptions
 @inject NavigationManager Navigation
+@inject TimeProvider TimeProvider
+@inject WheelSpinService Spins
+@inject WinnerActionService WinnerActions
+@inject ILogger<Dashboard> Logger
 @implements IAsyncDisposable
 
+<h1 class="ss-visually-hidden">SonglistSpinner Dashboard</h1>
+
 <section class="dashboard-health" aria-label="Service health">
-    <div class="dashboard-health-item @ServiceHealthClass(_apiHealth)" title="@_apiHealthDetail">
+    <div class="dashboard-health-item @ServiceHealthClass(_apiHealth)" title="@_apiHealthDetail"
+         tabindex="0" aria-label="API: @ServiceHealthLabel(_apiHealth). @_apiHealthDetail">
         <span class="dashboard-health-dot" aria-hidden="true"></span>
         <span>API</span>
         <strong>@ServiceHealthLabel(_apiHealth)</strong>
     </div>
-    <div class="dashboard-health-item @ServiceHealthClass(_realtimeHealth)" title="@_realtimeHealthDetail">
+    <div class="dashboard-health-item @ServiceHealthClass(_realtimeHealth)" title="@_realtimeHealthDetail"
+         tabindex="0" aria-label="Realtime: @ServiceHealthLabel(_realtimeHealth). @_realtimeHealthDetail">
         <span class="dashboard-health-dot" aria-hidden="true"></span>
         <span>Realtime</span>
         <strong>@ServiceHealthLabel(_realtimeHealth)</strong>
     </div>
-    <div class="dashboard-health-item @OverlayHealthClass" title="@OverlayHealthDetail">
+    <div class="dashboard-health-item @OverlayHealthClass" title="@OverlayHealthDetail"
+         tabindex="0" aria-label="Overlay: @OverlayHealthLabel. @OverlayHealthDetail">
         <span class="dashboard-health-dot" aria-hidden="true"></span>
         <span>Overlay</span>
         <strong>@OverlayHealthLabel</strong>
     </div>
-    <div class="dashboard-health-item dashboard-health-channel" title="The StreamerSongList channel currently loaded">
+    <div class="dashboard-health-item dashboard-health-channel"
+         title="The StreamerSongList channel currently loaded" tabindex="0"
+         aria-label="Channel: @(string.IsNullOrWhiteSpace(DisplayedStreamer) ? "Not loaded" : DisplayedStreamer)">
         <span>Channel</span>
-        <strong>@(string.IsNullOrWhiteSpace(_currentStreamer) ? "Not loaded" : _currentStreamer)</strong>
+        <strong>@(string.IsNullOrWhiteSpace(DisplayedStreamer) ? "Not loaded" : DisplayedStreamer)</strong>
     </div>
-    <div class="dashboard-health-environment @ApiEnvironmentClass" title="@ApiOptions.BaseAddress">
+    <div class="dashboard-health-environment @ApiEnvironmentClass" title="@ApiOptions.BaseAddress"
+         tabindex="0" aria-label="API environment: @ApiEnvironmentLabel. @ApiOptions.BaseAddress">
         @ApiEnvironmentLabel
     </div>
 </section>
@@ -40,8 +53,9 @@
 <div id="container">
     @if (_loading)
     {
-        <div class="dashboard-loadingSection">
+        <div class="dashboard-loadingSection" role="status" aria-live="polite">
             <MudProgressCircular Color="Color.Default" Size="Size.Large" Indeterminate="true"/>
+            <span class="ss-visually-hidden">Loading the Dashboard.</span>
         </div>
     }
     else
@@ -51,19 +65,29 @@
                 <div id="pointer"></div>
                 <div id="wheelContainer"></div>
                 <div id="buttonContainer">
-                    <button id="spinButton" @onclick="Spin" disabled="@IsSpinDisabled">@_spinButtonText</button>
+                    <button id="spinButton" @onclick="Spin" disabled="@IsBusy">@SpinButtonText</button>
                 </div>
-                <div id="status" style="@(_statusVisible ? "display:block" : "display:none")">@_status</div>
+                <div id="status" role="status" aria-live="polite" aria-atomic="true"
+                     style="@(_statusVisible ? "display:block" : "display:none")">@_status</div>
             </div>
         </div>
 
-        <div id="resizeHandle"></div>
+        <div id="resizeHandle"
+             role="separator"
+             aria-label="Resize played songs panel"
+             aria-controls="playedList"
+             aria-orientation="vertical"
+             aria-valuemin="300"
+             aria-valuemax="800"
+             tabindex="0"></div>
 
-        <div id="playedList" data-position="@_config.SongList.PlayedListPosition">
+        <div id="playedList" data-position="@_config.PlayedList.Position">
             <div id="playedListTop">
                 <button id="collapseBtn" class="collapse-button" @onclick="ToggleCollapse"
-                        title="Collapse/Expand Played List">
-                    <span id="collapseIcon"></span>
+                        aria-controls="playedListContent"
+                        aria-expanded="@(_playedListCollapsed ? "false" : "true")"
+                        aria-label="@(_playedListCollapsed ? "Expand played songs" : "Collapse played songs")">
+                    <span id="collapseIcon" aria-hidden="true"></span>
                 </button>
                 <div id="streamerSection">
                     @if (_showStreamerInput)
@@ -76,18 +100,18 @@
                                @bind:event="oninput"
                                placeholder="Enter streamer name..."
                                @onkeydown="OnStreamerKeyDown"/>
-                        <button class="small-button" @onclick="LoadStreamer">Load</button>
+                        <button class="small-button" @onclick="LoadStreamer" disabled="@IsBusy">Load</button>
                     }
                     else
                     {
-                        <span id="streamerLabel">Streamer: @_currentStreamer</span>
+                        <span id="streamerLabel">Streamer: @DisplayedStreamer</span>
                         @if (!_isLockedDefault)
                         {
-                            <button id="changeStreamerBtn" class="small-button" @onclick="ChangeStreamer">Change
+                            <button id="changeStreamerBtn" class="small-button" @onclick="ChangeStreamer" disabled="@IsBusy">Change
                             </button>
                         }
                     }
-                    <button id="refreshSongsBtn" class="small-button" @onclick="LoadStreamer">Refresh</button>
+                    <button id="refreshSongsBtn" class="small-button" @onclick="LoadStreamer" disabled="@IsBusy">Refresh</button>
                     @if (_showStreamerInput && _streamerInputError is not null)
                     {
                         <div id="streamerInputError" class="streamer-input-error-message" role="alert">
@@ -106,10 +130,10 @@
                             <strong id="nowPlayingSong">@NowPlayingDisplayText</strong>
                         </div>
                         <button id="markNowPlayingPlayedBtn"
-                                disabled="@(_markNowPlayingPending || _isSpinning)"
+                                disabled="@IsBusy"
                                 aria-describedby="nowPlayingSong"
                                 @onclick="MarkNowPlayingPlayedAsync">
-                            @(_markNowPlayingPending ? "Marking..." : "Mark Played")
+                            @(_activity == DashboardActivity.MarkingNowPlaying ? "Marking..." : "Mark Played")
                         </button>
                     </section>
                 }
@@ -117,13 +141,21 @@
                     <h3>Played Songs: <span id="playedCount">@_playedSongs.Length</span></h3>
                     <h3>Queued Songs: <span id="availableCount">@_availableSongs.Count</span></h3>
                 </div>
+                @if (!string.IsNullOrWhiteSpace(DisplayedStreamer) && _availableSongs.Count == 0)
+                {
+                    <p class="queue-empty-state" role="status">No eligible queued songs are available to spin.</p>
+                }
                 @{
-                    var playedFieldTable = SpinnerDataService.CreatePlayedSongFieldTable(_playedSongs, _config);
+                    var playedFieldTable = PlayedSongList.CreateFieldTable(_playedSongs, _config);
                     var showPlayedFieldHeaders = _config.PlayedList.ShowFieldHeaders &&
                                                  playedFieldTable.Headers.Length > 0;
                 }
                 <ul id="playedSongsUl">
-                    @if (showPlayedFieldHeaders)
+                    @if (_playedSongs.Length == 0)
+                    {
+                        <li class="played-list-empty-state">No played songs in the selected history period.</li>
+                    }
+                    else if (showPlayedFieldHeaders)
                     {
                         <li class="played-field-grid played-field-header-row"
                             aria-label="Played Songs field headers">
@@ -164,7 +196,7 @@
                     }
                     else
                     {
-                        @foreach (var text in SpinnerDataService.CreatePlayedSongTexts(_playedSongs, _config))
+                        @foreach (var text in PlayedSongList.CreateTexts(_playedSongs, _config))
                         {
                             <li>
                                 <span class="played-song-text">
@@ -180,13 +212,13 @@
                 {
                     <button id="playedListSpinButton"
                             class="small-button played-list-spin-button"
-                            disabled="@IsSpinDisabled"
+                            disabled="@IsBusy"
                             @onclick="Spin">
-                        @_spinButtonText
+                        @SpinButtonText
                     </button>
                 }
                 <div class="toggle-right">
-                    <span id="toggleWheelLabel" class="toggle-label">Toggle Wheel</span>
+                    <span id="toggleWheelLabel" class="toggle-label">Show wheel</span>
                     <label class="switch">
                         <input type="checkbox" id="showWheelCheckbox" checked="@_wheelVisible"
                                aria-labelledby="toggleWheelLabel"
@@ -199,10 +231,9 @@
     }
 </div>
 
-<div id="winnerModal" class="winner-modal" style="@(_winnerVisible ? "display:block" : "display:none")">
-    <div class="winner-modal-backdrop" aria-hidden="true"></div>
-    <div class="winner-modal-content" role="dialog" aria-modal="true" aria-labelledby="winnerTitle">
-        <div id="winnerConfetti" class="winner-confetti"></div>
+<dialog id="winnerModal" class="winner-modal" aria-labelledby="winnerTitle" aria-describedby="winnerActionPrompt">
+    <div class="winner-modal-content" aria-busy="@(_winnerActionPending ? "true" : "false")">
+        <div id="winnerConfetti" class="winner-confetti" aria-hidden="true"></div>
         <h2 id="winnerTitle">Winner</h2>
         @if (_winnerFields.Length > 0)
         {
@@ -223,22 +254,24 @@
         {
             <p class="winner-queue-position">Queue position: <strong>#@queuePosition</strong></p>
         }
-        <p class="winner-action-prompt">Choose what happens to this queue entry.</p>
+        <p id="winnerActionPrompt" class="winner-action-prompt">Choose what happens to this queue entry.</p>
         <div class="winner-modal-actions">
             @if (IsNowPlayingWinnerActionEnabled)
             {
-                <button class="winner-action-button winner-action-primary"
+                <button id="setWinnerNowPlayingBtn" class="winner-action-button winner-action-primary"
                         disabled="@_winnerActionPending"
                         @onclick="SetWinnerNowPlayingAsync">
                     Set Now Playing
                 </button>
             }
-            <button class="winner-action-button @(!IsNowPlayingWinnerActionEnabled && _preferMarkWinnerPlayed ? "winner-action-primary" : "winner-action-secondary")"
+            <button id="markWinnerPlayedBtn"
+                    class="winner-action-button @(!IsNowPlayingWinnerActionEnabled && _preferMarkWinnerPlayed ? "winner-action-primary" : "winner-action-secondary")"
                     disabled="@_winnerActionPending"
                     @onclick="MarkWinnerPlayedAsync">
                 Mark Played
             </button>
-            <button class="winner-action-button @(!IsNowPlayingWinnerActionEnabled && !_preferMarkWinnerPlayed ? "winner-action-primary" : "winner-action-secondary")"
+            <button id="leaveWinnerInQueueBtn"
+                    class="winner-action-button @(!IsNowPlayingWinnerActionEnabled && !_preferMarkWinnerPlayed ? "winner-action-primary" : "winner-action-secondary")"
                     disabled="@_winnerActionPending"
                     @onclick="LeaveWinnerInQueueAsync">
                 Leave in Queue
@@ -253,4 +286,4 @@
             <p class="winner-action-error" role="alert">@_winnerActionError</p>
         }
     </div>
-</div>
+</dialog>

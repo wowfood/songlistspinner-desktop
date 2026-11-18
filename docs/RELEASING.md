@@ -29,8 +29,9 @@ Before each release merge, update these values in
 - `VersionPrefix` to the next `MAJOR.MINOR.PATCH` version.
 - `ApplicationVersion` to a higher positive Windows build number.
 
-Release `v1.1.1` already exists. Every later release merge must increment
-`VersionPrefix`. If the generated tag already exists, the `develop` to `main`
+The checked-in `VersionPrefix` is the version of the last release, or of the
+release in progress; the repository's tags and GitHub Releases list what has
+shipped. Every release merge must increment `VersionPrefix`. If the generated tag already exists, the `develop` to `main`
 pull request fails validation before it can be merged. The release job repeats
 the check defensively and never replaces an existing executable.
 
@@ -50,6 +51,12 @@ The `Windows CI` workflow:
    the release as latest, and attaches:
    - `SonglistSpinner.Desktop.exe`
    - `SonglistSpinner.Desktop.exe.sha256`
+
+For the pull request that promotes `develop` to `main`, and for a manual run
+with `end_to_end` ticked, a separate `End-to-end tests` job also builds the app
+with its test profile enabled and runs the end-to-end suite (about ten minutes).
+Publishing the release does not wait for that job, so check its result on the
+pull request before merging.
 
 The executable remains a single-file application. The checksum is a separate
 release download used to verify the executable; users do not need to keep it
@@ -78,6 +85,10 @@ embedded product version before succeeding.
 Before merging `develop` into `main`:
 
 - Confirm the pull request workflow and all tests passed.
+- Run the end-to-end tests from a desktop session with `./scripts/run-e2e.ps1` and
+  confirm they pass. They are skipped in every ordinary CI run, and they are the
+  only automated tests of the Dashboard, Settings and Setup pages. The promotion
+  pull request also runs them in CI (the `End-to-end tests` job).
 - Download and launch the CI artifact on a clean Windows account or test
   machine; automated startup and overlay smoke testing do not replace
   interactive QA.

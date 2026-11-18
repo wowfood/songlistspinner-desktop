@@ -20,7 +20,7 @@
                   title="@($"Drag {label} to reorder")">&#10247;</span>
             <button type="button"
                     class="ss-chip-toggle"
-                    aria-pressed="@field.Selected"
+                    aria-pressed="@(field.Selected ? "true" : "false")"
                     aria-describedby="@HelpId"
                     title="@($"Toggle {label}")"
                     @onclick="@(() => ToggleFieldAsync(field.Name))">

@@ -1,4 +1,6 @@
-using SonglistSpinner.Core.Models;
+using SonglistSpinner.Core.Settings;
+using SonglistSpinner.Core.Songs;
+using SonglistSpinner.Core.StreamerSongList;
 
 namespace SonglistSpinner.Components.Pages;
 
@@ -19,7 +21,7 @@ internal static class SettingsOptions
 
     public static IReadOnlyList<SettingOption> PlayHistoryPeriods { get; } = Array.AsReadOnly<SettingOption>(
     [
-        new(SpinnerSettingValues.PlayHistoryPeriods.Stream, "Recent (API v2)"),
+        new(SpinnerSettingValues.PlayHistoryPeriods.Stream, "Most recent plays"),
         new(SpinnerSettingValues.PlayHistoryPeriods.Day, "Last 24 hours"),
         new(SpinnerSettingValues.PlayHistoryPeriods.Week, "Last 7 days"),
         new(SpinnerSettingValues.PlayHistoryPeriods.Month, "Last month"),

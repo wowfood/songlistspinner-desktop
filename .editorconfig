@@ -1,0 +1,83 @@
+# Code style for the whole repository. The rules record the style the code already follows;
+# `dotnet format --verify-no-changes --severity warn` (run in CI) enforces the ones at warning.
+root = true
+
+[*]
+indent_style = space
+indent_size = 4
+charset = utf-8
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# Third-party files are kept byte-for-byte as published.
+[src/SonglistSpinner.Desktop/wwwroot/{lib/**,spinner/spin-wheel-iife.js}]
+charset = unset
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+[*.cs]
+# Layout
+csharp_style_namespace_declarations = file_scoped:warning
+csharp_using_directive_placement = outside_namespace:warning
+dotnet_sort_system_directives_first = true
+csharp_new_line_before_open_brace = all
+csharp_preserve_single_line_blocks = true
+
+# Language preferences. `this.` is never used. The code mixes var, braces and expression bodies
+# where readability differs, so those stay advisory.
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_prefer_braces = when_multiline:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+csharp_style_expression_bodied_properties = true:silent
+csharp_style_prefer_primary_constructors = true:suggestion
+dotnet_style_prefer_collection_expression = when_types_loosely_match:suggestion
+
+# Naming: constants and static readonly fields are PascalCase; other private fields are _camelCase.
+dotnet_naming_symbols.constant_fields.applicable_kinds = field
+dotnet_naming_symbols.constant_fields.required_modifiers = const
+dotnet_naming_symbols.static_readonly_fields.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_fields.required_modifiers = static, readonly
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private, private_protected, internal
+
+dotnet_naming_style.pascal_case.capitalization = pascal_case
+dotnet_naming_style.underscore_camel_case.capitalization = camel_case
+dotnet_naming_style.underscore_camel_case.required_prefix = _
+
+dotnet_naming_rule.constant_fields_are_pascal_case.symbols = constant_fields
+dotnet_naming_rule.constant_fields_are_pascal_case.style = pascal_case
+dotnet_naming_rule.constant_fields_are_pascal_case.severity = warning
+dotnet_naming_rule.static_readonly_fields_are_pascal_case.symbols = static_readonly_fields
+dotnet_naming_rule.static_readonly_fields_are_pascal_case.style = pascal_case
+dotnet_naming_rule.static_readonly_fields_are_pascal_case.severity = warning
+dotnet_naming_rule.private_fields_are_underscore_camel_case.symbols = private_fields
+dotnet_naming_rule.private_fields_are_underscore_camel_case.style = underscore_camel_case
+dotnet_naming_rule.private_fields_are_underscore_camel_case.severity = warning
+
+# CA1859 suggests concrete collection types on private members for speed. The code deliberately
+# passes read-only abstractions, and the gain is immaterial in this app.
+dotnet_diagnostic.CA1859.severity = suggestion
+
+# CA1848 asks for [LoggerMessage] delegates on every log call, and CA1873 for an IsEnabled guard around
+# every Debug/Information call with arguments. The structured-logging standard keeps both for hot paths
+# and expensive arguments; this app logs at boundaries and failures with cheap arguments.
+dotnet_diagnostic.CA1848.severity = suggestion
+dotnet_diagnostic.CA1873.severity = suggestion
+
+[tests/**.cs]
+# Test methods are named Given_X_When_Y_Then_Z (see AGENTS.md), so underscores are intended.
+dotnet_diagnostic.CA1707.severity = none

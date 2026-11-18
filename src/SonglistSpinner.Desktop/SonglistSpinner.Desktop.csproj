@@ -5,9 +5,7 @@
         <RootNamespace>SonglistSpinner</RootNamespace>
         <UseMaui>true</UseMaui>
         <SingleProject>true</SingleProject>
-        <ImplicitUsings>enable</ImplicitUsings>
         <EnableDefaultCssItems>false</EnableDefaultCssItems>
-        <Nullable>enable</Nullable>
         <MauiVersion>10.0.90</MauiVersion>
         <IncludeAllContentForSelfExtract>true</IncludeAllContentForSelfExtract>
         <!-- Display name -->
@@ -36,6 +34,41 @@
         <CopyOutputSymbolsToPublishDirectory>false</CopyOutputSymbolsToPublishDirectory>
     </PropertyGroup>
 
+    <!--
+      The development variables (the test profile, the StreamerSongList address and token overrides and the
+      update URL; every SONGLISTSPINNER_* variable but the overlay port) are compiled in for Debug builds and
+      for builds that ask for them (scripts/run-e2e.ps1 passes -p:EnableTestProfile=true). A Release build, and
+      so every published executable, ignores them; TestProfileBuild.cs says why. The assembly metadata is how
+      the end-to-end tests tell that a built app honours them before they start it.
+    -->
+    <PropertyGroup>
+        <EnableTestProfile Condition="'$(EnableTestProfile)' == '' And '$(Configuration)' == 'Debug'">true</EnableTestProfile>
+        <DefineConstants Condition="'$(EnableTestProfile)' == 'true'">$(DefineConstants);TEST_PROFILE</DefineConstants>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(EnableTestProfile)' == 'true'">
+        <AssemblyMetadata Include="SonglistSpinner.TestProfile" Value="enabled"/>
+    </ItemGroup>
+    <!--
+      MSBuild also takes EnableTestProfile from an environment variable of that name, so a publish refuses to go
+      ahead with it on however it was set. scripts/publish-single-file.ps1 passes -p:EnableTestProfile=false,
+      which overrides the environment.
+    -->
+    <Target Name="RefuseToPublishWithTheTestProfile"
+            BeforeTargets="PrepareForPublish"
+            Condition="'$(EnableTestProfile)' == 'true'">
+        <Error Text="EnableTestProfile is true, so this build honours the test-profile variables and must not be published. Publish with -p:EnableTestProfile=false."/>
+    </Target>
+    <!--
+      The check above reads the property of this publish, not what an earlier build compiled in, and a publish
+      that skips the build would package whatever is already there (scripts/run-e2e.ps1 leaves a test-profile
+      build in the same folder). So a publish always builds.
+    -->
+    <Target Name="RefuseToPublishWithoutBuilding"
+            BeforeTargets="PrepareForPublish"
+            Condition="'$(NoBuild)' == 'true'">
+        <Error Text="Publishing without building is not supported: the existing build may honour the test-profile variables. Publish without --no-build."/>
+    </Target>
+
     <!-- RID-specific settings apply only when the publish command supplies win-x64. -->
     <PropertyGroup Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' == 'win-x64'">
         <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
@@ -54,21 +87,15 @@
     <ItemGroup>
         <PackageReference Include="Microsoft.Maui.Controls" Version="$(MauiVersion)"/>
         <PackageReference Include="Microsoft.AspNetCore.Components.WebView.Maui" Version="$(MauiVersion)"/>
+        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.11"/>
         <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="10.0.11"/>
         <PackageReference Include="MudBlazor" Version="9.3.0"/>
     </ItemGroup>
     <ItemGroup>
+        <ProjectReference Include="..\SonglistSpinner.Application\SonglistSpinner.Application.csproj"/>
         <ProjectReference Include="..\SonglistSpinner.Core\SonglistSpinner.Core.csproj"/>
     </ItemGroup>
-    <ItemGroup>
-        <!-- Embed the standalone overlay assets so the local OBS server can serve them from the single executable. -->
-        <EmbeddedResource Include="wwwroot\overlay\Overlay.html"
-                          LogicalName="SonglistSpinner.WebAssets.Overlay.html"/>
-        <EmbeddedResource Include="wwwroot\overlay\SongSpinner.contracts.js"
-                          LogicalName="SonglistSpinner.WebAssets.SongSpinner.contracts.js"/>
-        <EmbeddedResource Include="wwwroot\spinner\spin-wheel-iife.js"
-                          LogicalName="SonglistSpinner.WebAssets.spin-wheel-iife.js"/>
-    </ItemGroup>
+    <!-- The overlay's wwwroot files are embedded in SonglistSpinner.Application, beside LocalOverlayServer. -->
 
     <!--
       .NET 10 adds both the build and publish static-web-asset endpoint manifests
