@@ -65,7 +65,12 @@ function loadOverlayPage({ search = '', reducedMotion = true, framedBy = null } 
         },
         spinWheel: {
             Wheel: class {
-                constructor(container, options) { this.items = options.items; wheels.push(this); }
+                constructor(container, options) {
+                    this.items = options.items;
+                    // The interop styles the canvas of every wheel it builds.
+                    this.canvas = { style: {} };
+                    wheels.push(this);
+                }
                 remove() { }
             }
         },

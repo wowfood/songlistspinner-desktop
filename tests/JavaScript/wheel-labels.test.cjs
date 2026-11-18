@@ -11,7 +11,12 @@ const interopPath = path.resolve(__dirname, '../../src/SonglistSpinner.Desktop/w
 function createWheel(items) {
     const wheels = [];
     class Wheel {
-        constructor(container, options) { this.options = options; wheels.push(this); }
+        constructor(container, options) {
+            this.options = options;
+            // The interop styles the canvas of every wheel it builds.
+            this.canvas = { style: {} };
+            wheels.push(this);
+        }
         remove() { }
     }
     const context = {

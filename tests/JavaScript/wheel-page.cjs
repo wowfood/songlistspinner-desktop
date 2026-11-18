@@ -121,4 +121,14 @@ function canvasTurn(wheel) {
     return Number(match[1]);
 }
 
-module.exports = { loadWheelPage, canvasTurn };
+// The item the pointer is on as the wheel shows: where the wheel is drawn plus the turn on its canvas. The
+// library knows only where it drew the wheel, so this asks a second wheel drawn at the angle shown.
+function itemUnderPointer(wheel) {
+    const reference = loadWheelPage();
+    reference.interop.createWheel(wheel.items.map(item => ({ label: item.label })), []);
+    reference.frame(0);
+    reference.currentWheel().rotation = wheel.rotation + canvasTurn(wheel);
+    return reference.currentWheel().getCurrentIndex();
+}
+
+module.exports = { loadWheelPage, canvasTurn, itemUnderPointer };

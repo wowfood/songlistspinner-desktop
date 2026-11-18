@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { test } = require('node:test');
-const { loadWheelPage, canvasTurn } = require('./wheel-page.cjs');
+const { loadWheelPage, canvasTurn, itemUnderPointer } = require('./wheel-page.cjs');
 
 // The dashboard and the OBS overlay both load SongSpinner.interop.js, which redraws the wheel when its
 // container changes size.
@@ -19,14 +19,13 @@ test('SongSpinner.interop.js: resizing preserves the spinning wheel and final ro
     page.frame(4000);
     const turnAfterResize = canvasTurn(wheel);
     page.frame(6000);
-    const rotationAtRest = wheel.rotation;
+    const turnAtRest = canvasTurn(wheel);
     page.resizeContainer(400);
     page.frame(6500);
 
     assert.equal(page.wheels.length, 1);
     assert.ok(turnAfterResize > turnBeforeResize, 'the spin carries on after the resize');
     assert.equal(wheel.canvas.width, 400);
-    assert.equal(canvasTurn(wheel), 0);
-    assert.equal(wheel.getCurrentIndex(), 1);
-    assert.equal(wheel.rotation, rotationAtRest);
+    assert.equal(canvasTurn(wheel), turnAtRest);
+    assert.equal(itemUnderPointer(wheel), 1);
 });
